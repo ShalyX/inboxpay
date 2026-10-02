@@ -1,0 +1,9 @@
+{
+  "version": 2,
+  "cleanUrls": true,
+  "routes": [
+    { "src": "/api/invoices", "dest": "/api/invoices.js" },
+    { "src": "/api/pay", "dest": "/api/pay.js" },
+    { "handle": "filesystem" }
+  ]
+}

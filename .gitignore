@@ -1,0 +1,16 @@
+node_modules/
+.env
+credentials.json
+credentials.json.json
+gmail-token.json
+gmail-inbox/
+agent-decisions.json
+gmail-scan-result.json
+live-run-result.json
+web-run-result.json
+.next/
+.vercel/
+circle-*.json
+out/
+cache/
+

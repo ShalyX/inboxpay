@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>InboxPay — Autonomous AP</title>
+  <meta name="description" content="Autonomous accounts payable with bounded USDC settlement on Arc.">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="shell">
+    <aside class="sidebar">
+      <div class="brand"><div class="mark">I</div><div><strong>InboxPay</strong><span>autonomous AP</span></div></div>
+      <nav>
+        <button class="nav active"><span>▣</span> Inbox <b id="invoice-count">0</b></button>
+        <button class="nav"><span>↗</span> Payments <b>3</b></button>
+        <button class="nav"><span>◇</span> Policies</button>
+        <button class="nav"><span>≡</span> Audit trail</button>
+      </nav>
+      <div class="sidebar-foot"><div><i class="dot"></i><strong>Arc Testnet</strong></div><small>USDC settlement rail</small></div>
+    </aside>
+
+    <section class="content">
+      <header class="topbar">
+        <div>
+          <div class="eyebrow">● delegated finance operator</div>
+          <h1>Accounts payable, without the handoff.</h1>
+          <p>InboxPay reads the invoice, checks business rules, then settles only what policy permits.</p>
+        </div>
+        <button id="refresh" class="ghost">↻ Refresh inbox</button>
+      </header>
+
+      <section id="stats" class="stats"></section>
+
+      <div class="workspace">
+        <section class="panel queue">
+          <div class="panel-head"><div><label>PAYMENT QUEUE</label><h2>What the agent found</h2></div><span id="queue-count" class="meta">0 invoices</span></div>
+          <div id="invoice-list"></div>
+        </section>
+        <section id="detail" class="panel detail">
+          <div class="empty"><div class="empty-icon">✉</div><h3>Select an invoice</h3><p>The detail view shows the extraction, decision, and policy gates before money can move.</p></div>
+        </section>
+      </div>
+
+      <section class="proof">
+        <article><span class="proof-icon">✓</span><div><strong>Agent decision</strong><p>Explainable checks wrap every model output.</p></div></article>
+        <article><span class="proof-icon">⌁</span><div><strong>Policy vault</strong><p>Duplicate, vendor, daily-limit and cash-floor rules are enforced onchain.</p></div></article>
+        <article><span class="proof-icon">↗</span><div><strong>Arc receipt</strong><p>Settlement ends with a transaction hash and reconciliation record.</p></div></article>
+      </section>
+    </section>
+    <div id="toast" class="toast" hidden></div>
+  </main>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

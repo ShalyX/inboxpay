@@ -1,0 +1,17 @@
+{
+  "name": "inboxpay",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "scan:gmail": "node gmail-bridge.mjs scan",
+    "evaluate": "node agent-evaluator.mjs",
+    "pay:test": "node execute-gmail-payment.mjs"
+  },
+  "dependencies": {
+    "@circle-fin/developer-controlled-wallets": "^10.8.1",
+    "@google-cloud/local-auth": "^2.1.0",
+    "pdf-parse": "^2.4.5",
+    "viem": "^2.57.2"
+  }
+}
