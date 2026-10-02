@@ -2,8 +2,10 @@
   "version": 2,
   "cleanUrls": true,
   "routes": [
+    { "src": "/", "dest": "/index.html" },
     { "src": "/api/invoices", "dest": "/api/invoices.js" },
     { "src": "/api/pay", "dest": "/api/pay.js" },
-    { "handle": "filesystem" }
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/app.mjs" }
   ]
 }
