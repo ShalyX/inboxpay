@@ -1,7 +1,8 @@
 const state = {
   invoices: [],
   selected: null,
-  loading: false
+  loading: false,
+  feedSource: "demo"
 };
 
 const $ = (id) => document.getElementById(id);
@@ -24,6 +25,8 @@ function renderStats() {
   const held = state.invoices.filter((x) => !x.settlement?.reconciled && x.agentDecision !== "PAY_NOW");
   const total = payable.reduce((sum, x) => sum + Number(x.amount || 0), 0);
   $("invoice-count").textContent = state.invoices.length;
+  $("feed-label").textContent = state.feedSource === "gmail-live" ? "live Gmail operator" : "delegated finance operator";
+  $("feed-dot").textContent = state.feedSource === "gmail-live" ? "●" : "○";
   $("payment-count").textContent = settled.length;
   $("queue-count").textContent = state.invoices.length + (state.invoices.length === 1 ? " invoice" : " invoices");
   $("stats").innerHTML = [
@@ -107,6 +110,7 @@ async function load() {
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Invoice data unavailable");
     state.invoices = data.invoices || [];
+    state.feedSource = data.liveGmail ? "gmail-live" : (data.source || "demo");
     state.selected = state.selected
       ? state.invoices.find((x) => x.invoiceNumber === state.selected.invoiceNumber) || null
       : state.invoices[0] || null;
