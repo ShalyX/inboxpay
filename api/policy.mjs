@@ -1,5 +1,6 @@
 import { requireUser, supabaseRest } from "../lib/supabase-server.mjs";
 import { getBusiness } from "../lib/business-data.mjs";
+import { writePolicy } from "../lib/policy-sync.mjs";
 
 const allowedNumbers = new Set([
   "max_transaction_usdc",
@@ -47,6 +48,56 @@ export default async function handler(req, res) {
       if ("max_transaction_usdc" in updates && "daily_limit_usdc" in updates &&
           updates.max_transaction_usdc > updates.daily_limit_usdc) {
         return res.status(400).json({ error: "Per-payment limit cannot exceed the daily limit" });
+      }
+
+      if (business.policy_contract_status === "ready" && business.policy_contract_address) {
+        const maxTx = updates.max_transaction_usdc ?? Number(policy.max_transaction_usdc);
+        const daily = updates.daily_limit_usdc ?? Number(policy.daily_limit_usdc);
+        const floor = updates.cash_floor_usdc ?? Number(policy.cash_floor_usdc);
+
+        if ("max_transaction_usdc" in updates || "daily_limit_usdc" in updates || "cash_floor_usdc" in updates) {
+          const tx = await writePolicy({
+            walletId: business.wallet_id,
+            contractAddress: business.policy_contract_address,
+            abiFunctionSignature: "setPolicy(uint256,uint256,uint256)",
+            abiParameters: [
+              String(Math.round(Number(maxTx) * 1e6)),
+              String(Math.round(Number(daily) * 1e6)),
+              String(Math.round(Number(floor) * 1e6))
+            ]
+          });
+          await supabaseRest("audit_events", {
+            token,
+            method: "POST",
+            body: {
+              user_id: user.id,
+              business_id: business.id,
+              event_type: "policy_updated_onchain",
+              actor: "user",
+              data: { tx_hash: tx.txHash, max_transaction_usdc: maxTx, daily_limit_usdc: daily, cash_floor_usdc: floor }
+            }
+          });
+        }
+
+        if ("paused" in updates) {
+          const tx = await writePolicy({
+            walletId: business.wallet_id,
+            contractAddress: business.policy_contract_address,
+            abiFunctionSignature: "setPaused(bool)",
+            abiParameters: [String(Boolean(updates.paused))]
+          });
+          await supabaseRest("audit_events", {
+            token,
+            method: "POST",
+            body: {
+              user_id: user.id,
+              business_id: business.id,
+              event_type: "policy_pause_updated",
+              actor: "user",
+              data: { tx_hash: tx.txHash, paused: Boolean(updates.paused) }
+            }
+          });
+        }
       }
 
       updates.updated_at = new Date().toISOString();
