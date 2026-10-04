@@ -35,7 +35,7 @@ export default async function handler(req, res) {
           name,
           recipient_address: recipientAddress,
           currency,
-          status: "verified"
+          status: "review"
         }
       });
       return res.status(201).json({ vendor: rows?.[0] || null });
