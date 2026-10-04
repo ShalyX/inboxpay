@@ -77,7 +77,10 @@ async function signup() {
     const { data, error } = await state.supabase.auth.signUp({
       email,
       password,
-      options: { data: { business_name: email.split("@")[1] || "My Business" } }
+      options: {
+        emailRedirectTo: window.location.origin + "/",
+        data: { business_name: email.split("@")[1] || "My Business" }
+      }
     });
     if (error) throw error;
     if (!data.session) {
