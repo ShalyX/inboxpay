@@ -82,7 +82,11 @@ function renderDetail() {
     checkRow("Currency rail", invoice.currency === "USDC" ? "USDC" : invoice.currency) +
     checkRow("Vendor registry", settled || ready ? "Verified" : "Check required") +
     checkRow("Payment policy", settled ? "Executed" : ready ? "Within limits" : "Blocked by policy") +
-    '</div>' + (settled && invoice.settlement?.paymentTxHash ? '<div class="settlement"><span>Arc transaction</span><a href="https://explorer.arc.io/tx/' + invoice.settlement.paymentTxHash + '" target="_blank" rel="noreferrer">' + invoice.settlement.paymentTxHash.slice(0, 18) + '…</a><b>Reconciliation PASS</b></div>' : "") +
+    '</div>' + (settled
+      ? invoice.settlement?.paymentTxHash
+        ? '<div class="settlement"><span>Arc transaction</span><a href="https://explorer.arc.io/tx/' + invoice.settlement.paymentTxHash + '" target="_blank" rel="noreferrer">' + invoice.settlement.paymentTxHash.slice(0, 18) + '…</a><b>Reconciliation PASS</b></div>'
+        : '<div class="settlement"><span>Arc confirmation</span><b>Vault state confirmed · reconciliation PASS</b></div>'
+      : "") +
     '<button id="pay-button" class="pay"' + (ready ? "" : " disabled") +
     '>' + (ready ? "Settle invoice on Arc ↗" : settled ? "Settled on Arc ✓" : "Payment blocked") + '</button></div>';
 
