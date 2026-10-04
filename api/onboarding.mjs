@@ -5,6 +5,76 @@ function slugify(value) {
   return slug.slice(0, 48) || "business";
 }
 
+async function findBusiness(token, userId) {
+  const rows = await supabaseRest(
+    "businesses?select=*&owner_user_id=eq." + encodeURIComponent(userId) + "&limit=1",
+    { token }
+  );
+  return rows?.[0] || null;
+}
+
+async function ensureBusiness(token, user) {
+  const existing = await findBusiness(token, user.id);
+  if (existing) return existing;
+
+  const name = String(user.user_metadata?.business_name || user.email?.split("@")[1] || "My Business").trim() || "My Business";
+
+  try {
+    const created = await supabaseRest("businesses", {
+      token,
+      method: "POST",
+      body: {
+        owner_user_id: user.id,
+        name,
+        slug: slugify(name) + "-" + user.id.slice(0, 8)
+      }
+    });
+    return created?.[0] || null;
+  } catch (error) {
+    // Another bootstrap request can win the unique owner_user_id insert.
+    // Treat that conflict as success and load the business that now exists.
+    if (error instanceof Error && /^Supabase 409:/i.test(error.message)) {
+      return findBusiness(token, user.id);
+    }
+    throw error;
+  }
+}
+
+async function ensurePolicy(token, userId, businessId) {
+  const policies = await supabaseRest(
+    "policies?select=*&user_id=eq." + encodeURIComponent(userId) + "&limit=1",
+    { token }
+  );
+  if (policies?.[0]) return policies[0];
+
+  try {
+    const created = await supabaseRest("policies", {
+      token,
+      method: "POST",
+      body: {
+        user_id: userId,
+        business_id: businessId,
+        max_transaction_usdc: 1000,
+        daily_limit_usdc: 5000,
+        cash_floor_usdc: 20,
+        require_verified_vendor: true,
+        paused: false
+      }
+    });
+    return created?.[0] || null;
+  } catch (error) {
+    // Same idempotency rule for concurrent policy initialization.
+    if (error instanceof Error && /^Supabase 409:/i.test(error.message)) {
+      const rows = await supabaseRest(
+        "policies?select=*&user_id=eq." + encodeURIComponent(userId) + "&limit=1",
+        { token }
+      );
+      return rows?.[0] || null;
+    }
+    throw error;
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
@@ -15,11 +85,7 @@ export default async function handler(req, res) {
     const { token, user } = await requireUser(req);
 
     if (req.body?.action === "provision_wallet") {
-      const businessRows = await supabaseRest(
-        "businesses?select=*&owner_user_id=eq." + encodeURIComponent(user.id) + "&limit=1",
-        { token }
-      );
-      const business = businessRows?.[0];
+      const business = await findBusiness(token, user.id);
       if (!business) return res.status(409).json({ error: "Complete business onboarding first" });
       if (business.wallet_id) return res.status(200).json({ business });
 
@@ -77,53 +143,14 @@ export default async function handler(req, res) {
       }
     }
 
-    const requestedName = String(req.body?.businessName || "").trim();
-    const name = requestedName || user.user_metadata?.business_name || user.email?.split("@")[1] || "My Business";
+    const business = await ensureBusiness(token, user);
+    if (!business) throw new Error("Unable to create or load InboxPay business");
 
-    const existing = await supabaseRest(
-      "businesses?select=*&owner_user_id=eq." + encodeURIComponent(user.id) + "&limit=1",
-      { token }
-    );
-
-    let business = existing?.[0];
-    if (!business) {
-      const created = await supabaseRest("businesses", {
-        token,
-        method: "POST",
-        body: {
-          owner_user_id: user.id,
-          name,
-          slug: slugify(name) + "-" + user.id.slice(0, 8)
-        }
-      });
-      business = created?.[0];
-    }
-
-    if (!business) throw new Error("Unable to create InboxPay business");
+    const policy = await ensurePolicy(token, user.id, business.id);
+    if (!policy) throw new Error("Unable to create or load InboxPay policy");
 
     // Wallet creation is a separate explicit business action.
     // This avoids silently creating mainnet state during account sign-in.
-
-
-    const policies = await supabaseRest(
-      "policies?select=*&user_id=eq." + encodeURIComponent(user.id) + "&limit=1",
-      { token }
-    );
-    if (!policies?.[0]) {
-      await supabaseRest("policies", {
-        token,
-        method: "POST",
-        body: {
-          user_id: user.id,
-          business_id: business.id,
-          max_transaction_usdc: 1000,
-          daily_limit_usdc: 5000,
-          cash_floor_usdc: 20,
-          require_verified_vendor: true,
-          paused: false
-        }
-      });
-    }
 
     return res.status(200).json({
       business,
