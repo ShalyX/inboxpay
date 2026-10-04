@@ -35,7 +35,21 @@ The app expects the resulting RPC as ARC_RPC_URL or the exported RPC value.
 
 Circle credentials are read from the existing local environment. For production, configure CIRCLE_API_KEY, CIRCLE_ENTITY_SECRET, CIRCLE_WALLET_ID, CIRCLE_WALLET_ADDRESS, PAYMENT_VAULT_ADDRESS, and ARC_RPC_URL.
 
-Gmail scanning:
+### Live Gmail mode
+
+Production can read Gmail directly without storing inbox contents in the repository. Configure these Vercel Production environment variables:
+
+- GMAIL_CLIENT_ID
+- GMAIL_CLIENT_SECRET
+- GMAIL_REFRESH_TOKEN
+
+The refresh token must come from a Google OAuth flow that grants offline access. InboxPay uses that refresh token server-side to obtain short-lived Gmail access tokens when the invoice queue is requested.
+
+InboxPay then uses the Gmail API search query to find candidate invoice messages, fetches full message data, parses invoice PDFs when attached, groups email/PDF evidence, and runs the same deterministic evaluator used by the local CLI.
+
+When those Gmail variables are absent, production falls back to the checked-in redacted demo fixture; it never writes private Gmail data to the repository.
+
+### Local Gmail scanning
 
 npm run scan:gmail
 npm run evaluate
