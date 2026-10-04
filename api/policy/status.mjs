@@ -1,6 +1,8 @@
 import { requireUser, supabaseRest } from "../../lib/supabase-server.mjs";
 import { getBusiness } from "../../lib/business-data.mjs";
 import { getBusinessPolicyVault, getWalletTransaction } from "../../lib/policy-contract.mjs";
+import { policyClient } from "../../lib/policy-sync.mjs";
+import { parseAbi } from "viem";
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
@@ -33,6 +35,18 @@ export default async function handler(req, res) {
     }
 
     const address = contract?.contractAddress || contract?.address || null;
+    let allowance = null;
+    if (address && business.wallet_address) {
+      try {
+        const client = policyClient(business.wallet_blockchain);
+        allowance = await client.readContract({
+          address: "0x3600000000000000000000000000000000000000",
+          abi: parseAbi(["function allowance(address owner,address spender) view returns (uint256)"]),
+          functionName: "allowance",
+          args: [business.wallet_address, address]
+        });
+      } catch {}
+    }
     const deploymentStatus = contract?.deploymentStatus || "UNKNOWN";
     let status = business.policy_contract_status;
 
@@ -60,7 +74,13 @@ export default async function handler(req, res) {
       });
     }
 
-    return res.status(200).json({ status, business, contract, transaction });
+    return res.status(200).json({
+      status,
+      business,
+      contract,
+      transaction,
+      allowance: allowance === null ? null : String(allowance)
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Policy status unavailable";
     return res.status(/Authentication required|Invalid or expired/i.test(message) ? 401 : 500).json({ error: message });
