@@ -516,3 +516,27 @@ async function init() {
 
     const { data } = await state.supabase.auth.getSession();
     state.session = data.session;
+
+    if (!state.session) {
+      showAuth();
+      return;
+    }
+
+    state.user = state.session.user;
+    await bootstrap();
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("gmail") === "connected") {
+      toast("Business Gmail connected");
+      history.replaceState({}, "", "/");
+    } else if (params.get("gmail") === "error") {
+      toast(params.get("message") || "Gmail connection failed");
+      history.replaceState({}, "", "/");
+    }
+  } catch (error) {
+    showAuth();
+    setAuthMessage(error.message || "InboxPay failed to initialize", true);
+  }
+}
+
+init();
