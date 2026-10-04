@@ -141,6 +141,7 @@ async function loadPolicyStatus() {
     if (!response.ok) throw new Error(data.error || "Policy status unavailable");
     state.business = data.business || state.business;
     state.policy = data.contract || null;
+    state.policyAllowance = data.allowance ? BigInt(data.allowance) > 0n : false;
   } catch (error) {
     state.policy = null;
   }
