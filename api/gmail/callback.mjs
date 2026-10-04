@@ -85,7 +85,9 @@ export default async function handler(req, res) {
       provider: "google_gmail",
       provider_account_id: googleUser.sub,
       access_token_encrypted: encryptSecret(tokens.access_token),
-      refresh_token_encrypted: encryptSecret(tokens.refresh_token || ""),
+      refresh_token_encrypted: tokens.refresh_token
+        ? encryptSecret(tokens.refresh_token)
+        : existing?.[0]?.refresh_token_encrypted || "",
       token_expires_at: new Date(Date.now() + Number(tokens.expires_in || 3600) * 1000).toISOString(),
       scopes: String(tokens.scope || "").split(" ").filter(Boolean),
       status: "connected",
