@@ -84,7 +84,7 @@ export default async function handler(req, res) {
             walletId: business.wallet_id,
             contractAddress: business.policy_contract_address,
             abiFunctionSignature: "setPaused(bool)",
-            abiParameters: [String(Boolean(updates.paused))]
+            abiParameters: [Boolean(updates.paused)]
           });
           await supabaseRest("audit_events", {
             token,
