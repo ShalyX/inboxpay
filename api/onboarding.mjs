@@ -61,7 +61,14 @@ export default async function handler(req, res) {
       });
     }
 
-    return res.status(200).json({ business });
+    return res.status(200).json({
+      business,
+      onboarding: {
+        walletRequired: !business.wallet_id,
+        gmailRequired: true,
+        policyVaultRequired: !business.policy_contract_address
+      }
+    });
   } catch (error) {
     console.error("InboxPay onboarding failed:", error);
     return res.status(500).json({
