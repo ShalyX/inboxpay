@@ -10,6 +10,7 @@ const state = {
   feedSource: "gmail-live",
   gmail: null,
   wallet: null,
+  policy: null,
   vendors: []
 };
 
@@ -122,6 +123,8 @@ async function bootstrap() {
   const wallet = await walletResponse.json();
   if (walletResponse.ok) state.wallet = wallet;
 
+  await loadPolicyStatus();
+
   renderAccount();
   renderSetup();
   await load();
@@ -131,10 +134,22 @@ function shortAddress(address) {
   return address ? address.slice(0, 8) + "…" + address.slice(-6) : "Wallet provisioning…";
 }
 
+async function loadPolicyStatus() {
+  try {
+    const response = await apiFetch("/api/policy/status");
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Policy status unavailable");
+    state.business = data.business || state.business;
+    state.policy = data.contract || null;
+  } catch (error) {
+    state.policy = null;
+  }
+}
+
 function renderAccount() {
   $("business-name").textContent = state.business?.name || "Business";
   $("wallet-address").textContent = state.business?.wallet_address
-    ? "Circle wallet · " + shortAddress(state.business.wallet_address) +
+    ? (state.business.wallet_blockchain || "Arc") + " · Circle wallet · " + shortAddress(state.business.wallet_address) +
       (state.wallet ? " · " + Number(state.wallet.balance || 0).toFixed(2) + " USDC" : "")
     : "Wallet provisioning…";
   $("connect-gmail").textContent = state.gmail?.status === "connected" ? "Gmail connected ✓" : "Connect Gmail";
@@ -147,7 +162,9 @@ function renderSetup() {
   const node = $("setup-card");
   const gmailReady = state.gmail?.status === "connected";
   const walletReady = state.business?.wallet_status === "ready";
-  if (gmailReady && walletReady) {
+  const policyReady = state.business?.policy_contract_status === "ready" && Boolean(state.business?.policy_contract_address);
+
+  if (gmailReady && walletReady && policyReady) {
     node.hidden = true;
     return;
   }
@@ -156,14 +173,68 @@ function renderSetup() {
   node.innerHTML =
     '<div><label>SETUP</label><h3>Finish connecting your business</h3><p>' +
     (!walletReady ? "InboxPay is provisioning your dedicated Circle wallet. " : "") +
-    (!gmailReady ? "Connect the Gmail inbox your business actually uses for invoices." : "") +
+    (!gmailReady ? "Connect the Gmail inbox your business actually uses for invoices. " : "") +
+    (!policyReady ? "Deploy the business policy guard before autonomous payments can run. " : "") +
     '</p></div><div class="setup-status">' +
     '<span class="' + (walletReady ? "done" : "") + '">✓ Dedicated Circle wallet</span>' +
     '<span class="' + (gmailReady ? "done" : "") + '">✓ Business Gmail</span>' +
-    (walletReady && Number(state.wallet?.balance || 0) === 0
-      ? '<span>○ Fund the business wallet with USDC</span>'
-      : "") +
+    '<span class="' + (policyReady ? "done" : "") + '">✓ Onchain payment policy</span>' +
+    (!policyReady
+      ? '<button id="deploy-policy" class="ghost">' + (state.business?.policy_contract_status === "deploying" ? "Policy deployment running…" : "Deploy policy guard") + '</button>'
+      : '<span class="setup-contract">Vault · ' + shortAddress(state.business.policy_contract_address) +
+        (state.wallet?.policyVaultBalance != null ? " · " + Number(state.wallet.policyVaultBalance).toFixed(2) + " USDC" : "") +
+        '</span>') +
     '</div>';
+
+  if (!policyReady && state.business?.policy_contract_status !== "deploying") {
+    $("deploy-policy").addEventListener("click", deployPolicy);
+  }
+}
+
+async function deployPolicy() {
+  const button = $("deploy-policy");
+  if (button) {
+    button.disabled = true;
+    button.textContent = "Starting deployment…";
+  }
+  try {
+    const response = await apiFetch("/api/policy/deploy", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({})
+    });
+    const data = await response.json();
+    if (response.status === 409 && data.confirmation) {
+      const ok = window.confirm(
+        "Deploy InboxPay's policy vault on " + data.confirmation.network +
+        "?\n\nWallet: " + data.confirmation.wallet +
+        "\nToken: " + data.confirmation.token
+      );
+      if (!ok) return;
+      const retry = await apiFetch("/api/policy/deploy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmMainnet: true })
+      });
+      const retryData = await retry.json();
+      if (!retry.ok) throw new Error(retryData.error || "Policy deployment failed");
+      state.business = retryData.business || state.business;
+    } else if (!response.ok) {
+      throw new Error(data.error || "Policy deployment failed");
+    } else {
+      state.business = data.business || state.business;
+    }
+
+    toast("Policy guard deployment started");
+    await loadPolicyStatus();
+    renderAccount();
+    renderSetup();
+  } catch (error) {
+    toast(error.message);
+    await loadPolicyStatus();
+    renderAccount();
+    renderSetup();
+  }
 }
 
 function renderStats() {
@@ -426,40 +497,22 @@ async function init() {
       load();
     });
 
-    state.supabase.auth.onAuthStateChange((_event, session) => {
+    state.supabase.auth.onAuthStateChange((event, session) => {
       state.session = session;
-      if (!session) {
+      if (event === "SIGNED_OUT") {
         state.user = null;
         state.business = null;
         state.gmail = null;
+        state.wallet = null;
+        state.policy = null;
         showAuth();
         return;
       }
-      state.user = session.user;
-      bootstrap().catch((error) => toast(error.message));
+      if (event === "SIGNED_IN" && session) {
+        state.user = session.user;
+        bootstrap().catch((error) => toast(error.message));
+      }
     });
 
     const { data } = await state.supabase.auth.getSession();
     state.session = data.session;
-    if (!state.session) {
-      showAuth();
-      return;
-    }
-    state.user = state.session.user;
-    await bootstrap();
-
-    const params = new URLSearchParams(window.location.search);
-    if (params.get("gmail") === "connected") {
-      toast("Business Gmail connected");
-      history.replaceState({}, "", "/");
-    } else if (params.get("gmail") === "error") {
-      toast(params.get("message") || "Gmail connection failed");
-      history.replaceState({}, "", "/");
-    }
-  } catch (error) {
-    showAuth();
-    setAuthMessage(error.message || "InboxPay failed to initialize", true);
-  }
-}
-
-init();
