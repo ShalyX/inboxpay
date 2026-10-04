@@ -61,7 +61,8 @@ export default async function handler(req, res) {
         walletAddress: business.wallet_address,
         maxTransaction: policy.max_transaction_usdc,
         dailyLimit: policy.daily_limit_usdc,
-        cashFloor: policy.cash_floor_usdc
+        cashFloor: policy.cash_floor_usdc,
+        blockchain: business.wallet_blockchain
       });
 
       const updated = await supabaseRest(
