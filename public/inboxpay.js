@@ -133,9 +133,9 @@ async function settle() {
       body: JSON.stringify({ invoiceNumber: invoice.invoiceNumber })
     });
     const data = await response.json();
-    if (!response.ok || !data.ok) throw new Error(data.message || "Settlement failed");
+    if (!response.ok || !data.ok) throw new Error(data.error || data.message || "Settlement failed");
     toast("Paid " + data.result.amount + " — " + data.result.paymentTxHash.slice(0, 10) + "…");
-    $("pay-button").textContent = "Settled on Arc ✓";
+    await load();
   } catch (error) {
     toast(error.message);
     $("pay-button").disabled = false;
