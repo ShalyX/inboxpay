@@ -8,7 +8,8 @@ const state = {
   invoices: [],
   selected: null,
   feedSource: "gmail-live",
-  gmail: null
+  gmail: null,
+  wallet: null
 };
 
 const $ = (id) => document.getElementById(id);
@@ -116,6 +117,10 @@ async function bootstrap() {
   const session = await sessionResponse.json();
   if (sessionResponse.ok) state.gmail = session.gmail;
 
+  const walletResponse = await apiFetch("/api/wallet");
+  const wallet = await walletResponse.json();
+  if (walletResponse.ok) state.wallet = wallet;
+
   renderAccount();
   renderSetup();
   await load();
@@ -128,7 +133,8 @@ function shortAddress(address) {
 function renderAccount() {
   $("business-name").textContent = state.business?.name || "Business";
   $("wallet-address").textContent = state.business?.wallet_address
-    ? "Circle wallet · " + shortAddress(state.business.wallet_address)
+    ? "Circle wallet · " + shortAddress(state.business.wallet_address) +
+      (state.wallet ? " · " + Number(state.wallet.balance || 0).toFixed(2) + " USDC" : "")
     : "Wallet provisioning…";
   $("connect-gmail").textContent = state.gmail?.status === "connected" ? "Gmail connected ✓" : "Connect Gmail";
   $("connect-gmail").disabled = state.gmail?.status === "connected";
@@ -152,7 +158,11 @@ function renderSetup() {
     (!gmailReady ? "Connect the Gmail inbox your business actually uses for invoices." : "") +
     '</p></div><div class="setup-status">' +
     '<span class="' + (walletReady ? "done" : "") + '">✓ Dedicated Circle wallet</span>' +
-    '<span class="' + (gmailReady ? "done" : "") + '">✓ Business Gmail</span></div>';
+    '<span class="' + (gmailReady ? "done" : "") + '">✓ Business Gmail</span>' +
+    (walletReady && Number(state.wallet?.balance || 0) === 0
+      ? '<span>○ Fund the business wallet with USDC</span>'
+      : "") +
+    '</div>';
 }
 
 function renderStats() {
