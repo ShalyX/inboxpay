@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node server.mjs",
+    "start": "node dev-server.mjs",
     "scan:gmail": "node gmail-bridge.mjs scan",
     "evaluate": "node agent-evaluator.mjs",
     "pay:test": "node execute-gmail-payment.mjs",
