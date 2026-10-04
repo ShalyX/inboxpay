@@ -216,7 +216,7 @@ async function provisionWallet() {
     const response = await apiFetch("/api/wallet/provision", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: { network }
+      body: JSON.stringify({ network })
     });
     const data = await response.json();
 
