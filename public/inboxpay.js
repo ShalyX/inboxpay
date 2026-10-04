@@ -109,7 +109,7 @@ async function bootstrap() {
   const response = await apiFetch("/api/onboarding", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({})
+    body: JSON.stringify({ action: "approve" })
   });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || "Business onboarding failed");
@@ -136,7 +136,7 @@ function shortAddress(address) {
 
 async function loadPolicyStatus() {
   try {
-    const response = await apiFetch("/api/policy/status");
+    const response = await apiFetch("/api/policy?view=status");
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Policy status unavailable");
     state.business = data.business || state.business;
@@ -213,10 +213,10 @@ async function provisionWallet() {
   button.textContent = "Creating wallet…";
 
   try {
-    const response = await apiFetch("/api/wallet/provision", {
+    const response = await apiFetch("/api/onboarding", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ network })
+      body: JSON.stringify({ action: "provision_wallet", network })
     });
     const data = await response.json();
 
@@ -229,7 +229,7 @@ async function provisionWallet() {
       const retry = await apiFetch("/api/wallet/provision", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ network, confirmMainnet: true })
+        body: JSON.stringify({ action: "provision_wallet", network, confirmMainnet: true })
       });
       const retryData = await retry.json();
       if (!retry.ok) throw new Error(retryData.error || "Wallet creation failed");
