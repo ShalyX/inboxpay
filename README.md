@@ -2,7 +2,7 @@
 
 InboxPay is an autonomous accounts-payable operator built for Tameion.
 
-It watches Gmail for invoices, extracts the payable facts, applies deterministic business checks around the agent decision, and settles approved USDC invoices through Circle's developer-controlled wallet on Arc Mainnet.
+Each business gets its own InboxPay account, Gmail integration, AP policy, vendor registry, and Circle developer-controlled wallet. The agent reads the business's real invoice inbox, makes a bounded payment decision, and settles approved USDC invoices from that business wallet on Arc Mainnet.
 
 ## The product
 
@@ -35,19 +35,13 @@ The app expects the resulting RPC as ARC_RPC_URL or the exported RPC value.
 
 Circle credentials are read from the existing local environment. For production, configure CIRCLE_API_KEY, CIRCLE_ENTITY_SECRET, CIRCLE_WALLET_ID, CIRCLE_WALLET_ADDRESS, PAYMENT_VAULT_ADDRESS, and ARC_RPC_URL.
 
-### Live Gmail mode
+### Gmail integration
 
-Production can read Gmail directly without storing inbox contents in the repository. Configure these Vercel Production environment variables:
+Users do not enter Gmail client IDs, client secrets, or refresh tokens. After signing into InboxPay, they click **Connect Gmail** and complete a Google OAuth consent flow for the Gmail account that actually carries the business's invoices.
 
-- GMAIL_CLIENT_ID
-- GMAIL_CLIENT_SECRET
-- GMAIL_REFRESH_TOKEN
+The OAuth callback binds the Google connection to the authenticated InboxPay user, encrypts the provider tokens before persistence, and stores only the minimum integration metadata in Supabase. Invoice bodies and PDF contents are never written to Git.
 
-The refresh token must come from a Google OAuth flow that grants offline access. InboxPay uses that refresh token server-side to obtain short-lived Gmail access tokens when the invoice queue is requested.
-
-InboxPay then uses the Gmail API search query to find candidate invoice messages, fetches full message data, parses invoice PDFs when attached, groups email/PDF evidence, and runs the same deterministic evaluator used by the local CLI.
-
-When those Gmail variables are absent, production falls back to the checked-in redacted demo fixture; it never writes private Gmail data to the repository.
+Google refresh tokens are used only server-side to refresh short-lived access tokens when InboxPay syncs the user's inbox.
 
 ### Local Gmail scanning
 
@@ -60,9 +54,11 @@ npm start
 
 Then open http://localhost:3000.
 
-## Payment guardrails
+## Multi-business execution
 
-The execution route refuses invoices unless the evaluator has marked them PAY_NOW, the currency is USDC, and the vendor is verified.
+Every business owns a separate Circle wallet. The agent never selects a global treasury wallet at runtime.
+
+The execution route refuses invoices unless the evaluator has marked them PAY_NOW, the currency is USDC, the business is not paused, the vendor is verified, the payment is inside the business's per-transaction and daily limits, and the business wallet remains above its configured cash floor.
 
 Before settlement, the contract is checked for:
 - duplicate payment ID
@@ -78,7 +74,9 @@ The payment receipt is reconciled against the vendor balance after the Arc trans
 
 This repo is intentionally framework-light: static HTML/CSS/JS in `public/` plus native Vercel Node functions under `api/`. There is no frontend build step. `dev-server.mjs` is for local development only; production API traffic goes directly to the Vercel functions.
 
-Set the production secrets in Vercel, deploy, and keep the Canteen RPC unique to the project. Do not commit Gmail tokens, Circle wallet exports, OAuth credentials, local invoice files, or evaluator output.
+Set the infrastructure secrets in Vercel, including Circle credentials, Supabase configuration, Gmail OAuth client credentials, and token-encryption secrets. Users supply their own OAuth consent through the product; they never configure infrastructure secrets.
+
+Do not commit Gmail tokens, Circle wallet exports, OAuth credentials, local invoice files, or evaluator output.
 
 ## Hackathon proof
 
@@ -94,3 +92,14 @@ The live demo uses the same mainnet USDC rail and reads settlement state directl
 
 Tameion final submission requires a public GitHub repository and a recorded demo under three minutes. A live product URL is encouraged.
 
+
+
+## Product onboarding
+
+1. A business creates an InboxPay account.
+2. InboxPay provisions a dedicated Circle developer-controlled wallet and records its wallet address.
+3. The business connects the Gmail account used for invoices.
+4. The business registers vendor settlement addresses and configures AP limits.
+5. InboxPay continuously evaluates real invoice evidence and settles approved USDC payments from that business wallet.
+
+The hackathon evaluates genuine business usage and real USDC activity during the event window, so the production path intentionally requires a real connected business inbox rather than a synthetic invoice dataset.
