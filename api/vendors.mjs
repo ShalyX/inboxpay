@@ -1,5 +1,7 @@
 import { requireUser, supabaseRest } from "../lib/supabase-server.mjs";
 import { getBusiness } from "../lib/business-data.mjs";
+import { writePolicy } from "../lib/policy-sync.mjs";
+import { keccak256 } from "viem";
 
 export default async function handler(req, res) {
   try {
@@ -21,11 +23,40 @@ export default async function handler(req, res) {
       if (!id || !["verified", "review", "blocked"].includes(status)) {
         return res.status(400).json({ error: "Vendor id and valid status are required" });
       }
+      const existingRows = await supabaseRest(
+        "vendors?select=*&id=eq." + encodeURIComponent(id) + "&business_id=eq." + encodeURIComponent(business.id) + "&limit=1",
+        { token }
+      );
+      const vendor = existingRows?.[0];
+      if (!vendor) return res.status(404).json({ error: "Vendor not found" });
+
+      if (business.policy_contract_status === "ready" && business.policy_contract_address) {
+        const vendorId = keccak256(new TextEncoder().encode("vendor:" + vendor.name));
+        const recipient = status === "verified" ? vendor.recipient_address : "0x0000000000000000000000000000000000000000";
+        const tx = await writePolicy({
+          walletId: business.wallet_id,
+          contractAddress: business.policy_contract_address,
+          abiFunctionSignature: "setVendor(bytes32,address)",
+          abiParameters: [vendorId, recipient]
+        });
+        await supabaseRest("audit_events", {
+          token,
+          method: "POST",
+          body: {
+            user_id: user.id,
+            business_id: business.id,
+            event_type: "vendor_policy_updated",
+            actor: "user",
+            data: { vendor: vendor.name, status, tx_hash: tx.txHash }
+          }
+        });
+      }
+
       const rows = await supabaseRest(
         "vendors?id=eq." + encodeURIComponent(id) + "&business_id=eq." + encodeURIComponent(business.id),
         { token, method: "PATCH", body: { status, updated_at: new Date().toISOString() } }
       );
-      return res.status(200).json({ vendor: rows?.[0] || null });
+      return res.status(200).json({ vendor: rows?.[0] || { ...vendor, status } });
     }
 
     if (req.method === "POST") {
