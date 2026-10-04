@@ -39,7 +39,32 @@ export default async function handler(req, res) {
     if (!business) throw new Error("Unable to create InboxPay business");
 
     if (!business.wallet_id) {
-      const wallet = await createBusinessWallet(business.id, business.name);
+      await supabaseRest(
+        "businesses?id=eq." + encodeURIComponent(business.id),
+        {
+          token,
+          method: "PATCH",
+          body: { wallet_status: "provisioning", wallet_error: null, updated_at: new Date().toISOString() }
+        }
+      );
+      let wallet;
+      try {
+        wallet = await createBusinessWallet(business.id, business.name);
+      } catch (walletError) {
+        await supabaseRest(
+          "businesses?id=eq." + encodeURIComponent(business.id),
+          {
+            token,
+            method: "PATCH",
+            body: {
+              wallet_status: "error",
+              wallet_error: walletError instanceof Error ? walletError.message : String(walletError),
+              updated_at: new Date().toISOString()
+            }
+          }
+        );
+        throw walletError;
+      }
       const updated = await supabaseRest(
         "businesses?id=eq." + encodeURIComponent(business.id),
         {
