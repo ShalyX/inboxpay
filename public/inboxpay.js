@@ -237,6 +237,43 @@ function toast(message) {
   toast.timer = window.setTimeout(() => $("toast").hidden = true, 3200);
 }
 
+function openVendorModal() {
+  $("vendor-modal").hidden = false;
+  $("vendor-name").focus();
+}
+
+function closeVendorModal() {
+  $("vendor-modal").hidden = true;
+}
+
+async function addVendor(event) {
+  event.preventDefault();
+  const submit = $("vendor-submit");
+  submit.disabled = true;
+  $("vendor-message").textContent = "Saving vendor…";
+  try {
+    const response = await apiFetch("/api/vendors", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: $("vendor-name").value.trim(),
+        recipientAddress: $("vendor-address").value.trim()
+      })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Unable to add vendor");
+    $("vendor-message").textContent = "Vendor added. Refresh the inbox to re-evaluate matching invoices.";
+    $("vendor-form").reset();
+    window.setTimeout(closeVendorModal, 800);
+    await load();
+  } catch (error) {
+    $("vendor-message").textContent = error.message;
+    $("vendor-message").className = "auth-message error";
+  } finally {
+    submit.disabled = false;
+  }
+}
+
 async function connectGmail() {
   try {
     const response = await apiFetch("/api/gmail/start");
@@ -313,6 +350,9 @@ async function init() {
     $("auth-form").addEventListener("submit", authSubmit);
     $("auth-signup").addEventListener("click", signup);
     $("connect-gmail").addEventListener("click", connectGmail);
+    $("add-vendor").addEventListener("click", openVendorModal);
+    $("close-vendor").addEventListener("click", closeVendorModal);
+    $("vendor-form").addEventListener("submit", addVendor);
     $("sign-out").addEventListener("click", async () => {
       await state.supabase.auth.signOut();
     });
