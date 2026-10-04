@@ -1,5 +1,4 @@
 import { requireUser, supabaseRest } from "../lib/supabase-server.mjs";
-import { createBusinessWallet } from "../lib/circle-wallets.mjs";
 
 function slugify(value) {
   const slug = String(value || "business").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
@@ -38,51 +37,9 @@ export default async function handler(req, res) {
 
     if (!business) throw new Error("Unable to create InboxPay business");
 
-    if (!business.wallet_id) {
-      await supabaseRest(
-        "businesses?id=eq." + encodeURIComponent(business.id),
-        {
-          token,
-          method: "PATCH",
-          body: { wallet_status: "provisioning", wallet_error: null, updated_at: new Date().toISOString() }
-        }
-      );
-      let wallet;
-      try {
-        wallet = await createBusinessWallet(business.id, business.name);
-      } catch (walletError) {
-        await supabaseRest(
-          "businesses?id=eq." + encodeURIComponent(business.id),
-          {
-            token,
-            method: "PATCH",
-            body: {
-              wallet_status: "error",
-              wallet_error: walletError instanceof Error ? walletError.message : String(walletError),
-              updated_at: new Date().toISOString()
-            }
-          }
-        );
-        throw walletError;
-      }
-      const updated = await supabaseRest(
-        "businesses?id=eq." + encodeURIComponent(business.id),
-        {
-          token,
-          method: "PATCH",
-          body: {
-            wallet_set_id: wallet.walletSetId,
-            wallet_id: wallet.walletId,
-            wallet_address: wallet.walletAddress,
-            wallet_blockchain: wallet.walletBlockchain,
-            wallet_status: "ready",
-            wallet_error: null,
-            updated_at: new Date().toISOString()
-          }
-        }
-      );
-      business = updated?.[0] || { ...business, ...wallet, wallet_status: "ready" };
-    }
+    // Wallet creation is a separate explicit business action.
+    // This avoids silently creating mainnet state during account sign-in.
+
 
     const policies = await supabaseRest(
       "policies?select=*&user_id=eq." + encodeURIComponent(user.id) + "&limit=1",
