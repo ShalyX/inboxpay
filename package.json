@@ -5,9 +5,7 @@
   "scripts": {
     "start": "node dev-server.mjs",
     "scan:gmail": "node gmail-bridge.mjs scan",
-    "evaluate": "node agent-evaluator.mjs",
-    "pay:test": "node execute-gmail-payment.mjs",
-    "pay:mainnet": "node execute-gmail-payment-mainnet.mjs"
+    "evaluate": "node agent-evaluator.mjs"
   },
   "dependencies": {
     "@circle-fin/developer-controlled-wallets": "^10.8.1",
