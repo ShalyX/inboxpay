@@ -9,7 +9,8 @@ const state = {
   selected: null,
   feedSource: "gmail-live",
   gmail: null,
-  wallet: null
+  wallet: null,
+  vendors: []
 };
 
 const $ = (id) => document.getElementById(id);
@@ -247,9 +248,63 @@ function toast(message) {
   toast.timer = window.setTimeout(() => $("toast").hidden = true, 3200);
 }
 
-function openVendorModal() {
+async function openVendorModal() {
   $("vendor-modal").hidden = false;
   $("vendor-name").focus();
+  await loadVendors();
+}
+
+async function loadVendors() {
+  try {
+    const response = await apiFetch("/api/vendors");
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Unable to load vendors");
+    state.vendors = data.vendors || [];
+    renderVendors();
+  } catch (error) {
+    $("vendor-message").textContent = error.message;
+    $("vendor-message").className = "auth-message error";
+  }
+}
+
+function renderVendors() {
+  const node = $("vendor-list");
+  if (!state.vendors.length) {
+    node.innerHTML = '<div class="vendor-empty">No vendor addresses registered yet.</div>';
+    return;
+  }
+  node.innerHTML = state.vendors.map((vendor) =>
+    '<div class="vendor-row"><div><strong>' + vendor.name + '</strong><span>' +
+    vendor.recipient_address.slice(0, 10) + "…" + vendor.recipient_address.slice(-8) +
+    '</span></div><div><b class="vendor-status ' + vendor.status + '">' + vendor.status + '</b>' +
+    (vendor.status === "review"
+      ? '<button class="ghost verify-vendor" data-id="' + vendor.id + '">Verify</button>'
+      : "") +
+    '</div></div>'
+  ).join("");
+
+  document.querySelectorAll(".verify-vendor").forEach((button) => {
+    button.addEventListener("click", () => verifyVendor(button.dataset.id));
+  });
+}
+
+async function verifyVendor(id) {
+  try {
+    const response = await apiFetch("/api/vendors", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, status: "verified" })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Unable to verify vendor");
+    $("vendor-message").textContent = "Vendor verified. InboxPay can now consider matching invoices for payment.";
+    $("vendor-message").className = "auth-message";
+    await loadVendors();
+    await load();
+  } catch (error) {
+    $("vendor-message").textContent = error.message;
+    $("vendor-message").className = "auth-message error";
+  }
 }
 
 function closeVendorModal() {
@@ -272,9 +327,9 @@ async function addVendor(event) {
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Unable to add vendor");
-    $("vendor-message").textContent = "Vendor added. Refresh the inbox to re-evaluate matching invoices.";
+    $("vendor-message").textContent = "Vendor added for review.";
     $("vendor-form").reset();
-    window.setTimeout(closeVendorModal, 800);
+    await loadVendors();
     await load();
   } catch (error) {
     $("vendor-message").textContent = error.message;
