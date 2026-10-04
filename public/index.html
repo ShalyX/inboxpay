@@ -8,7 +8,25 @@
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
-  <main class="shell">
+  <section id="auth-gate" class="auth-gate">
+    <div class="auth-card">
+      <div class="brand auth-brand"><div class="mark">I</div><div><strong>InboxPay</strong><span>autonomous AP</span></div></div>
+      <div class="auth-kicker">BUSINESS MONEY, OPERATED</div>
+      <h1>Your AP inbox. Run by an agent.</h1>
+      <p>Connect your business account, then give InboxPay access to the Gmail inbox that actually carries your invoices.</p>
+      <form id="auth-form">
+        <input id="auth-email" type="email" autocomplete="email" placeholder="you@company.com" required>
+        <input id="auth-password" type="password" autocomplete="current-password" placeholder="Password" minlength="8" required>
+        <button id="auth-submit" class="pay" type="submit">Sign in</button>
+      </form>
+      <div class="auth-actions">
+        <button id="auth-signup" class="ghost" type="button">Create business account</button>
+      </div>
+      <p id="auth-message" class="auth-message"></p>
+    </div>
+  </section>
+
+  <main id="app-shell" class="shell" hidden>
     <aside class="sidebar">
       <div class="brand"><div class="mark">I</div><div><strong>InboxPay</strong><span>autonomous AP</span></div></div>
       <nav>
@@ -27,10 +45,16 @@
           <h1>Accounts payable, without the handoff.</h1>
           <p>InboxPay reads the invoice, checks business rules, then settles only what policy permits.</p>
         </div>
-        <button id="refresh" class="ghost">↻ Refresh inbox</button>
+        <div class="account-actions">
+          <div class="account-copy"><strong id="business-name">Business</strong><span id="wallet-address">Wallet provisioning…</span></div>
+          <button id="connect-gmail" class="ghost">Connect Gmail</button>
+          <button id="sign-out" class="ghost">Sign out</button>
+          <button id="refresh" class="ghost">↻ Refresh inbox</button>
+        </div>
       </header>
 
       <section id="stats" class="stats"></section>
+      <section id="setup-card" class="setup-card" hidden></section>
 
       <div class="workspace">
         <section class="panel queue">
