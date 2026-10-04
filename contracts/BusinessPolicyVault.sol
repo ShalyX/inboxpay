@@ -3,7 +3,8 @@ pragma solidity ^0.8.19;
 
 interface IERC20 {
     function balanceOf(address account) external view returns (uint256);
-    function transfer(address to, uint256 amount) external returns (bool);
+    function allowance(address owner, address spender) external view returns (uint256);
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
 }
 
 contract BusinessPolicyVault {
@@ -93,7 +94,7 @@ contract BusinessPolicyVault {
     }
 
     function availableToSpend() public view returns (uint256) {
-        uint256 balance = token.balanceOf(address(this));
+        uint256 balance = token.balanceOf(owner);
         if (balance <= cashFloor) return 0;
         return balance - cashFloor;
     }
@@ -112,8 +113,9 @@ contract BusinessPolicyVault {
         uint256 spent = currentDaySpent();
         if (spent + amount > dailyLimit) return (false, "DAILY_LIMIT");
 
-        uint256 balance = token.balanceOf(address(this));
+        uint256 balance = token.balanceOf(owner);
         if (balance < amount + cashFloor) return (false, "CASH_FLOOR");
+        if (token.allowance(owner, address(this)) < amount) return (false, "ALLOWANCE");
 
         return (true, "ALLOWED");
     }
@@ -136,19 +138,19 @@ contract BusinessPolicyVault {
         usedPayment[paymentId] = true;
         dailySpent += amount;
 
-        require(token.transfer(recipient, amount), "TRANSFER_FAILED");
+        require(token.transferFrom(owner, recipient, amount), "TRANSFER_FAILED");
 
         emit PaymentExecuted(paymentId, vendorId, recipient, amount, invoiceHash);
     }
 
     function withdraw(address recipient, uint256 amount) external onlyOwner {
         require(recipient != address(0), "RECIPIENT_ZERO");
-        uint256 balance = token.balanceOf(address(this));
+        uint256 balance = token.balanceOf(owner);
         require(balance >= amount, "INSUFFICIENT_BALANCE");
 
         uint256 floorAfter = balance - amount;
         if (!paused) require(floorAfter >= cashFloor, "CASH_FLOOR");
 
-        require(token.transfer(recipient, amount), "TRANSFER_FAILED");
+        require(token.transferFrom(owner, recipient, amount), "TRANSFER_FAILED");
     }
 }
