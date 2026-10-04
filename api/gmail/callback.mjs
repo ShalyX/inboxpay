@@ -27,7 +27,7 @@ export default async function handler(req, res) {
     if (!raw) throw new Error("Gmail connection state expired. Please try again.");
 
     const session = JSON.parse(decryptSecret(raw));
-    if (Date.now() > session.expiresAt || session.state !== req.query?.state) {
+    if (Date.now() > session.expiresAt || session.state !== req.query?.state || !session.userToken) {
       throw new Error("Invalid Gmail connection state");
     }
 
@@ -57,24 +57,31 @@ export default async function handler(req, res) {
       throw new Error("Unable to identify the connected Google account");
     }
 
+    const userResponse = await fetch(
+      (process.env.SUPABASE_URL || "https://ecportgmionyhlofyobc.supabase.co") + "/auth/v1/user",
+      {
+        headers: {
+          apikey: process.env.SUPABASE_PUBLISHABLE_KEY,
+          Authorization: "Bearer " + session.userToken
+        }
+      }
+    );
+    const inboxUser = await userResponse.json();
+    if (!userResponse.ok || !inboxUser?.id) throw new Error("InboxPay session expired during Gmail connection");
+
     const businesses = await supabaseRest(
-      "businesses?select=id&owner_user_id=eq." + encodeURIComponent(JSON.parse(decryptSecret(raw)).userToken) + "&limit=1",
+      "businesses?select=id&owner_user_id=eq." + encodeURIComponent(inboxUser.id) + "&limit=1",
       { token: session.userToken }
     );
     const businessId = businesses?.[0]?.id;
 
-    await supabaseRest(
-      "integrations?user_id=eq." + encodeURIComponent(googleUser.sub),
-      { token: session.userToken }
-    );
-
     const existing = await supabaseRest(
-      "integrations?select=id&user_id=eq." + encodeURIComponent(JSON.parse(decryptSecret(raw)).userToken) + "&provider=eq.google_gmail&limit=1",
+      "integrations?select=id&user_id=eq." + encodeURIComponent(inboxUser.id) + "&provider=eq.google_gmail&limit=1",
       { token: session.userToken }
     );
 
     const record = {
-      user_id: JSON.parse(decryptSecret(raw)).userToken,
+      user_id: inboxUser.id,
       provider: "google_gmail",
       provider_account_id: googleUser.sub,
       access_token_encrypted: encryptSecret(tokens.access_token),
