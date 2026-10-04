@@ -1,9 +1,9 @@
-import { createPublicClient, http, formatUnits, parseAbi } from "viem";
+import { parseAbi, formatUnits } from "viem";
 import { requireUser } from "../lib/supabase-server.mjs";
 import { getBusiness } from "../lib/business-data.mjs";
+import { policyClient } from "../lib/policy-sync.mjs";
 
 const USDC = "0x3600000000000000000000000000000000000000";
-const RPC = process.env.ARC_RPC_URL || "https://rpc.mainnet.arc.io";
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
@@ -18,7 +18,7 @@ export default async function handler(req, res) {
       return res.status(409).json({ error: "Business wallet is not provisioned yet" });
     }
 
-    const client = createPublicClient({ transport: http(RPC) });
+    const client = policyClient(business.wallet_blockchain);
     const balance = await client.readContract({
       address: USDC,
       abi: parseAbi(["function balanceOf(address) view returns (uint256)"]),
@@ -26,11 +26,24 @@ export default async function handler(req, res) {
       args: [business.wallet_address]
     });
 
+    let policyVaultBalance = null;
+    if (business.policy_contract_address) {
+      try {
+        policyVaultBalance = await client.readContract({
+          address: business.policy_contract_address,
+          abi: parseAbi(["function vaultBalance() view returns (uint256)"]),
+          functionName: "vaultBalance"
+        });
+      } catch {}
+    }
+
     return res.status(200).json({
       address: business.wallet_address,
-      blockchain: "Arc Mainnet",
+      blockchain: business.wallet_blockchain,
       currency: "USDC",
-      balance: formatUnits(balance, 6)
+      balance: formatUnits(balance, 6),
+      policyVaultAddress: business.policy_contract_address || null,
+      policyVaultBalance: policyVaultBalance === null ? null : formatUnits(policyVaultBalance, 6)
     });
   } catch (error) {
     console.error("InboxPay wallet balance failed:", error);
