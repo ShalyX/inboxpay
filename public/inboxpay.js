@@ -24,6 +24,7 @@ function renderStats() {
   const held = state.invoices.filter((x) => !x.settlement?.reconciled && x.agentDecision !== "PAY_NOW");
   const total = payable.reduce((sum, x) => sum + Number(x.amount || 0), 0);
   $("invoice-count").textContent = state.invoices.length;
+  $("payment-count").textContent = settled.length;
   $("queue-count").textContent = state.invoices.length + (state.invoices.length === 1 ? " invoice" : " invoices");
   $("stats").innerHTML = [
     ["◎", "Ready to pay", total.toFixed(2) + " USDC", payable.length + " approved invoices"],

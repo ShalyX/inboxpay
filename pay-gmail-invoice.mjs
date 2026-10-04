@@ -15,11 +15,11 @@ import {
 } from "@circle-fin/developer-controlled-wallets";
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
-const RPC = "https://rpc.testnet.arc.io";
-const CHAIN_ID = 5042002;
+const RPC = "https://rpc.mainnet.arc.io";
+const CHAIN_ID = 5042;
 const USDC = "0x3600000000000000000000000000000000000000";
 const wallet = JSON.parse(
-  fs.readFileSync(path.join(ROOT, "circle-evm-wallet.json"), "utf8")
+  fs.readFileSync(path.join(ROOT, "circle-mainnet-evm-wallet.json"), "utf8")
 );
 const decisions = JSON.parse(
   fs.readFileSync(path.join(ROOT, "agent-decisions.json"), "utf8")
@@ -139,3 +139,4 @@ const beforeVendor = await publicClient.readContract({
   functionName: "balanceOf",
   args: [vendor.recipient]
 });
+

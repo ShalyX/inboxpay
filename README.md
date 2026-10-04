@@ -70,5 +70,13 @@ Set the production secrets in Vercel, deploy, and keep the Canteen RPC unique to
 
 The project includes a real Gmail-derived evaluator, Circle developer-controlled wallet integration, a live x402 purchase on Arc mainnet, and an Arc mainnet PaymentPolicyVault deployment. Private Gmail/OAuth/Circle artifacts stay local; demo-decisions.json is the redacted reviewer-facing sample.
 
+## Arc mainnet proof
+
+The production PaymentPolicyVault is deployed on Arc Mainnet at `0xa1dafca93784eeeecd081662435a5943eba73c66`.
+
+InboxPay also completed a real x402 purchase on Arc Mainnet through Circle's developer-controlled wallet. The 0.001 USDC settlement transaction is `0x0957a0febac2b4d5757148aa8e9d36861167ef4139c20bfd5105a4b404ac0186`.
+
+The live demo uses the same mainnet USDC rail and reads settlement state directly from the vault's `PaymentExecuted` events.
+
 Tameion final submission requires a public GitHub repository and a recorded demo under three minutes. A live product URL is encouraged.
 

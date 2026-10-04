@@ -1,0 +1,12 @@
+{
+  "chainId": 5042,
+  "usdc": "0x3600000000000000000000000000000000000000",
+  "vaultAddress": "0xa1dafca93784eeeecd081662435a5943eba73c66",
+  "deploymentTxHash": "0x17c9a773e2544a349f030b71dfdceb60eb5460a63b503fa7fb0086b8a1c34341",
+  "executorWalletId": "dde269af-d92d-5f96-be60-69ebfcc19df7",
+  "executorAddress": "0xd3bb84b06dfdbeb0b4bf079dc9daaf7a68e55c7c",
+  "txLimit": "2000000",
+  "dailyLimit": "5000000",
+  "cashFloor": "500000",
+  "createdAt": "2026-10-04T00:57:54.674Z"
+}
