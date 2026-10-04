@@ -62,7 +62,7 @@ The payment receipt is reconciled against the vendor balance after the Arc trans
 
 ## Deployment
 
-This repo is intentionally framework-light: static HTML/CSS/JS plus Vercel Node functions. No frontend build step is required.
+This repo is intentionally framework-light: static HTML/CSS/JS in `public/` plus native Vercel Node functions under `api/`. There is no frontend build step. `dev-server.mjs` is for local development only; production API traffic goes directly to the Vercel functions.
 
 Set the production secrets in Vercel, deploy, and keep the Canteen RPC unique to the project. Do not commit Gmail tokens, Circle wallet exports, OAuth credentials, local invoice files, or evaluator output.
 
