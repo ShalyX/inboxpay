@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "functions": {
+    "api/*.mjs": {
+      "runtime": "nodejs24.x"
+    }
+  },
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/$1.mjs" },
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/index.html" }
+  ]
+}
