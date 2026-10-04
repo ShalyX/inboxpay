@@ -1,0 +1,40 @@
+name: Build policy vault artifact
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "contracts/BusinessPolicyVault.sol"
+      - "scripts/compile-policy.mjs"
+      - "package.json"
+
+permissions:
+  contents: write
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install compiler
+        run: npm install --no-save --ignore-scripts solc@0.8.19
+
+      - name: Compile
+        run: node scripts/compile-policy.mjs
+
+      - name: Update lockfile
+        run: npm install --package-lock-only --ignore-scripts
+
+      - name: Commit generated artifacts
+        run: |
+          git config user.name "inboxpay-bot"
+          git config user.email "inboxpay-bot@users.noreply.github.com"
+          git add contracts/artifacts/BusinessPolicyVault.json package-lock.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Build policy vault artifact"
+          git push
