@@ -16,6 +16,20 @@ const state = {
 
 let bootstrapPromise = null;
 
+async function readJsonResponse(response) {
+  const text = await response.text();
+  if (!text) return {};
+  try {
+    return JSON.parse(text);
+  } catch {
+    const body = text.replace(/\\s+/g, " ").trim().slice(0, 240);
+    throw new Error(
+      "InboxPay server error (" + response.status + "): " +
+      (body || response.statusText || "Unexpected non-JSON response")
+    );
+  }
+}
+
 const $ = (id) => document.getElementById(id);
 
 function status(decision) {
@@ -140,16 +154,16 @@ async function bootstrap() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: "approve" })
     });
-    const data = await response.json();
+    const data = await readJsonResponse(response);
     if (!response.ok) throw new Error(data.error || "Business onboarding failed");
     state.business = data.business;
 
     const sessionResponse = await apiFetch("/api/session");
-    const session = await sessionResponse.json();
+    const session = await readJsonResponse(sessionResponse);
     if (sessionResponse.ok) state.gmail = session.gmail;
 
     const walletResponse = await apiFetch("/api/wallet");
-    const wallet = await walletResponse.json();
+    const wallet = await readJsonResponse(walletResponse);
     if (walletResponse.ok) state.wallet = wallet;
 
     await loadPolicyStatus();
@@ -173,7 +187,7 @@ function shortAddress(address) {
 async function loadPolicyStatus() {
   try {
     const response = await apiFetch("/api/policy?view=status");
-    const data = await response.json();
+    const data = await readJsonResponse(response);
     if (!response.ok) throw new Error(data.error || "Policy status unavailable");
     state.business = data.business || state.business;
     state.policy = data.contract || null;
@@ -258,14 +272,14 @@ async function provisionWallet() {
         ...(network === "ARC" ? { confirmMainnet: true } : {})
       })
     });
-    const data = await response.json();
+    const data = await readJsonResponse(response);
     if (!response.ok) throw new Error(data.error || "Wallet creation failed");
 
     state.business = data.business || state.business;
     await loadPolicyStatus();
 
     const walletResponse = await apiFetch("/api/wallet");
-    const walletData = await walletResponse.json();
+    const walletData = await readJsonResponse(walletResponse);
     if (walletResponse.ok) state.wallet = walletData;
 
     renderAccount();
@@ -305,7 +319,7 @@ async function deployPolicy() {
         ...(confirmed ? { confirmMainnet: true } : {})
       })
     });
-    const data = await response.json();
+    const data = await readJsonResponse(response);
 
     if (!response.ok) {
       throw new Error(data.error || "Policy deployment failed");
@@ -416,7 +430,7 @@ async function openVendorModal() {
 async function loadVendors() {
   try {
     const response = await apiFetch("/api/vendors");
-    const data = await response.json();
+    const data = await readJsonResponse(response);
     if (!response.ok) throw new Error(data.error || "Unable to load vendors");
     state.vendors = data.vendors || [];
     renderVendors();
@@ -454,7 +468,7 @@ async function verifyVendor(id) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, status: "verified" })
     });
-    const data = await response.json();
+    const data = await readJsonResponse(response);
     if (!response.ok) throw new Error(data.error || "Unable to verify vendor");
     $("vendor-message").textContent = "Vendor verified. InboxPay can now consider matching invoices for payment.";
     $("vendor-message").className = "auth-message";
@@ -484,7 +498,7 @@ async function addVendor(event) {
         recipientAddress: $("vendor-address").value.trim()
       })
     });
-    const data = await response.json();
+    const data = await readJsonResponse(response);
     if (!response.ok) throw new Error(data.error || "Unable to add vendor");
     $("vendor-message").textContent = "Vendor added for review.";
     $("vendor-form").reset();
@@ -501,7 +515,7 @@ async function addVendor(event) {
 async function connectGmail() {
   try {
     const response = await apiFetch("/api/gmail/start");
-    const data = await response.json();
+    const data = await readJsonResponse(response);
     if (!response.ok) throw new Error(data.error || "Unable to start Gmail connection");
     window.location.href = data.url;
   } catch (error) {
@@ -523,7 +537,7 @@ async function load() {
   $("refresh").disabled = true;
   try {
     const response = await apiFetch("/api/invoices");
-    const data = await response.json();
+    const data = await readJsonResponse(response);
     if (!response.ok) throw new Error(data.error || "Invoice data unavailable");
     state.invoices = data.invoices || [];
     state.selected = state.selected
@@ -550,7 +564,7 @@ async function settle() {
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({ invoiceNumber: invoice.invoiceNumber })
     });
-    const data = await response.json();
+    const data = await readJsonResponse(response);
     if (!response.ok || !data.ok) throw new Error(data.error || "Settlement failed");
     toast("Payment submitted");
     await load();
@@ -564,7 +578,7 @@ async function settle() {
 async function init() {
   try {
     const configResponse = await fetch("/api/config");
-    const config = await configResponse.json();
+    const config = await readJsonResponse(configResponse);
     if (!configResponse.ok) throw new Error(config.error || "InboxPay configuration unavailable");
 
     state.supabase = createClient(config.url, config.publishableKey, {
@@ -623,8 +637,15 @@ async function init() {
       history.replaceState({}, "", "/");
     }
   } catch (error) {
-    showAuth();
-    setAuthMessage(error.message || "InboxPay failed to initialize", true);
+    if (state.session) {
+      showApp();
+      toast(error.message || "InboxPay failed to initialize");
+      renderAccount();
+      renderSetup();
+    } else {
+      showAuth();
+      setAuthMessage(error.message || "InboxPay failed to initialize", true);
+    }
   }
 }
 
