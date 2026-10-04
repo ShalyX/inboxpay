@@ -13,6 +13,70 @@ export default async function handler(req, res) {
 
   try {
     const { token, user } = await requireUser(req);
+
+    if (req.body?.action === "provision_wallet") {
+      const businessRows = await supabaseRest(
+        "businesses?select=*&owner_user_id=eq." + encodeURIComponent(user.id) + "&limit=1",
+        { token }
+      );
+      const business = businessRows?.[0];
+      if (!business) return res.status(409).json({ error: "Complete business onboarding first" });
+      if (business.wallet_id) return res.status(200).json({ business });
+
+      const network = String(req.body?.network || "ARC-TESTNET");
+      if (!["ARC-TESTNET", "ARC"].includes(network)) {
+        return res.status(400).json({ error: "InboxPay supports Arc Testnet and Arc Mainnet" });
+      }
+      if (network === "ARC" && req.body?.confirmMainnet !== true) {
+        return res.status(409).json({
+          error: "Dedicated Circle wallet creation on Arc Mainnet requires explicit confirmation",
+          confirmation: {
+            network: "Arc Mainnet",
+            wallet: business.wallet_address || null,
+            purpose: "Create the business's dedicated USDC wallet for live payments"
+          }
+        });
+      }
+
+      await supabaseRest("businesses?id=eq." + encodeURIComponent(business.id), {
+        token,
+        method: "PATCH",
+        body: {
+          wallet_status: "provisioning",
+          wallet_blockchain: network,
+          wallet_error: null,
+          updated_at: new Date().toISOString()
+        }
+      });
+
+      try {
+        const { createBusinessWallet } = await import("../lib/circle-wallets.mjs");
+        const wallet = await createBusinessWallet(business.id, business.name, network);
+        const updated = await supabaseRest("businesses?id=eq." + encodeURIComponent(business.id), {
+          token,
+          method: "PATCH",
+          body: {
+            ...wallet,
+            wallet_status: "ready",
+            wallet_error: null,
+            updated_at: new Date().toISOString()
+          }
+        });
+        return res.status(200).json({ business: updated?.[0] || { ...business, ...wallet, wallet_status: "ready" } });
+      } catch (walletError) {
+        await supabaseRest("businesses?id=eq." + encodeURIComponent(business.id), {
+          token,
+          method: "PATCH",
+          body: {
+            wallet_status: "error",
+            wallet_error: walletError instanceof Error ? walletError.message : String(walletError),
+            updated_at: new Date().toISOString()
+          }
+        }).catch(() => {});
+        throw walletError;
+      }
+    }
+
     const requestedName = String(req.body?.businessName || "").trim();
     const name = requestedName || user.user_metadata?.business_name || user.email?.split("@")[1] || "My Business";
 
