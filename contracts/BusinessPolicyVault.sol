@@ -90,7 +90,7 @@ contract BusinessPolicyVault {
     }
 
     function vaultBalance() public view returns (uint256) {
-        return token.balanceOf(address(this));
+        return token.balanceOf(owner);
     }
 
     function availableToSpend() public view returns (uint256) {
@@ -143,14 +143,5 @@ contract BusinessPolicyVault {
         emit PaymentExecuted(paymentId, vendorId, recipient, amount, invoiceHash);
     }
 
-    function withdraw(address recipient, uint256 amount) external onlyOwner {
-        require(recipient != address(0), "RECIPIENT_ZERO");
-        uint256 balance = token.balanceOf(owner);
-        require(balance >= amount, "INSUFFICIENT_BALANCE");
-
-        uint256 floorAfter = balance - amount;
-        if (!paused) require(floorAfter >= cashFloor, "CASH_FLOOR");
-
-        require(token.transferFrom(owner, recipient, amount), "TRANSFER_FAILED");
-    }
+}
 }
