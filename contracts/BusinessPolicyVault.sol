@@ -73,7 +73,6 @@ contract BusinessPolicyVault {
     }
 
     function setVendor(bytes32 vendorId, address recipient) external onlyOwner {
-        require(recipient != address(0), "RECIPIENT_ZERO");
         vendorRecipient[vendorId] = recipient;
         emit VendorSet(vendorId, recipient);
     }
