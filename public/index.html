@@ -47,6 +47,7 @@
         </div>
         <div class="account-actions">
           <div class="account-copy"><strong id="business-name">Business</strong><span id="wallet-address">Wallet provisioning…</span></div>
+          <button id="add-vendor" class="ghost">Add vendor</button>
           <button id="connect-gmail" class="ghost">Connect Gmail</button>
           <button id="sign-out" class="ghost">Sign out</button>
           <button id="refresh" class="ghost">↻ Refresh inbox</button>
@@ -72,6 +73,18 @@
         <article><span class="proof-icon">↗</span><div><strong>Arc receipt</strong><p>Settlement ends with a transaction hash and reconciliation record.</p></div></article>
       </section>
     </section>
+    <div id="vendor-modal" class="vendor-modal" hidden>
+      <div class="vendor-card">
+        <div class="detail-top"><div><label>VENDOR</label><h2>Add settlement address</h2></div><button id="close-vendor" class="ghost">Close</button></div>
+        <p>Use the vendor's verified Arc/EVM address. InboxPay will require this registry match before autonomous payment.</p>
+        <form id="vendor-form">
+          <input id="vendor-name" placeholder="Vendor name" required>
+          <input id="vendor-address" placeholder="0x…" pattern="0x[a-fA-F0-9]{40}" required>
+          <button id="vendor-submit" class="pay" type="submit">Add verified vendor</button>
+        </form>
+        <div id="vendor-message" class="auth-message"></div>
+      </div>
+    </div>
     <div id="toast" class="toast" hidden></div>
   </main>
   <script type="module" src="/inboxpay.js"></script>
