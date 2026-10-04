@@ -22,7 +22,7 @@ async function readJsonResponse(response) {
   try {
     return JSON.parse(text);
   } catch {
-    const body = text.replace(/\\s+/g, " ").trim().slice(0, 240);
+    const body = text.replace(/\s+/g, " ").trim().slice(0, 240);
     throw new Error(
       "InboxPay server error (" + response.status + "): " +
       (body || response.statusText || "Unexpected non-JSON response")
