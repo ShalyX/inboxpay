@@ -14,6 +14,8 @@ const state = {
   vendors: []
 };
 
+let bootstrapPromise = null;
+
 const $ = (id) => document.getElementById(id);
 
 function status(decision) {
@@ -128,29 +130,40 @@ async function apiFetch(path, options = {}) {
 }
 
 async function bootstrap() {
-  showApp();
-  const response = await apiFetch("/api/onboarding", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ action: "approve" })
-  });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || "Business onboarding failed");
-  state.business = data.business;
+  if (bootstrapPromise) return bootstrapPromise;
 
-  const sessionResponse = await apiFetch("/api/session");
-  const session = await sessionResponse.json();
-  if (sessionResponse.ok) state.gmail = session.gmail;
+  bootstrapPromise = (async () => {
+    showApp();
 
-  const walletResponse = await apiFetch("/api/wallet");
-  const wallet = await walletResponse.json();
-  if (walletResponse.ok) state.wallet = wallet;
+    const response = await apiFetch("/api/onboarding", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "approve" })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Business onboarding failed");
+    state.business = data.business;
 
-  await loadPolicyStatus();
+    const sessionResponse = await apiFetch("/api/session");
+    const session = await sessionResponse.json();
+    if (sessionResponse.ok) state.gmail = session.gmail;
 
-  renderAccount();
-  renderSetup();
-  await load();
+    const walletResponse = await apiFetch("/api/wallet");
+    const wallet = await walletResponse.json();
+    if (walletResponse.ok) state.wallet = wallet;
+
+    await loadPolicyStatus();
+
+    renderAccount();
+    renderSetup();
+    await load();
+  })();
+
+  try {
+    return await bootstrapPromise;
+  } finally {
+    bootstrapPromise = null;
+  }
 }
 
 function shortAddress(address) {
