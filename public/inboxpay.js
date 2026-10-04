@@ -70,7 +70,7 @@ function renderDetail() {
     invoice.vendor + '</strong><span>' + invoice.currency + ' settlement · due ' + invoice.dueDate +
     '</span></div></div><div class="big-amount">' + Number(invoice.amount || 0).toFixed(2) +
     ' <span>' + invoice.currency + '</span></div><div class="decision"><div class="decision-head">● Agent reasoning</div><p>' +
-    (settled ? "Payment executed and reconciled on Arc Testnet." : invoice.decisionReasons?.[0] || "No decision reason recorded.") +
+    (settled ? "Payment executed and reconciled on Arc Mainnet." : invoice.decisionReasons?.[0] || "No decision reason recorded.") +
     '</p><div class="confidence"><span>Extraction confidence</span><b>' +
     (invoice.extraction?.confidence || "unknown") + '</b></div></div>' +
     '<div class="checks">' +
@@ -78,7 +78,7 @@ function renderDetail() {
     checkRow("Currency rail", invoice.currency === "USDC" ? "USDC" : invoice.currency) +
     checkRow("Vendor registry", settled || ready ? "Verified" : "Check required") +
     checkRow("Payment policy", settled ? "Executed" : ready ? "Within limits" : "Blocked by policy") +
-    '</div>' + (settled && invoice.settlement?.paymentTxHash ? '<div class="settlement"><span>Arc transaction</span><a href="https://testnet.arcscan.app/tx/' + invoice.settlement.paymentTxHash + '" target="_blank" rel="noreferrer">' + invoice.settlement.paymentTxHash.slice(0, 18) + '…</a><b>Reconciliation PASS</b></div>' : "") +
+    '</div>' + (settled && invoice.settlement?.paymentTxHash ? '<div class="settlement"><span>Arc transaction</span><a href="https://explorer.arc.io/tx/' + invoice.settlement.paymentTxHash + '" target="_blank" rel="noreferrer">' + invoice.settlement.paymentTxHash.slice(0, 18) + '…</a><b>Reconciliation PASS</b></div>' : "") +
     '<button id="pay-button" class="pay"' + (ready ? "" : " disabled") +
     '>' + (ready ? "Settle invoice on Arc ↗" : settled ? "Settled on Arc ✓" : "Payment blocked") + '</button></div>';
 
