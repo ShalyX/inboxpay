@@ -39,3 +39,5 @@ nav{display:grid;gap:5px}.nav{border:0;background:transparent;padding:10px 11px;
 .google-auth{width:100%;border:1px solid var(--line);background:#fff;border-radius:10px;padding:11px 13px;font-size:12px;font-weight:750;cursor:pointer}
 .google-auth:hover{background:#f3f2ee}
 .google-auth:disabled{opacity:.5;cursor:not-allowed}
+
+.auth-helper{margin:8px 0 0!important;text-align:center;color:var(--muted);font-size:11px!important;line-height:1.4!important}
