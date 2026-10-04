@@ -2,7 +2,7 @@
 
 InboxPay is an autonomous accounts-payable operator built for Tameion.
 
-It watches Gmail for invoices, extracts the payable facts, applies deterministic business checks around the agent decision, and settles approved USDC invoices through Circle's developer-controlled wallet on Arc Testnet.
+It watches Gmail for invoices, extracts the payable facts, applies deterministic business checks around the agent decision, and settles approved USDC invoices through Circle's developer-controlled wallet on Arc Mainnet.
 
 ## The product
 
@@ -33,7 +33,7 @@ arc-canteen rpc-url --export
 
 The app expects the resulting RPC as ARC_RPC_URL or the exported RPC value.
 
-Circle credentials are read from the existing local environment. For deployment, configure CIRCLE_API_KEY, CIRCLE_ENTITY_SECRET, CIRCLE_WALLET_ID, and CIRCLE_WALLET_ADDRESS.
+Circle credentials are read from the existing local environment. For production, configure CIRCLE_API_KEY, CIRCLE_ENTITY_SECRET, CIRCLE_WALLET_ID, CIRCLE_WALLET_ADDRESS, PAYMENT_VAULT_ADDRESS, and ARC_RPC_URL.
 
 Gmail scanning:
 
@@ -68,7 +68,7 @@ Set the production secrets in Vercel, deploy, and keep the Canteen RPC unique to
 
 ## Hackathon proof
 
-The local project includes a real Gmail-derived evaluator and a previously successful Arc settlement run. The private run artifacts stay local; demo-decisions.json is the redacted reviewer-facing sample.
+The project includes a real Gmail-derived evaluator, Circle developer-controlled wallet integration, a live x402 purchase on Arc mainnet, and an Arc mainnet PaymentPolicyVault deployment. Private Gmail/OAuth/Circle artifacts stay local; demo-decisions.json is the redacted reviewer-facing sample.
 
 Tameion final submission requires a public GitHub repository and a recorded demo under three minutes. A live product URL is encouraged.
 
