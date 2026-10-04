@@ -45,7 +45,7 @@ export default async function handler(req, res) {
       "inboxpay_google_oauth=" + payload +
         "; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=600"
     );
-    return res.redirect(302, GOOGLE_AUTH + "?" + query.toString());
+    return res.status(200).json({ url: GOOGLE_AUTH + "?" + query.toString() });
   } catch (error) {
     return res.status(401).json({ error: error instanceof Error ? error.message : "Unable to start Gmail connection" });
   }
