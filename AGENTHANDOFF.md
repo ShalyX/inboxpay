@@ -334,6 +334,11 @@ A separate authenticated Business B account now has its own Circle wallet on Arc
 - The latest provider response resolves the immediate blocker: the wallet's `0.05 USDC` balance is below Circle's aggregate pending-fee requirement of `0.0654236295 USDC`. The earlier `TX_NOT_INITIATED` record was an opaque provider failure; this retry exposed the actionable cause.
 - Do not retry until the same dedicated Business B wallet has a sufficient balance. The minimum shortfall is `0.0154236295 USDC`; a larger operational buffer is prudent because fee quotes can change. No shared executor wallet is permitted.
 
+### Business B funding verification (2026-10-06)
+
+- A read-only Arc Mainnet RPC balance check against the exact dedicated Business B wallet `0xa5639edc94b68af952f6744a8cd6a8b25ef4f80b` returned `0.15` native USDC (`eth_getBalance`, `0x214e8348c4f0000`). This is above the last Circle aggregate pending-fee requirement of `0.0654236295 USDC`.
+- This verifies the external funding onchain, but it does not by itself mutate InboxPay state. The next write must be one authenticated production `POST /api/policy` deployment retry with `confirmMainnet: true`, followed by Circle contract/transaction polling. No allowance or payment write is authorized by this funding event.
+
 ### Mainnet PaymentPolicyVault
 
 Production vault:
