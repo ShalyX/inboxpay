@@ -134,9 +134,9 @@ The production alias is:
 `tameion-ap-agent-live.vercel.app`
 
 Latest verified production deployment:
-- Deployment: `dpl_Aj6zydNxDW1sSq8cHJHL1EaQTzrE`
-- Commit: `83bcbb2`
-- Message: `Handle failed Circle policy deployments`
+- Deployment: `dpl_6skKxTFAmV1HEkacqDXmLg7UGdtx`
+- Commit: `2796971`
+- Message: `Record completed USDC allowance approval`
 - State: `READY`
 
 That deployment includes the auth/onboarding fixes, Circle SDK import repairs, dedicated-wallet retry protection, correct Supabase wallet persistence, financial-route/PDF runtime decoupling, Gmail PDF parsing hardening, real Arc Testnet wallet funding, and failed policy-deployment recovery described below.
@@ -584,15 +584,15 @@ At last inspection:
 - financial routes no longer crash through the PDF runtime
 - Gmail OAuth callback configuration is saved and the real Gmail integration is connected in production.
 - The connected Gmail integration is encrypted and refreshable; the live inbox currently yields 9 invoice records.
-- No invoice has been settled. After explicit vendor verification, the selected invoice now evaluates to `PAY_NOW` and the settlement button is available; no payment transaction has been submitted.
+- The selected `TA-GMAIL-0001` invoice for `Acme Test Hosting` was settled from the dedicated business wallet on Arc Testnet after explicit authorization. The production API records `settlement_status=confirmed`, payment transaction `0x7dc26bc15519137fdf28b07f1d72bbf38dd001ac14f47be3daf3a3b77ca33090`, and `reconciled=true`; the `payment_settled` audit event records the same hash. The live UI shows `0.00 USDC` ready to pay, `0 approved invoices`, `1 settled`, and `Reconciliation PASS`. The wallet balance is `39.45334 USDC` after the 0.50 USDC payment and network fees.
 - The policy-vault deployment path is live on Arc Testnet and currently ready.
 - The intended live invoice vendor, `Acme Test Hosting`, is now registered and verified against the documented Arc/EVM recipient address.
 
 The `audit_events` RLS policy is now corrected in Supabase. Authenticated inserts require `user_id = auth.uid()` and ownership of the referenced business. A real authenticated `vendor_registered` audit insert returned HTTP 201. The earlier testnet-funding audit failure should be retested on the next real funding request; no server-authorized bypass was added.
 
-Acme vendor verification is complete on Arc Testnet. Circle transaction `0x5c61812fe41284e1b79fde64c62936b10ddd61e1e1b33096c3c1a5e80948804a` completed, the onchain vault returns Acme's registered recipient, and the `vendor_policy_updated` audit event was written. No settlement transaction has been submitted.
+Acme vendor verification is complete on Arc Testnet. Circle transaction `0x5c61812fe41284e1b79fde64c62936b10ddd61e1e1b33096c3c1a5e80948804a` completed, the onchain vault returns Acme's registered recipient, and the `vendor_policy_updated` audit event was written. The subsequent settlement transaction is `0x7dc26bc15519137fdf28b07f1d72bbf38dd001ac14f47be3daf3a3b77ca33090`; the authenticated invoice API and audit trail both confirm it reconciled successfully.
 
-The dedicated wallet's USDC allowance to its policy vault has now been explicitly approved on Arc Testnet. Circle reports the approval transaction `COMPLETE`, the live allowance is the maximum uint256 value, and the wallet balance is approximately `39.95 USDC` after the network fee. The invoice remains unpaid.
+The dedicated wallet's USDC allowance to its policy vault has now been explicitly approved on Arc Testnet. Circle reports the approval transaction `COMPLETE`, the live allowance is the maximum uint256 value, and the wallet balance was approximately `39.95 USDC` before settlement. After the confirmed 0.50 USDC payment, the live wallet balance is `39.45334 USDC`.
 
 Do not mark the product “fully working” until the following are verified live:
 
@@ -624,10 +624,10 @@ Do not mark the product “fully working” until the following are verified liv
 - Duplicate/vendor/currency/policy checks are visible. **Verified; Acme is now verified and the selected invoice evaluates to `PAY_NOW`.**
 
 ### Settlement
-- Approved invoice can settle from the correct business wallet. **Not yet verified; the approved invoice is intentionally awaiting explicit settlement authorization.**
+- Approved invoice can settle from the correct business wallet. **Verified on Arc Testnet for `TA-GMAIL-0001`; the dedicated wallet paid 0.50 USDC and reconciliation passed.**
 - Mainnet confirmation is explicit.
-- Actual Arc transaction hash is stored.
-- Reconciliation reflects the real transaction state.
+- Actual Arc Testnet transaction hash is stored: `0x7dc26bc15519137fdf28b07f1d72bbf38dd001ac14f47be3daf3a3b77ca33090`.
+- Reconciliation reflects the real transaction state. **Verified (`settlement_status=confirmed`, `reconciled=true`).**
 - Business A can never spend Business B's wallet.
 
 ---
@@ -690,7 +690,7 @@ Use a genuine test/business invoice email and continue only after explicit user 
 
 Do not use the currently held/unverified records as a reason to bypass the vendor gate. Mainnet wallet creation, policy deployment, USDC approval, and settlement all remain explicit actions.
 
-Current handoff state: Acme Test Hosting has `status=verified`, the policy-vault recipient mapping is confirmed on Arc Testnet, the selected invoice is `PAY_NOW`, and the wallet allowance is approved. The settlement button is intentionally untouched; settlement remains a separate explicit action.
+Current handoff state: Acme Test Hosting has `status=verified`, the policy-vault recipient mapping is confirmed on Arc Testnet, the selected invoice has settled as `confirmed`, the wallet allowance is approved, and reconciliation passed for the recorded Arc Testnet transaction. Mainnet wallet/policy/payment writes remain separately gated and were not used for this verification.
 
 ### P1 — Final submission hygiene
 Before hackathon submission:

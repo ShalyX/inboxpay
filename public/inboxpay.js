@@ -199,6 +199,12 @@ async function loadPolicyStatus() {
 
 function renderAccount() {
   $("business-name").textContent = state.business?.name || "Business";
+  const networkLabel = state.business?.wallet_blockchain === "ARC-TESTNET"
+    ? "Arc Testnet"
+    : state.business?.wallet_blockchain === "ARC"
+      ? "Arc Mainnet"
+      : "Arc";
+  $("network-label").textContent = networkLabel;
   $("wallet-address").textContent = state.business?.wallet_address
     ? (state.business.wallet_blockchain || "Arc") + " · Circle wallet · " + shortAddress(state.business.wallet_address) +
       (state.wallet ? " · " + Number(state.wallet.balance || 0).toFixed(2) + " USDC" : "")
@@ -423,6 +429,11 @@ function renderDetail() {
   if (!invoice) return;
   const settled = invoice.settlement?.reconciled === true;
   const ready = invoice.agentDecision === "PAY_NOW" && !settled;
+  const settlementNetwork = state.business?.wallet_blockchain === "ARC-TESTNET"
+    ? "Arc Testnet"
+    : state.business?.wallet_blockchain === "ARC"
+      ? "Arc Mainnet"
+      : "Arc";
   const vendorInitial = (invoice.vendor || "V").slice(0, 1);
   $("detail").innerHTML = '<div class="detail-inner"><div class="detail-top"><div><label>INVOICE</label><h2>' +
     (invoice.invoiceNumber || "Needs review") + '</h2></div>' + status(settled ? "SETTLED" : invoice.agentDecision) + '</div>' +
@@ -430,7 +441,7 @@ function renderDetail() {
     (invoice.vendor || "Unknown vendor") + '</strong><span>' + (invoice.currency || "Unknown") +
     ' settlement · due ' + (invoice.dueDate || "not found") + '</span></div></div><div class="big-amount">' +
     Number(invoice.amount || 0).toFixed(2) + ' <span>' + (invoice.currency || "") + '</span></div><div class="decision"><div class="decision-head">● Agent reasoning</div><p>' +
-    (settled ? "Payment executed and reconciled on Arc Mainnet." : invoice.decisionReasons?.[0] || "No decision reason recorded.") +
+    (settled ? "Payment executed and reconciled on " + settlementNetwork + "." : invoice.decisionReasons?.[0] || "No decision reason recorded.") +
     '</p><div class="confidence"><span>Extraction confidence</span><b>' +
     (invoice.extraction?.confidence || "unknown") + '</b></div></div>' +
     '<div class="checks">' +
