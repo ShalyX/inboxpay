@@ -311,6 +311,16 @@ The production `gmail.com` business currently has:
 
 This is a dedicated business policy vault. It is not the executor/deployer wallet or a shared treasury. Mainnet policy deployment remains explicitly gated.
 
+### Business B Mainnet wallet
+
+A separate authenticated Business B account now has its own Circle wallet on Arc Mainnet:
+- blockchain: `ARC`
+- wallet address: `0xa5639e…f4f80b`
+- balance at creation: `0 USDC`
+- policy vault: not deployed
+- Mainnet wallet creation was explicitly confirmed; no Mainnet funds or payments have been moved.
+- Refresh/reconnect restored the same Business B account, wallet, and Gmail connection after provisioning.
+
 ### Mainnet PaymentPolicyVault
 
 Production vault:
@@ -579,6 +589,8 @@ At last inspection:
 - Arc Testnet Circle credentials are configured under the server's expected production variable names
 - Google login completed and remained authenticated as the existing `gmail.com` business
 - authenticated Arc Testnet wallet creation and business-row persistence completed
+- a separate Business B account was authenticated and its dedicated Arc Mainnet wallet was created and persisted; no Mainnet policy, allowance, funding, or payment write has occurred
+- refresh/reconnect after Mainnet wallet provisioning restored the same Business B wallet and Gmail state
 - deterministic retry behavior was verified against the real Circle test account
 - the persisted wallet and live balance reload successfully in production (`39.96 USDC` after the testnet faucet and policy deployment fee)
 - financial routes no longer crash through the PDF runtime
@@ -606,7 +618,7 @@ Do not mark the product “fully working” until the following are verified liv
 - Dedicated Arc Testnet wallet creation succeeds. **Verified.**
 - Wallet details persist to the correct business row. **Verified.**
 - A retry does not create another Circle wallet. **Verified at the Circle helper boundary.**
-- Dedicated Arc Mainnet wallet creation still requires explicit confirmation and a separate eligible business; do not replace the existing testnet wallet.
+- Dedicated Arc Mainnet wallet creation is **verified for separate Business B** after explicit confirmation; the existing Testnet wallet was not replaced. Mainnet policy deployment remains separately gated.
 
 - Arc Testnet policy-vault deployment succeeds after real faucet funding. **Verified.**
 - Failed provider contract state is surfaced as an actionable error and can be retried without parallel duplicate deployment. **Verified.**
@@ -622,6 +634,13 @@ Do not mark the product “fully working” until the following are verified liv
 - Extraction is evidence-based. **Verified on the live selected record.**
 - Agent decision is bounded. **Verified.**
 - Duplicate/vendor/currency/policy checks are visible. **Verified; Acme is now verified and the selected invoice evaluates to `PAY_NOW`. The live USD records evaluate to `HOLD` with the payment button disabled because the Arc rail requires USDC; no held invoice was submitted.**
+
+### Refresh / adversarial rejection QA
+- Refresh/reconnect after Business B Mainnet wallet provisioning restored the authenticated account, dedicated wallet, Gmail connection, and `0 USDC` balance. **Verified.**
+- Mainnet policy deployment without `confirmMainnet=true` returns HTTP `409` and performs no provider write. **Verified.**
+- USDC approval before a policy vault exists returns HTTP `409` (`Onchain policy vault is not ready`). **Verified.**
+- Invalid vendor address and non-USDC vendor currency return HTTP `400` before persistence. **Verified.**
+- Invalid policy values (per-payment limit above daily limit and negative cash floor) return HTTP `400` before persistence. **Verified.**
 
 ### Settlement
 - Approved invoice can settle from the correct business wallet. **Verified on Arc Testnet for `TA-GMAIL-0001`; the dedicated wallet paid 0.50 USDC and reconciliation passed.**
@@ -688,9 +707,9 @@ Use a genuine test/business invoice email and continue only after explicit user 
 - settle only from this business's dedicated wallet on the intended network
 - reconcile the actual Arc transaction and receipt
 
-Do not use the currently held/unverified records as a reason to bypass the vendor gate. Mainnet wallet creation, policy deployment, USDC approval, and settlement all remain explicit actions.
+Do not use the currently held/unverified records as a reason to bypass the vendor gate. Business B's Mainnet policy deployment, USDC approval, funding, and settlement all remain explicit actions.
 
-Current handoff state: Acme Test Hosting has `status=verified`, the policy-vault recipient mapping is confirmed on Arc Testnet, the selected invoice has settled as `confirmed`, the wallet allowance is approved, and reconciliation passed for the recorded Arc Testnet transaction. Mainnet wallet/policy/payment writes remain separately gated and were not used for this verification.
+Current handoff state: Acme Test Hosting has `status=verified`, the policy-vault recipient mapping is confirmed on Arc Testnet, the selected invoice has settled as `confirmed`, the wallet allowance is approved, and reconciliation passed for the recorded Arc Testnet transaction. Business B's separate Arc Mainnet wallet is provisioned and persisted, but its policy vault, allowance, funding, and payment writes remain separately gated.
 
 ### P1 — Final submission hygiene
 Before hackathon submission:
