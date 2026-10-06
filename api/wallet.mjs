@@ -27,22 +27,39 @@ export default async function handler(req, res) {
         return res.status(409).json({ error: "Testnet funding is not available for mainnet wallets" });
       }
 
-      await requestBusinessTestnetFunds(business.wallet_address, business.wallet_blockchain);
-      await supabaseRest("audit_events", {
-        token,
-        method: "POST",
-        body: {
-          user_id: user.id,
-          business_id: business.id,
-          event_type: "testnet_wallet_funding_requested",
-          actor: "user",
-          data: {
-            wallet_address: business.wallet_address,
-            blockchain: business.wallet_blockchain
-          }
-        }
+      const client = policyClient(business.wallet_blockchain);
+      const currentBalance = await client.readContract({
+        address: USDC,
+        abi: parseAbi(["function balanceOf(address) view returns (uint256)"]),
+        functionName: "balanceOf",
+        args: [business.wallet_address]
       });
-      return res.status(202).json({ ok: true, status: "requested" });
+      if (currentBalance > 0n) {
+        return res.status(200).json({ ok: true, status: "already_funded", balance: formatUnits(currentBalance, 6) });
+      }
+
+      await requestBusinessTestnetFunds(business.wallet_address, business.wallet_blockchain);
+      let auditRecorded = true;
+      try {
+        await supabaseRest("audit_events", {
+          token,
+          method: "POST",
+          body: {
+            user_id: user.id,
+            business_id: business.id,
+            event_type: "testnet_wallet_funding_requested",
+            actor: "user",
+            data: {
+              wallet_address: business.wallet_address,
+              blockchain: business.wallet_blockchain
+            }
+          }
+        });
+      } catch (error) {
+        auditRecorded = false;
+        console.error("InboxPay testnet funding audit failed:", error instanceof Error ? error.message : error);
+      }
+      return res.status(202).json({ ok: true, status: "requested", auditRecorded });
     }
 
     const client = policyClient(business.wallet_blockchain);

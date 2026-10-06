@@ -119,10 +119,13 @@ async function statusHandler(token, user, business) {
   }
 
   let status = business.policy_contract_status;
-  const deploymentStatus = contract?.deploymentStatus || "UNKNOWN";
+  const deploymentStatus = contract?.deploymentStatus || contract?.status || "UNKNOWN";
   const patch = {};
   if (deploymentStatus === "COMPLETE" && address) status = "ready";
-  else if (deploymentStatus === "FAILED") status = "error";
+  else if (deploymentStatus === "FAILED") {
+    status = "error";
+    patch.policy_contract_error = contract?.deploymentErrorReason || "Policy vault deployment failed";
+  }
   if (status !== business.policy_contract_status) patch.policy_contract_status = status;
   if (address && address !== business.policy_contract_address) patch.policy_contract_address = address;
   if (transaction?.state === "FAILED") {
@@ -233,6 +236,9 @@ export default async function handler(req, res) {
       if (action === "deploy") {
         if (!business.wallet_id || !business.wallet_address) return res.status(409).json({ error: "Dedicated business wallet is not ready" });
         if (business.policy_contract_status === "ready" && business.policy_contract_address) return res.status(200).json({ business });
+        if (business.policy_contract_status === "deploying" && business.policy_contract_id) {
+          return res.status(202).json({ business, deployment: { contractId: business.policy_contract_id, transactionId: business.policy_contract_tx_id } });
+        }
 
         const policy = await getPolicy(token, business.id);
         if (!policy) throw new Error("Business payment policy is not configured");
@@ -253,6 +259,7 @@ export default async function handler(req, res) {
         try {
           deployment = await deployBusinessPolicyVault({
             businessId: business.id,
+            deploymentAttempt: business.policy_contract_id,
             walletId: business.wallet_id,
             walletAddress: business.wallet_address,
             maxTransaction: policy.max_transaction_usdc,
