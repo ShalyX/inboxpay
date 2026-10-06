@@ -213,6 +213,8 @@ function renderSetup() {
   const node = $("setup-card");
   const gmailReady = state.gmail?.status === "connected";
   const walletReady = state.business?.wallet_status === "ready";
+  const walletFunded = Number(state.wallet?.balance || 0) > 0;
+  const testnetNeedsFunding = walletReady && state.business?.wallet_blockchain === "ARC-TESTNET" && !walletFunded;
   const policyReady = state.business?.policy_contract_status === "ready" && Boolean(state.business?.policy_contract_address);
 
   if (gmailReady && walletReady && policyReady) {
@@ -225,16 +227,19 @@ function renderSetup() {
     '<div><label>SETUP</label><h3>Finish connecting your business</h3><p>' +
     (!walletReady ? "Create the dedicated Circle wallet that will hold this business's USDC. " : "") +
     (!gmailReady ? "Connect the Gmail inbox your business actually uses for invoices. " : "") +
-    (!policyReady && walletReady ? "Deploy the onchain policy guard before autonomous payments can run. " : "") +
+    (testnetNeedsFunding ? "Fund the Arc Testnet wallet so it can pay deployment gas. " : "") +
+    (!policyReady && walletReady && !testnetNeedsFunding ? "Deploy the onchain policy guard before autonomous payments can run. " : "") +
     '</p></div><div class="setup-status">' +
     '<span class="' + (walletReady ? "done" : "") + '">✓ Dedicated Circle wallet</span>' +
     (!walletReady
       ? '<div class="network-picker"><label for="wallet-network">Network</label><select id="wallet-network"><option value="ARC-TESTNET">Arc Testnet</option><option value="ARC">Arc Mainnet</option></select></div><button id="provision-wallet" class="ghost">Create dedicated wallet</button>'
       : '') +
+    (testnetNeedsFunding ? '<button id="fund-test-wallet" class="ghost">Fund test wallet</button>' : '') +
     '<span class="' + (gmailReady ? "done" : "") + '">✓ Business Gmail</span>' +
     '<span class="' + (policyReady ? "done" : "") + '">✓ Onchain payment policy</span>' +
     (walletReady && !policyReady
-      ? '<button id="deploy-policy" class="ghost">' + (state.business?.policy_contract_status === "deploying" ? "Policy deployment running…" : "Deploy policy guard") + '</button>'
+      ? '<button id="deploy-policy" class="ghost"' + (testnetNeedsFunding ? ' disabled' : '') + '>' +
+        (testnetNeedsFunding ? "Fund wallet first" : state.business?.policy_contract_status === "deploying" ? "Policy deployment running…" : "Deploy policy guard") + '</button>'
       : policyReady
         ? '<span class="setup-contract">Vault · ' + shortAddress(state.business.policy_contract_address) +
           (state.wallet?.policyVaultBalance != null ? " · " + Number(state.wallet.policyVaultBalance).toFixed(2) + " USDC" : "") +
@@ -243,8 +248,40 @@ function renderSetup() {
     '</div>';
 
   if (!walletReady) $("provision-wallet").addEventListener("click", provisionWallet);
-  if (walletReady && !policyReady && state.business?.policy_contract_status !== "deploying") {
+  if (testnetNeedsFunding) $("fund-test-wallet").addEventListener("click", fundTestWallet);
+  if (walletReady && !policyReady && !testnetNeedsFunding && state.business?.policy_contract_status !== "deploying") {
     $("deploy-policy").addEventListener("click", deployPolicy);
+  }
+}
+
+async function fundTestWallet() {
+  const button = $("fund-test-wallet");
+  button.disabled = true;
+  button.textContent = "Requesting test funds…";
+
+  try {
+    const response = await apiFetch("/api/wallet", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "fund_testnet" })
+    });
+    const data = await readJsonResponse(response);
+    if (!response.ok) throw new Error(data.error || "Testnet funding failed");
+
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      await new Promise((resolve) => window.setTimeout(resolve, 4000));
+      const walletResponse = await apiFetch("/api/wallet");
+      const walletData = await readJsonResponse(walletResponse);
+      if (walletResponse.ok) state.wallet = walletData;
+      if (Number(state.wallet?.balance || 0) > 0) break;
+    }
+
+    renderAccount();
+    renderSetup();
+    toast(Number(state.wallet?.balance || 0) > 0 ? "Arc Testnet wallet funded" : "Testnet funding requested; balance is pending");
+  } catch (error) {
+    toast(error.message || "Testnet funding failed");
+    renderSetup();
   }
 }
 

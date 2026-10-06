@@ -1,13 +1,14 @@
 import { parseAbi, formatUnits } from "viem";
-import { requireUser } from "../lib/supabase-server.mjs";
+import { requireUser, supabaseRest } from "../lib/supabase-server.mjs";
 import { getBusiness } from "../lib/businesses.mjs";
 import { policyClient } from "../lib/policy-sync.mjs";
+import { requestBusinessTestnetFunds } from "../lib/circle-wallets.mjs";
 
 const USDC = "0x3600000000000000000000000000000000000000";
 
 export default async function handler(req, res) {
-  if (req.method !== "GET") {
-    res.setHeader("Allow", "GET");
+  if (!['GET', 'POST'].includes(req.method)) {
+    res.setHeader("Allow", "GET, POST");
     return res.status(405).json({ error: "Method Not Allowed" });
   }
 
@@ -16,6 +17,32 @@ export default async function handler(req, res) {
     const business = await getBusiness(token, user.id);
     if (!business?.wallet_address) {
       return res.status(409).json({ error: "Business wallet is not provisioned yet" });
+    }
+
+    if (req.method === "POST") {
+      if (req.body?.action !== "fund_testnet") {
+        return res.status(400).json({ error: "Unsupported wallet action" });
+      }
+      if (business.wallet_blockchain !== "ARC-TESTNET") {
+        return res.status(409).json({ error: "Testnet funding is not available for mainnet wallets" });
+      }
+
+      await requestBusinessTestnetFunds(business.wallet_address, business.wallet_blockchain);
+      await supabaseRest("audit_events", {
+        token,
+        method: "POST",
+        body: {
+          user_id: user.id,
+          business_id: business.id,
+          event_type: "testnet_wallet_funding_requested",
+          actor: "user",
+          data: {
+            wallet_address: business.wallet_address,
+            blockchain: business.wallet_blockchain
+          }
+        }
+      });
+      return res.status(202).json({ ok: true, status: "requested" });
     }
 
     const client = policyClient(business.wallet_blockchain);
