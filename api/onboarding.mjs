@@ -118,17 +118,23 @@ export default async function handler(req, res) {
       try {
         const { createBusinessWallet } = await import("../lib/circle-wallets.mjs");
         const wallet = await createBusinessWallet(business.id, business.name, network);
+        const walletRecord = {
+          wallet_set_id: wallet.walletSetId,
+          wallet_id: wallet.walletId,
+          wallet_address: wallet.walletAddress,
+          wallet_blockchain: wallet.walletBlockchain
+        };
         const updated = await supabaseRest("businesses?id=eq." + encodeURIComponent(business.id), {
           token,
           method: "PATCH",
           body: {
-            ...wallet,
+            ...walletRecord,
             wallet_status: "ready",
             wallet_error: null,
             updated_at: new Date().toISOString()
           }
         });
-        return res.status(200).json({ business: updated?.[0] || { ...business, ...wallet, wallet_status: "ready" } });
+        return res.status(200).json({ business: updated?.[0] || { ...business, ...walletRecord, wallet_status: "ready" } });
       } catch (walletError) {
         await supabaseRest("businesses?id=eq." + encodeURIComponent(business.id), {
           token,
