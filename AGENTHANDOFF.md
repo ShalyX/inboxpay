@@ -134,12 +134,12 @@ The production alias is:
 `tameion-ap-agent-live.vercel.app`
 
 Latest verified production deployment:
-- Deployment: `dpl_2K7E6K2ZfdeSQ82ZvSSXUkJsFjRu`
-- Commit: `105f446279530350102e916cac8161fe0ffe8e9a`
-- Message: `Fix Circle wallet SDK module interop`
+- Deployment: `dpl_87jEAPgxFhvexGnWgBk1Cyf7AjkZ`
+- Commit: `5214a96`
+- Message: `Harden Gmail PDF parsing on Vercel`
 - State: `READY`
 
-That deployment includes the previous auth/onboarding/frontend fixes and the Circle SDK import repair described below.
+That deployment includes the auth/onboarding fixes, the Circle SDK import repairs, dedicated-wallet retry protection, correct Supabase wallet persistence, financial-route/PDF runtime decoupling, and Gmail PDF parsing hardening described below.
 
 ---
 
@@ -242,7 +242,7 @@ Current frontend has `readJsonResponse(response)` and does not force a valid ses
 
 ---
 
-## 7. RESOLVED — Circle SDK import
+## 7. RESOLVED — Circle SDK and wallet provisioning blockers
 
 The production wallet-provisioning route previously failed while importing the Circle SDK.
 
@@ -259,7 +259,7 @@ The incompatible import was:
 
 SDK `10.8.1` exposes a named ESM export locally, but Vercel's function runtime treated the dependency as CommonJS. A direct default ESM import was also tested and rejected by Node 24 because the package's ESM build has no default export.
 
-Resolved in:
+The original import incompatibility was resolved in:
 `105f446279530350102e916cac8161fe0ffe8e9a`
 
 The helper now uses Node's `createRequire(import.meta.url)` and destructures `initiateDeveloperControlledWalletsClient` from the package's CommonJS export. Verification completed against:
@@ -270,7 +270,29 @@ The helper now uses Node's `createRequire(import.meta.url)` and destructures `in
 
 The default Arc Testnet path also required two missing production environment variables. `CIRCLE_TEST_API_KEY` and `CIRCLE_TEST_ENTITY_SECRET` are now configured as sensitive Vercel production variables using a verified Circle test account. Live credentials remain separate under the existing live credential names.
 
-The remaining verification boundary is an authenticated production provisioning request that creates and persists a dedicated business wallet, followed by a repeated request check. Do not treat import/build success alone as proof of persisted wallet provisioning.
+Authenticated production provisioning exposed and resolved three additional blockers:
+
+- Circle resource names exceeded the provider's 50-character limit for realistic business names.
+- The onboarding route spread camelCase wallet results into snake_case Supabase columns.
+- The smart-contract SDK used the same ESM/CommonJS pattern and financial routes pulled in the Gmail PDF runtime transitively.
+
+Resolved in:
+
+- `238e516` — bounded Circle resource names, deterministic HMAC-derived idempotency keys, and business/network-scoped retry safety.
+- `3553549` — explicit `wallet_set_id`, `wallet_id`, `wallet_address`, and `wallet_blockchain` persistence.
+- `b890a2c` — CommonJS interop plus test/live credential and blockchain propagation for policy operations.
+- `d29c363` — lightweight business lookup for financial routes so wallet/policy reads do not load PDF/Gmail dependencies.
+- `5214a96` — dynamic production PDF parser loading, native canvas runtime dependency, and Google local-auth dependency upgrade.
+
+Production verification completed for the authenticated `gmail.com` business:
+
+- A dedicated Arc Testnet Circle wallet was created and persisted.
+- A full page reload restored the same wallet from the correct business row.
+- The live UI reports `ARC-TESTNET · Circle wallet · 0xca32c8…18d5e2 · 0.00 USDC`.
+- Deterministic duplicate helper calls returned the same wallet set, wallet ID, and address instead of creating additional resources.
+- The production `/api/wallet` and `/api/policy` routes load without the previous SDK/PDF runtime crashes.
+
+Do not replace this business wallet with the executor/deployer wallet in `deployment.json`.
 
 ---
 
@@ -542,7 +564,18 @@ At last inspection:
 - historical JSON parser masking issue was fixed
 - Circle SDK ESM/CommonJS import blocker is fixed and deployed
 - Arc Testnet Circle credentials are configured under the server's expected production variable names
-- authenticated live wallet creation/persistence and repeated-request behavior still require completion
+- Google login completed and remained authenticated as the existing `gmail.com` business
+- authenticated Arc Testnet wallet creation and business-row persistence completed
+- deterministic retry behavior was verified against the real Circle test account
+- the persisted wallet and `0.00 USDC` balance reload successfully in production
+- financial routes no longer crash through the PDF runtime
+- Gmail OAuth currently reaches Google but is blocked by `redirect_uri_mismatch`
+
+The active Gmail blocker is external OAuth client configuration. The Google Cloud client named `Gmail invoice pay web app` has only the old Arc Studio preview and Netlify redirect URIs. Add and save this exact authorized redirect URI:
+
+`https://tameion-ap-agent-live.vercel.app/api/gmail/callback`
+
+The value has been staged in the Google Cloud form but was not saved without action-time confirmation. Google notes that OAuth client changes can take from several minutes to several hours to propagate.
 
 Do not mark the product “fully working” until the following are verified live:
 
@@ -553,9 +586,10 @@ Do not mark the product “fully working” until the following are verified liv
 - Production email confirmation returns to the production origin.
 
 ### Business setup
-- Dedicated Arc Mainnet wallet creation succeeds.
-- Wallet details persist to the correct business row.
-- A second click/request does not create another wallet or corrupt the business.
+- Dedicated Arc Testnet wallet creation succeeds. **Verified.**
+- Wallet details persist to the correct business row. **Verified.**
+- A retry does not create another Circle wallet. **Verified at the Circle helper boundary.**
+- Dedicated Arc Mainnet wallet creation still requires explicit confirmation and a separate eligible business; do not replace the existing testnet wallet.
 
 ### Gmail
 - Connect Gmail completes.
@@ -614,21 +648,19 @@ When taking over:
 ## 18. Immediate next actions
 
 ### P0 — Fix Circle wallet provisioning
-The SDK import incompatibility is fixed and deployed. Complete the remaining live verification:
-- Arc Testnet wallet creation
+The SDK import incompatibility and authenticated Arc Testnet provisioning path are fixed and deployed. Remaining verification:
 - Arc Mainnet wallet creation with confirmation
-- returned wallet ID/address persistence
-- repeated provisioning request behavior
+- route-level repeated provisioning response (the persisted-wallet UI prevents a normal second click; helper-level idempotency is verified)
 
 ### P0 — Re-run production Google auth
-After wallet work does not regress auth:
-- sign into production with Google
-- verify existing business loads
-- verify setup state renders rather than logging out
-- inspect runtime logs
+Completed after the wallet changes:
+- production Google sign-in remained authenticated
+- the existing business loaded without duplicate-key errors
+- setup state and persisted wallet rendered without logging out
+- current deployment produced no new HTTP 500 logs during verification
 
 ### P1 — Complete real Gmail connection
-Use the production Connect Gmail button and verify the integration is stored against the authenticated business.
+Save the production callback URI in the existing Google OAuth client, wait for propagation if necessary, then repeat Connect Gmail and verify the integration is encrypted and stored against the authenticated business.
 
 ### P1 — Complete one real invoice end-to-end
 Use a genuine test/business invoice email:
