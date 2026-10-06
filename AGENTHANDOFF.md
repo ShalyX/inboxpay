@@ -134,12 +134,12 @@ The production alias is:
 `tameion-ap-agent-live.vercel.app`
 
 Latest verified production deployment:
-- Deployment: `dpl_87jEAPgxFhvexGnWgBk1Cyf7AjkZ`
-- Commit: `5214a96`
-- Message: `Harden Gmail PDF parsing on Vercel`
+- Deployment: `dpl_Aj6zydNxDW1sSq8cHJHL1EaQTzrE`
+- Commit: `83bcbb2`
+- Message: `Handle failed Circle policy deployments`
 - State: `READY`
 
-That deployment includes the auth/onboarding fixes, the Circle SDK import repairs, dedicated-wallet retry protection, correct Supabase wallet persistence, financial-route/PDF runtime decoupling, and Gmail PDF parsing hardening described below.
+That deployment includes the auth/onboarding fixes, Circle SDK import repairs, dedicated-wallet retry protection, correct Supabase wallet persistence, financial-route/PDF runtime decoupling, Gmail PDF parsing hardening, real Arc Testnet wallet funding, and failed policy-deployment recovery described below.
 
 ---
 
@@ -288,15 +288,28 @@ Production verification completed for the authenticated `gmail.com` business:
 
 - A dedicated Arc Testnet Circle wallet was created and persisted.
 - A full page reload restored the same wallet from the correct business row.
-- The live UI reports `ARC-TESTNET · Circle wallet · 0xca32c8…18d5e2 · 0.00 USDC`.
+- The live UI reports `ARC-TESTNET · Circle wallet · 0xca32c8…18d5e2 · 39.96 USDC` after a real Circle Arc Testnet faucet request and the policy-vault deployment fee.
 - Deterministic duplicate helper calls returned the same wallet set, wallet ID, and address instead of creating additional resources.
 - The production `/api/wallet` and `/api/policy` routes load without the previous SDK/PDF runtime crashes.
+- A PaymentPolicyVault was deployed for this business on Arc Testnet and reconciled through Circle's contract/transaction status APIs.
+- The first provider attempt failed with `TX_NOT_INITIATED`; the status route now surfaces failed provider state and the retry uses a fresh deterministic attempt key. The retry completed successfully.
 
 Do not replace this business wallet with the executor/deployer wallet in `deployment.json`.
 
 ---
 
 ## 8. Circle / Arc state
+
+### Authenticated business policy-vault state
+
+The production `gmail.com` business currently has:
+- policy contract status: `ready`
+- policy contract address: `0x59ceead805ef96fc2839388cafe937150412383a`
+- Circle contract ID: `01a110c7-f83d-7b03-84a9-a173f6d76c67`
+- Circle transaction ID: `c9bf280a-e5ee-5523-ad56-8edfb57a9511`
+- blockchain: `ARC-TESTNET`
+
+This is a dedicated business policy vault. It is not the executor/deployer wallet or a shared treasury. Mainnet policy deployment remains explicitly gated.
 
 ### Mainnet PaymentPolicyVault
 
@@ -567,15 +580,14 @@ At last inspection:
 - Google login completed and remained authenticated as the existing `gmail.com` business
 - authenticated Arc Testnet wallet creation and business-row persistence completed
 - deterministic retry behavior was verified against the real Circle test account
-- the persisted wallet and `0.00 USDC` balance reload successfully in production
+- the persisted wallet and live balance reload successfully in production (`39.96 USDC` after the testnet faucet and policy deployment fee)
 - financial routes no longer crash through the PDF runtime
-- Gmail OAuth currently reaches Google but is blocked by `redirect_uri_mismatch`
+- Gmail OAuth callback configuration is saved and the real Gmail integration is connected in production.
+- The connected Gmail integration is encrypted and refreshable; the live inbox currently yields 9 invoice records.
+- No invoice is approved or settled. The selected invoice is blocked because its vendor is not verified; the payment button is disabled.
+- The policy-vault deployment path is live on Arc Testnet and currently ready.
 
-The active Gmail blocker is external OAuth client configuration. The Google Cloud client named `Gmail invoice pay web app` has only the old Arc Studio preview and Netlify redirect URIs. Add and save this exact authorized redirect URI:
-
-`https://tameion-ap-agent-live.vercel.app/api/gmail/callback`
-
-The value has been staged in the Google Cloud form but was not saved without action-time confirmation. Google notes that OAuth client changes can take from several minutes to several hours to propagate.
+Known production follow-up: the testnet funding audit insert is best-effort because the current `audit_events` RLS policy rejects the authenticated insert. The funding route reports `auditRecorded: false` when that happens and does not hide the funding result. Add a server-authorized audit write or the correct narrow RLS policy before treating funding audit coverage as complete.
 
 Do not mark the product “fully working” until the following are verified live:
 
@@ -591,20 +603,23 @@ Do not mark the product “fully working” until the following are verified liv
 - A retry does not create another Circle wallet. **Verified at the Circle helper boundary.**
 - Dedicated Arc Mainnet wallet creation still requires explicit confirmation and a separate eligible business; do not replace the existing testnet wallet.
 
+- Arc Testnet policy-vault deployment succeeds after real faucet funding. **Verified.**
+- Failed provider contract state is surfaced as an actionable error and can be retried without parallel duplicate deployment. **Verified.**
+
 ### Gmail
-- Connect Gmail completes.
-- Integration is bound to the correct InboxPay user/business.
-- Encrypted refresh/access tokens persist.
-- Refresh inbox reads the connected account.
+- Connect Gmail completes. **Verified.**
+- Integration is bound to the correct InboxPay user/business. **Verified.**
+- Encrypted refresh/access tokens persist. **Verified.**
+- Refresh inbox reads the connected account and currently returns 9 records. **Verified.**
 
 ### AP
-- Real invoice appears in the queue.
-- Extraction is evidence-based.
-- Agent decision is bounded.
-- Duplicate/vendor/currency/policy checks are visible.
+- Real invoices appear in the queue. **Verified (9 records).**
+- Extraction is evidence-based. **Verified on the live selected record.**
+- Agent decision is bounded. **Verified.**
+- Duplicate/vendor/currency/policy checks are visible. **Verified; vendor verification currently blocks payment.**
 
 ### Settlement
-- Approved invoice can settle from the correct business wallet.
+- Approved invoice can settle from the correct business wallet. **Not yet verified; no live invoice is currently approved.**
 - Mainnet confirmation is explicit.
 - Actual Arc transaction hash is stored.
 - Reconciliation reflects the real transaction state.
@@ -648,9 +663,7 @@ When taking over:
 ## 18. Immediate next actions
 
 ### P0 — Fix Circle wallet provisioning
-The SDK import incompatibility and authenticated Arc Testnet provisioning path are fixed and deployed. Remaining verification:
-- Arc Mainnet wallet creation with confirmation
-- route-level repeated provisioning response (the persisted-wallet UI prevents a normal second click; helper-level idempotency is verified)
+Complete and deployed. The ESM/CommonJS import incompatibility, authenticated Arc Testnet provisioning, deterministic retry behavior, and correct business-row persistence are verified in production. Do not create a mainnet wallet or policy vault without explicit user confirmation.
 
 ### P0 — Re-run production Google auth
 Completed after the wallet changes:
@@ -660,16 +673,17 @@ Completed after the wallet changes:
 - current deployment produced no new HTTP 500 logs during verification
 
 ### P1 — Complete real Gmail connection
-Save the production callback URI in the existing Google OAuth client, wait for propagation if necessary, then repeat Connect Gmail and verify the integration is encrypted and stored against the authenticated business.
+Complete and deployed. The production callback URI is saved, Gmail is connected, the integration is encrypted against the authenticated business, and inbox refresh returns 9 real records.
 
 ### P1 — Complete one real invoice end-to-end
-Use a genuine test/business invoice email:
-- ingest
-- evaluate
-- verify vendor
-- pass policy
-- settle
-- reconcile
+Use a genuine test/business invoice email and continue only after explicit user action where required:
+- verify/register the intended vendor
+- re-evaluate the invoice and confirm deterministic policy gates
+- obtain explicit confirmation before any USDC approval or payment transaction
+- settle only from this business's dedicated wallet on the intended network
+- reconcile the actual Arc transaction and receipt
+
+Do not use the currently held/unverified records as a reason to bypass the vendor gate. Mainnet wallet creation, policy deployment, USDC approval, and settlement all remain explicit actions.
 
 ### P1 — Final submission hygiene
 Before hackathon submission:
