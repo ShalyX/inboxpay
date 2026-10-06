@@ -1,4 +1,4 @@
-import { decryptSecret } from "../../lib/secure-tokens.mjs";
+import { decryptSecret, encryptSecret } from "../../lib/secure-tokens.mjs";
 import { supabaseRest } from "../../lib/supabase-server.mjs";
 
 const GOOGLE_TOKEN = "https://oauth2.googleapis.com/token";
@@ -76,7 +76,7 @@ export default async function handler(req, res) {
     const businessId = businesses?.[0]?.id;
 
     const existing = await supabaseRest(
-      "integrations?select=id&user_id=eq." + encodeURIComponent(inboxUser.id) + "&provider=eq.google_gmail&limit=1",
+      "integrations?select=id,refresh_token_encrypted&user_id=eq." + encodeURIComponent(inboxUser.id) + "&provider=eq.google_gmail&limit=1",
       { token: session.userToken }
     );
 
