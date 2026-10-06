@@ -20,6 +20,12 @@ async function audit(token, values) {
   await supabaseRest("audit_events", { token, method: "POST", body: values });
 }
 
+function providerError(error) {
+  const message = error instanceof Error ? error.message : "Policy vault deployment failed";
+  const code = Number.isFinite(Number(error?.code)) ? Number(error.code) : null;
+  return code ? message + " (Circle " + code + ")" : message;
+}
+
 async function statusHandler(token, user, business) {
   if (!business.policy_contract_id) return { status: "not_deployed", business, contract: null, transaction: null, allowance: null };
 
@@ -184,15 +190,35 @@ export default async function handler(req, res) {
           body: { policy_contract_status: "deploying", policy_contract_error: null, policy_contract_blockchain: business.wallet_blockchain, updated_at: new Date().toISOString() }
         });
 
-        const deployment = await deployBusinessPolicyVault({
-          businessId: business.id,
-          walletId: business.wallet_id,
-          walletAddress: business.wallet_address,
-          maxTransaction: policy.max_transaction_usdc,
-          dailyLimit: policy.daily_limit_usdc,
-          cashFloor: policy.cash_floor_usdc,
-          blockchain: business.wallet_blockchain
-        });
+        let deployment;
+        try {
+          deployment = await deployBusinessPolicyVault({
+            businessId: business.id,
+            walletId: business.wallet_id,
+            walletAddress: business.wallet_address,
+            maxTransaction: policy.max_transaction_usdc,
+            dailyLimit: policy.daily_limit_usdc,
+            cashFloor: policy.cash_floor_usdc,
+            blockchain: business.wallet_blockchain
+          });
+        } catch (error) {
+          const message = providerError(error);
+          await supabaseRest("businesses?id=eq." + encodeURIComponent(business.id), {
+            token,
+            method: "PATCH",
+            body: {
+              policy_contract_status: "error",
+              policy_contract_error: message,
+              updated_at: new Date().toISOString()
+            }
+          });
+          console.error("Circle policy deployment rejected", {
+            code: Number.isFinite(Number(error?.code)) ? Number(error.code) : null,
+            status: Number.isFinite(Number(error?.status)) ? Number(error.status) : null,
+            message
+          });
+          throw new Error(message);
+        }
 
         const updated = await supabaseRest("businesses?id=eq." + encodeURIComponent(business.id), {
           token, method: "PATCH",
