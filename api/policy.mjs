@@ -22,9 +22,37 @@ async function audit(token, values) {
 }
 
 function providerError(error) {
-  const message = error instanceof Error ? error.message : "Policy vault deployment failed";
+  const responseData = error?.error?.response?.data || error?.response?.data || null;
+  const details = [
+    responseData?.message,
+    responseData?.error?.message,
+    responseData?.data?.message,
+    ...(Array.isArray(responseData?.errors)
+      ? responseData.errors.flatMap((entry) => [entry?.message, entry?.error, entry?.reason])
+      : [])
+  ].filter((value) => typeof value === "string" && value.trim());
+  const baseMessage = error instanceof Error ? error.message : "Policy vault deployment failed";
+  const providerMessage = details.find((value) => value !== baseMessage);
+  const message = providerMessage ? baseMessage + ": " + providerMessage : baseMessage;
   const code = Number.isFinite(Number(error?.code)) ? Number(error.code) : null;
   return code ? message + " (Circle " + code + ")" : message;
+}
+
+function providerErrorContext(error) {
+  const responseData = error?.error?.response?.data || error?.response?.data || null;
+  return {
+    requestId: error?.circleRequestId || null,
+    code: Number.isFinite(Number(error?.code)) ? Number(error.code) : null,
+    status: Number.isFinite(Number(error?.status)) ? Number(error.status) : null,
+    providerCode: responseData?.code || responseData?.error?.code || null,
+    providerMessage: responseData?.message || responseData?.error?.message || responseData?.data?.message || null,
+    providerErrors: Array.isArray(responseData?.errors)
+      ? responseData.errors.slice(0, 5).map((entry) => ({
+          field: entry?.field || entry?.path || null,
+          message: entry?.message || entry?.error || entry?.reason || null
+        }))
+      : []
+  };
 }
 
 async function statusHandler(token, user, business) {
@@ -243,11 +271,7 @@ export default async function handler(req, res) {
               updated_at: new Date().toISOString()
             }
           });
-          console.error("Circle policy deployment rejected", {
-            code: Number.isFinite(Number(error?.code)) ? Number(error.code) : null,
-            status: Number.isFinite(Number(error?.status)) ? Number(error.status) : null,
-            message
-          });
+          console.error("Circle policy deployment rejected", { ...providerErrorContext(error), message });
           throw new Error(message);
         }
 
