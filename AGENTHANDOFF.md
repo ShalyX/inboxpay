@@ -322,6 +322,14 @@ A separate authenticated Business B account now has its own Circle wallet on Arc
 - Refresh/reconnect restored the same Business B account, wallet, and Gmail connection after provisioning.
 - Vercel Production now has `INBOXPAY_ALLOW_MAINNET_WRITES=true` configured. A fresh Git-triggered Production build loaded the flag: the first funded deployment request reached Circle and returned `202` with contract record `01a11292-867f-71f5-b129-80bba31e335d`; Circle later marked it `FAILED` with `TX_NOT_INITIATED`, with no onchain address or transaction ID.
 
+### Business B Mainnet deployment diagnosis (2026-10-06)
+
+- A fresh authenticated status read still reports wallet balance `0.05 USDC` and policy record `01a11292-867f-71f5-b129-80bba31e335d` as Circle `FAILED` / `TX_NOT_INITIATED`; `policy_contract_address`, `policy_contract_tx_id`, and the provider transaction object are all null. No allowance or payment write was attempted.
+- InboxPay's Mainnet gate is working: the request passed only after `INBOXPAY_ALLOW_MAINNET_WRITES=true` was loaded in the fresh Production build, then the real `client.deployContract({ blockchain: "ARC", walletId: ... })` path returned `202` and Circle created the provider record.
+- This is therefore not the earlier insufficient-USDC failure and not a Supabase/UI state issue. The failure occurs before Circle initiates an onchain transaction.
+- Current provider-capability hypothesis: Circle Wallets documents Arc mainnet EOA/SCA support, while the Circle Contracts deployment quickstart and examples remain Arc Testnet-focused, and the current Circle contract-execution fee API documentation does not list `ARC` among its allowed blockchain values. Arc itself is available on Mainnet. Treat this as a Circle Contracts/Arc Mainnet capability or routing mismatch until Circle confirms otherwise.
+- Do not retry `deployContract` or ask for more funds based on this error. The next safe step is a provider support confirmation and/or an implementation review of a Circle developer-controlled wallet sign-and-broadcast deployment path that still uses Business B's dedicated wallet and Arc Mainnet RPC. No shared executor wallet is permitted.
+
 ### Mainnet PaymentPolicyVault
 
 Production vault:
