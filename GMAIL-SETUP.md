@@ -1,39 +1,53 @@
 # Gmail integration setup
 
-The AP Agent uses Gmail as the invoice intake and receipt surface.
+InboxPay uses Gmail as the invoice intake and receipt surface for a real connected business inbox.
 
-## 1. Create Google OAuth credentials
+## Production setup
 
-In Google Cloud, enable the Gmail API and create an OAuth 2.0 Client ID with application type **Desktop app**. Google documents this local OAuth flow for Node.js testing. See:
-https://developers.google.com/workspace/gmail/api/quickstart/nodejs
+The hosted product handles Gmail OAuth itself. Users **do not** upload credential files, enter client secrets, or run the local scanner.
 
-Download the credential JSON and save it as:
+In Google Cloud, create or use a **Web application** OAuth client with the Gmail API enabled.
 
-\`C:\Users\USER\tameion-ap-agent-live\credentials.json\`
+The InboxPay Gmail callback is:
 
-Do not commit or paste this file anywhere.
+`https://tameion-ap-agent-live.vercel.app/api/gmail/callback`
 
-## 2. Run the scanner
+The production origin is:
 
-Open a terminal and run:
+`https://tameion-ap-agent-live.vercel.app`
 
-\`C:\Users\USER\tameion-ap-agent-live\SCAN-GMAIL-INVOICES.cmd\`
+The same Web OAuth client may also be used for Supabase Google sign-in, provided its authorized origins and redirect URIs include both Google flows. Keeping separate clients is also valid.
 
-The first run opens Google's authorization flow. After authorization, the scanner searches:
+## Vercel configuration
 
-\`in:anywhere has:attachment filename:pdf newer_than:30d\`
+Set these server-side environment variables in the production Vercel project:
 
-It downloads PDF invoice attachments into \`gmail-inbox\`, extracts their text, and writes normalized metadata to \`gmail-scan-result.json\`.
+- `GMAIL_CLIENT_ID`
+- `GMAIL_CLIENT_SECRET`
+- the InboxPay token-encryption secret used by the Gmail integration
 
-## 3. What is wired today
+Never expose or commit these values.
 
-The scanner captures the Gmail message ID, thread ID, RFC Message-ID, sender, subject, date, PDF filename, invoice number, amount, currency, and due date.
+## Connect a business inbox
 
-The parser is intentionally deterministic and conservative. Missing key fields lower confidence instead of inventing values.
+1. Sign into InboxPay.
+2. Click **Connect Gmail**.
+3. Complete Google consent for the Gmail account that actually receives the business's invoices.
+4. InboxPay binds the Google connection to the authenticated InboxPay user and business.
+5. The server stores the provider tokens encrypted and uses them server-side to read invoice evidence.
 
-The payment path remains separately policy-gated. Gmail ingestion does not by itself move funds.
+The production connector requests Gmail read access only. It does not require the business user to paste tokens into InboxPay.
 
-## 4. Next integration
+## Invoice evaluation
 
-The next runner will consume the normalized invoice, resolve the vendor against the allowlist, apply the agent policy, execute the Arc payment when allowed, reconcile the onchain result, and reply in the original Gmail thread with the transaction receipt.
+After Gmail is connected, **Refresh inbox** runs the live Gmail invoice path. InboxPay evaluates the real email/PDF evidence, checks required fields, duplicate state, currency, vendor registry, and business policy, then produces a bounded decision such as `PAY_NOW`, `HOLD`, `ESCALATE`, or `SCHEDULE`.
 
+Gmail ingestion alone never moves funds. Settlement requires the business wallet, policy guard, verified vendor, and payment checks to pass.
+
+## Local development
+
+The repository still contains local Gmail scanner utilities for development and investigation, including:
+
+`npm run scan:gmail`
+
+Those scripts are separate from the production OAuth connector and should not be represented as the hosted user onboarding flow.
