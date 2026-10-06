@@ -584,11 +584,13 @@ At last inspection:
 - financial routes no longer crash through the PDF runtime
 - Gmail OAuth callback configuration is saved and the real Gmail integration is connected in production.
 - The connected Gmail integration is encrypted and refreshable; the live inbox currently yields 9 invoice records.
-- No invoice is approved or settled. The selected invoice is blocked because its vendor is not verified; the payment button is disabled.
+- No invoice has been settled. After explicit vendor verification, the selected invoice now evaluates to `PAY_NOW` and the settlement button is available; no payment transaction has been submitted.
 - The policy-vault deployment path is live on Arc Testnet and currently ready.
-- The intended live invoice vendor, `Acme Test Hosting`, is now registered against the documented Arc/EVM recipient address and remains in `review` until the user explicitly approves the vendor-verification transaction.
+- The intended live invoice vendor, `Acme Test Hosting`, is now registered and verified against the documented Arc/EVM recipient address.
 
 The `audit_events` RLS policy is now corrected in Supabase. Authenticated inserts require `user_id = auth.uid()` and ownership of the referenced business. A real authenticated `vendor_registered` audit insert returned HTTP 201. The earlier testnet-funding audit failure should be retested on the next real funding request; no server-authorized bypass was added.
+
+Acme vendor verification is complete on Arc Testnet. Circle transaction `0x5c61812fe41284e1b79fde64c62936b10ddd61e1e1b33096c3c1a5e80948804a` completed, the onchain vault returns Acme's registered recipient, and the `vendor_policy_updated` audit event was written. No settlement transaction has been submitted.
 
 Do not mark the product “fully working” until the following are verified live:
 
@@ -617,10 +619,10 @@ Do not mark the product “fully working” until the following are verified liv
 - Real invoices appear in the queue. **Verified (9 records).**
 - Extraction is evidence-based. **Verified on the live selected record.**
 - Agent decision is bounded. **Verified.**
-- Duplicate/vendor/currency/policy checks are visible. **Verified; vendor verification currently blocks payment.**
+- Duplicate/vendor/currency/policy checks are visible. **Verified; Acme is now verified and the selected invoice evaluates to `PAY_NOW`.**
 
 ### Settlement
-- Approved invoice can settle from the correct business wallet. **Not yet verified; no live invoice is currently approved.**
+- Approved invoice can settle from the correct business wallet. **Not yet verified; the approved invoice is intentionally awaiting explicit settlement authorization.**
 - Mainnet confirmation is explicit.
 - Actual Arc transaction hash is stored.
 - Reconciliation reflects the real transaction state.
@@ -686,7 +688,7 @@ Use a genuine test/business invoice email and continue only after explicit user 
 
 Do not use the currently held/unverified records as a reason to bypass the vendor gate. Mainnet wallet creation, policy deployment, USDC approval, and settlement all remain explicit actions.
 
-Current handoff state: Acme Test Hosting has been registered in the production vendor table with `status=review`. The Supabase RLS policy and a real authenticated audit insert are verified. The next action is an explicit Arc Testnet `setVendor` transaction before changing Acme to `verified`.
+Current handoff state: Acme Test Hosting has `status=verified`, the policy-vault recipient mapping is confirmed on Arc Testnet, and the selected invoice is `PAY_NOW`. The settlement button is intentionally untouched; USDC approval and settlement remain separate explicit actions.
 
 ### P1 — Final submission hygiene
 Before hackathon submission:
