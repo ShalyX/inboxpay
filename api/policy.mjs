@@ -185,6 +185,7 @@ export default async function handler(req, res) {
         });
 
         const deployment = await deployBusinessPolicyVault({
+          businessId: business.id,
           walletId: business.wallet_id,
           walletAddress: business.wallet_address,
           maxTransaction: policy.max_transaction_usdc,
