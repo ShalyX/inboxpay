@@ -133,13 +133,13 @@ Project:
 The production alias is:
 `tameion-ap-agent-live.vercel.app`
 
-Latest documented production deployment at handoff creation:
-- Deployment: `dpl_EPfMxK2acjFnSmWT5NYgkeacTSWK`
-- Commit: `e5fa87aefca7f8191b0c1b95ebda224f6376c738`
-- Message: `Document production Gmail OAuth flow`
+Latest verified production deployment:
+- Deployment: `dpl_2K7E6K2ZfdeSQ82ZvSSXUkJsFjRu`
+- Commit: `105f446279530350102e916cac8161fe0ffe8e9a`
+- Message: `Fix Circle wallet SDK module interop`
 - State: `READY`
 
-That deployment includes the previous auth/onboarding/frontend fixes because the docs commits were made on top of them.
+That deployment includes the previous auth/onboarding/frontend fixes and the Circle SDK import repair described below.
 
 ---
 
@@ -242,33 +242,35 @@ Current frontend has `readJsonResponse(response)` and does not force a valid ses
 
 ---
 
-## 7. CURRENT LIVE BLOCKER — Circle SDK import
+## 7. RESOLVED — Circle SDK import
 
-This is the most important thing Codex should see immediately.
+The production wallet-provisioning route previously failed while importing the Circle SDK.
 
 At the latest production runtime inspection, `/api/onboarding` produced:
 
 `SyntaxError: Named export 'initiateDeveloperControlledWalletsClient' not found. The requested module '@circle-fin/developer-controlled-wallets' is a CommonJS module...`
 
-Current file:
+Affected file:
 `lib/circle-wallets.mjs`
 
-Current import is:
+The incompatible import was:
 
 `import { initiateDeveloperControlledWalletsClient } from "@circle-fin/developer-controlled-wallets";`
 
-Vercel explicitly recommends the CommonJS-compatible pattern:
+SDK `10.8.1` exposes a named ESM export locally, but Vercel's function runtime treated the dependency as CommonJS. A direct default ESM import was also tested and rejected by Node 24 because the package's ESM build has no default export.
 
-`import pkg from "@circle-fin/developer-controlled-wallets";`
-`const { initiateDeveloperControlledWalletsClient } = pkg;`
+Resolved in:
+`105f446279530350102e916cac8161fe0ffe8e9a`
 
-**Do not blindly patch and assume success.**
-First inspect the installed package/version and confirm its exported shape, then make the smallest compatible change.
+The helper now uses Node's `createRequire(import.meta.url)` and destructures `initiateDeveloperControlledWalletsClient` from the package's CommonJS export. Verification completed against:
+- the installed `@circle-fin/developer-controlled-wallets@10.8.1`
+- direct Node 24 import of `lib/circle-wallets.mjs`
+- Vercel's generated Node 24 `api/onboarding` function bundle
+- production deployment state `READY`
 
-Relevant dependency in `package.json`:
-`"@circle-fin/developer-controlled-wallets": "^10.8.1"`
+The default Arc Testnet path also required two missing production environment variables. `CIRCLE_TEST_API_KEY` and `CIRCLE_TEST_ENTITY_SECRET` are now configured as sensitive Vercel production variables using a verified Circle test account. Live credentials remain separate under the existing live credential names.
 
-This blocker affects **dedicated business wallet provisioning**. It is distinct from Supabase Google login.
+The remaining verification boundary is an authenticated production provisioning request that creates and persists a dedicated business wallet, followed by a repeated request check. Do not treat import/build success alone as proof of persisted wallet provisioning.
 
 ---
 
@@ -538,7 +540,9 @@ At last inspection:
 - no duplicate business rows were found
 - historical auth duplicate-key issue was fixed
 - historical JSON parser masking issue was fixed
-- current known runtime blocker is the Circle SDK import during wallet provisioning
+- Circle SDK ESM/CommonJS import blocker is fixed and deployed
+- Arc Testnet Circle credentials are configured under the server's expected production variable names
+- authenticated live wallet creation/persistence and repeated-request behavior still require completion
 
 Do not mark the product “fully working” until the following are verified live:
 
@@ -610,9 +614,7 @@ When taking over:
 ## 18. Immediate next actions
 
 ### P0 — Fix Circle wallet provisioning
-Inspect `lib/circle-wallets.mjs` and the installed `@circle-fin/developer-controlled-wallets` package export format.
-
-Fix the ESM/CommonJS import incompatibility, then verify:
+The SDK import incompatibility is fixed and deployed. Complete the remaining live verification:
 - Arc Testnet wallet creation
 - Arc Mainnet wallet creation with confirmation
 - returned wallet ID/address persistence
