@@ -588,7 +588,7 @@ At last inspection:
 - The policy-vault deployment path is live on Arc Testnet and currently ready.
 - The intended live invoice vendor, `Acme Test Hosting`, is now registered against the documented Arc/EVM recipient address and remains in `review` until the user explicitly approves the vendor-verification transaction.
 
-Known production follow-up: the testnet funding audit insert is best-effort because the current `audit_events` RLS policy rejects the authenticated insert. The funding route reports `auditRecorded: false` when that happens and does not hide the funding result. Add a server-authorized audit write or the correct narrow RLS policy before treating funding audit coverage as complete.
+The `audit_events` RLS policy is now corrected in Supabase. Authenticated inserts require `user_id = auth.uid()` and ownership of the referenced business. A real authenticated `vendor_registered` audit insert returned HTTP 201. The earlier testnet-funding audit failure should be retested on the next real funding request; no server-authorized bypass was added.
 
 Do not mark the product “fully working” until the following are verified live:
 
@@ -686,7 +686,7 @@ Use a genuine test/business invoice email and continue only after explicit user 
 
 Do not use the currently held/unverified records as a reason to bypass the vendor gate. Mainnet wallet creation, policy deployment, USDC approval, and settlement all remain explicit actions.
 
-Current handoff state: Acme Test Hosting has been registered in the production vendor table with `status=review`. Supabase dashboard authentication is required to apply the narrow `audit_events` RLS policy; the policy SQL should require `user_id = auth.uid()` and ownership of the referenced business. After the RLS change is applied, verify that a real authenticated audit insert succeeds, then explicitly confirm the Arc Testnet `setVendor` transaction before changing Acme to `verified`.
+Current handoff state: Acme Test Hosting has been registered in the production vendor table with `status=review`. The Supabase RLS policy and a real authenticated audit insert are verified. The next action is an explicit Arc Testnet `setVendor` transaction before changing Acme to `verified`.
 
 ### P1 — Final submission hygiene
 Before hackathon submission:
