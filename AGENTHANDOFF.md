@@ -592,6 +592,8 @@ The `audit_events` RLS policy is now corrected in Supabase. Authenticated insert
 
 Acme vendor verification is complete on Arc Testnet. Circle transaction `0x5c61812fe41284e1b79fde64c62936b10ddd61e1e1b33096c3c1a5e80948804a` completed, the onchain vault returns Acme's registered recipient, and the `vendor_policy_updated` audit event was written. No settlement transaction has been submitted.
 
+The dedicated wallet's USDC allowance to its policy vault has now been explicitly approved on Arc Testnet. Circle reports the approval transaction `COMPLETE`, the live allowance is the maximum uint256 value, and the wallet balance is approximately `39.95 USDC` after the network fee. The invoice remains unpaid.
+
 Do not mark the product “fully working” until the following are verified live:
 
 ### Auth
@@ -688,7 +690,7 @@ Use a genuine test/business invoice email and continue only after explicit user 
 
 Do not use the currently held/unverified records as a reason to bypass the vendor gate. Mainnet wallet creation, policy deployment, USDC approval, and settlement all remain explicit actions.
 
-Current handoff state: Acme Test Hosting has `status=verified`, the policy-vault recipient mapping is confirmed on Arc Testnet, and the selected invoice is `PAY_NOW`. The settlement button is intentionally untouched; USDC approval and settlement remain separate explicit actions.
+Current handoff state: Acme Test Hosting has `status=verified`, the policy-vault recipient mapping is confirmed on Arc Testnet, the selected invoice is `PAY_NOW`, and the wallet allowance is approved. The settlement button is intentionally untouched; settlement remains a separate explicit action.
 
 ### P1 — Final submission hygiene
 Before hackathon submission:
