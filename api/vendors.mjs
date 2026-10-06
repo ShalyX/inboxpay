@@ -1,5 +1,5 @@
 import { requireUser, supabaseRest } from "../lib/supabase-server.mjs";
-import { getBusiness } from "../lib/business-data.mjs";
+import { getBusiness } from "../lib/businesses.mjs";
 import { writePolicy } from "../lib/policy-sync.mjs";
 import { keccak256 } from "viem";
 

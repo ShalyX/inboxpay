@@ -1,6 +1,6 @@
 import { parseAbi, formatUnits } from "viem";
 import { requireUser } from "../lib/supabase-server.mjs";
-import { getBusiness } from "../lib/business-data.mjs";
+import { getBusiness } from "../lib/businesses.mjs";
 import { policyClient } from "../lib/policy-sync.mjs";
 
 const USDC = "0x3600000000000000000000000000000000000000";

@@ -1,6 +1,6 @@
 import { parseAbi } from "viem";
 import { requireUser, supabaseRest } from "../lib/supabase-server.mjs";
-import { getBusiness } from "../lib/business-data.mjs";
+import { getBusiness } from "../lib/businesses.mjs";
 import { deployBusinessPolicyVault, getBusinessPolicyVault, getWalletTransaction } from "../lib/policy-contract.mjs";
 import { policyClient, writePolicy } from "../lib/policy-sync.mjs";
 
