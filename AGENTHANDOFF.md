@@ -621,7 +621,7 @@ Do not mark the product “fully working” until the following are verified liv
 - Real invoices appear in the queue. **Verified (9 records).**
 - Extraction is evidence-based. **Verified on the live selected record.**
 - Agent decision is bounded. **Verified.**
-- Duplicate/vendor/currency/policy checks are visible. **Verified; Acme is now verified and the selected invoice evaluates to `PAY_NOW`.**
+- Duplicate/vendor/currency/policy checks are visible. **Verified; Acme is now verified and the selected invoice evaluates to `PAY_NOW`. The live USD records evaluate to `HOLD` with the payment button disabled because the Arc rail requires USDC; no held invoice was submitted.**
 
 ### Settlement
 - Approved invoice can settle from the correct business wallet. **Verified on Arc Testnet for `TA-GMAIL-0001`; the dedicated wallet paid 0.50 USDC and reconciliation passed.**
