@@ -70,6 +70,26 @@ Before settlement, the contract is checked for:
 
 The payment receipt is reconciled against the vendor balance after the Arc transaction confirms.
 
+## Authentication and Google setup
+
+InboxPay uses Supabase Auth for business account authentication. Email/password signup and Google sign-in both land on the production Vercel origin. The hosted Supabase project must have Google enabled with a **Web application** OAuth client.
+
+Configure the production Supabase URL settings with:
+
+`https://tameion-ap-agent-live.vercel.app/`
+
+In Google Cloud, the Web OAuth client should authorize the production origin:
+
+`https://tameion-ap-agent-live.vercel.app`
+
+and the Supabase Auth callback:
+
+`https://ecportgmionyhlofyobc.supabase.co/auth/v1/callback`
+
+The Gmail connector is a separate Google OAuth flow. Its callback is:
+
+`https://tameion-ap-agent-live.vercel.app/api/gmail/callback`
+
 ## Deployment
 
 This repo is intentionally framework-light: static HTML/CSS/JS in `public/` plus native Vercel Node functions under `api/`. There is no frontend build step. `dev-server.mjs` is for local development only; production API traffic goes directly to the Vercel functions.
@@ -96,10 +116,11 @@ Tameion final submission requires a public GitHub repository and a recorded demo
 
 ## Product onboarding
 
-1. A business creates an InboxPay account.
-2. InboxPay provisions a dedicated Circle developer-controlled wallet and records its wallet address.
-3. The business connects the Gmail account used for invoices.
+1. A business creates or signs into an InboxPay account.
+2. The business explicitly provisions its dedicated Circle developer-controlled wallet and selects Arc Testnet or Arc Mainnet.
+3. The business connects the Gmail account used for invoices through the InboxPay OAuth flow.
 4. The business registers vendor settlement addresses and configures AP limits.
-5. InboxPay continuously evaluates real invoice evidence and settles approved USDC payments from that business wallet.
+5. The business deploys and funds the policy guard required for autonomous settlement.
+6. InboxPay continuously evaluates real invoice evidence and settles approved USDC payments from that business wallet.
 
 The hackathon evaluates genuine business usage and real USDC activity during the event window, so the production path intentionally requires a real connected business inbox rather than a synthetic invoice dataset.
