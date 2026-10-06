@@ -320,7 +320,7 @@ A separate authenticated Business B account now has its own Circle wallet on Arc
 - policy vault: not deployed; the confirmed deployment attempt was rejected by the server-side `INBOXPAY_ALLOW_MAINNET_WRITES` gate before any Circle contract was created
 - Mainnet wallet creation was explicitly confirmed; no Mainnet funds or payments have been moved.
 - Refresh/reconnect restored the same Business B account, wallet, and Gmail connection after provisioning.
-- Vercel Production now has `INBOXPAY_ALLOW_MAINNET_WRITES=true` configured. The latest production redeploy is Ready, but an authenticated live status check still reports the prior disabled-gate error, so no retry has been made and no Circle contract write has occurred.
+- Vercel Production now has `INBOXPAY_ALLOW_MAINNET_WRITES=true` configured. A fresh Git-triggered Production build loaded the flag: the confirmed deployment request reached Circle, which rejected it because the dedicated wallet has no USDC for the deployment transaction (`Circle 177025`, asset amount insufficient). No Circle contract ID or transaction ID was created.
 
 ### Mainnet PaymentPolicyVault
 
@@ -592,7 +592,7 @@ At last inspection:
 - authenticated Arc Testnet wallet creation and business-row persistence completed
 - a separate Business B account was authenticated and its dedicated Arc Mainnet wallet was created and persisted; no Mainnet policy, allowance, funding, or payment write has occurred
 - refresh/reconnect after Mainnet wallet provisioning restored the same Business B wallet and Gmail state
-- the confirmed Business B Mainnet policy deployment was rejected safely before any provider write; after enabling the Vercel Production flag, the current runtime still reports the prior disabled-gate error, so Circle contract ID and transaction ID remain null
+- the confirmed Business B Mainnet policy deployment reached the real Circle provider after the runtime flag was loaded, then failed safely because the dedicated wallet has `0 USDC` and Circle returned `Circle 177025` (asset amount insufficient); Circle contract ID and transaction ID remain null
 - deterministic retry behavior was verified against the real Circle test account
 - the persisted wallet and live balance reload successfully in production (`39.96 USDC` after the testnet faucet and policy deployment fee)
 - financial routes no longer crash through the PDF runtime
@@ -621,7 +621,7 @@ Do not mark the product “fully working” until the following are verified liv
 - Wallet details persist to the correct business row. **Verified.**
 - A retry does not create another Circle wallet. **Verified at the Circle helper boundary.**
 - Dedicated Arc Mainnet wallet creation is **verified for separate Business B** after explicit confirmation; the existing Testnet wallet was not replaced. Mainnet policy deployment remains separately gated.
-- Vercel Production `INBOXPAY_ALLOW_MAINNET_WRITES=true` is configured, but the current Ready deployment still serves the prior disabled-gate response. Do not retry until a fresh deployment/build is verified to load the flag; no provider contract was created.
+- Vercel Production `INBOXPAY_ALLOW_MAINNET_WRITES=true` is configured and verified in a fresh Ready build. The real deployment path now reaches Circle, but Business B's `0 USDC` wallet cannot pay the policy-vault deployment transaction (`Circle 177025`); no provider contract was created. Fund the dedicated wallet before retrying.
 
 - Arc Testnet policy-vault deployment succeeds after real faucet funding. **Verified.**
 - Failed provider contract state is surfaced as an actionable error and can be retried without parallel duplicate deployment. **Verified.**
@@ -641,7 +641,7 @@ Do not mark the product “fully working” until the following are verified liv
 ### Refresh / adversarial rejection QA
 - Refresh/reconnect after Business B Mainnet wallet provisioning restored the authenticated account, dedicated wallet, Gmail connection, and `0 USDC` balance. **Verified.**
 - Mainnet policy deployment without `confirmMainnet=true` returns HTTP `409` and performs no provider write. **Verified.**
-- Even with user confirmation, Mainnet policy deployment remains blocked when the live runtime does not load `INBOXPAY_ALLOW_MAINNET_WRITES=true`; the API records an actionable error and no Circle contract is created. **Verified before and after the first flag redeploy; a fresh build/runtime verification is still required.**
+- Mainnet policy deployment without the flag is blocked before provider access; after a fresh build loaded `INBOXPAY_ALLOW_MAINNET_WRITES=true`, the authenticated request reached Circle and was rejected with `Circle 177025` because Business B's wallet has `0 USDC`. **Verified; no contract or transaction was created.**
 - USDC approval before a policy vault exists returns HTTP `409` (`Onchain policy vault is not ready`). **Verified.**
 - Invalid vendor address and non-USDC vendor currency return HTTP `400` before persistence. **Verified.**
 - Invalid policy values (per-payment limit above daily limit and negative cash floor) return HTTP `400` before persistence. **Verified.**
@@ -711,9 +711,9 @@ Use a genuine test/business invoice email and continue only after explicit user 
 - settle only from this business's dedicated wallet on the intended network
 - reconcile the actual Arc transaction and receipt
 
-Do not use the currently held/unverified records as a reason to bypass the vendor gate. Business B's Mainnet policy deployment, USDC approval, funding, and settlement all remain explicit actions.
+Do not use the currently held/unverified records as a reason to bypass the vendor gate. Business B's Mainnet funding, policy deployment retry, USDC approval, and settlement all remain explicit actions; the wallet must be funded before the next policy deployment attempt.
 
-Current handoff state: Acme Test Hosting has `status=verified`, the policy-vault recipient mapping is confirmed on Arc Testnet, the selected invoice has settled as `confirmed`, the wallet allowance is approved, and reconciliation passed for the recorded Arc Testnet transaction. Business B's separate Arc Mainnet wallet is provisioned and persisted, but its policy deployment is currently blocked by `INBOXPAY_ALLOW_MAINNET_WRITES`; allowance, funding, and payment writes remain separately gated.
+Current handoff state: Acme Test Hosting has `status=verified`, the policy-vault recipient mapping is confirmed on Arc Testnet, the selected invoice has settled as `confirmed`, the wallet allowance is approved, and reconciliation passed for the recorded Arc Testnet transaction. Business B's separate Arc Mainnet wallet is provisioned and persisted with `0 USDC`; the Mainnet policy path is enabled in the verified production runtime but Circle rejected the confirmed deployment for insufficient wallet funds (`Circle 177025`), so no vault exists and allowance, funding, and payment writes remain separately gated.
 
 ### P1 — Final submission hygiene
 Before hackathon submission:
