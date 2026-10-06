@@ -26,8 +26,8 @@ async function statusHandler(token, user, business) {
   let contract = null;
   let transaction = null;
   try {
-    contract = await getBusinessPolicyVault(business.policy_contract_id);
-    if (business.policy_contract_tx_id) transaction = await getWalletTransaction(business.policy_contract_tx_id);
+    contract = await getBusinessPolicyVault(business.policy_contract_id, business.wallet_blockchain);
+    if (business.policy_contract_tx_id) transaction = await getWalletTransaction(business.policy_contract_tx_id, business.wallet_blockchain);
   } catch (error) {
     return {
       status: business.policy_contract_status,
@@ -124,7 +124,8 @@ export default async function handler(req, res) {
             walletId: business.wallet_id,
             contractAddress: business.policy_contract_address,
             abiFunctionSignature: "setPolicy(uint256,uint256,uint256)",
-            abiParameters: [String(Math.round(maxTx * 1e6)), String(Math.round(daily * 1e6)), String(Math.round(floor * 1e6))]
+            abiParameters: [String(Math.round(maxTx * 1e6)), String(Math.round(daily * 1e6)), String(Math.round(floor * 1e6))],
+            blockchain: business.wallet_blockchain
           });
           await audit(token, {
             user_id: user.id,
@@ -140,7 +141,8 @@ export default async function handler(req, res) {
             walletId: business.wallet_id,
             contractAddress: business.policy_contract_address,
             abiFunctionSignature: "setPaused(bool)",
-            abiParameters: [Boolean(updates.paused)]
+            abiParameters: [Boolean(updates.paused)],
+            blockchain: business.wallet_blockchain
           });
           await audit(token, {
             user_id: user.id,
@@ -234,7 +236,8 @@ export default async function handler(req, res) {
             walletId: business.wallet_id,
             contractAddress: USDC,
             abiFunctionSignature: "approve(address,uint256)",
-            abiParameters: [business.policy_contract_address, String(maxUint256)]
+            abiParameters: [business.policy_contract_address, String(maxUint256)],
+            blockchain: business.wallet_blockchain
           });
 
           await audit(token, {

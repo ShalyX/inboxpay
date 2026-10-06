@@ -37,7 +37,8 @@ export default async function handler(req, res) {
           walletId: business.wallet_id,
           contractAddress: business.policy_contract_address,
           abiFunctionSignature: "setVendor(bytes32,address)",
-          abiParameters: [vendorId, recipient]
+          abiParameters: [vendorId, recipient],
+          blockchain: business.wallet_blockchain
         });
         await supabaseRest("audit_events", {
           token,
