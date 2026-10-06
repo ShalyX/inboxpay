@@ -7,6 +7,7 @@ import { policyClient, writePolicy } from "../lib/policy-sync.mjs";
 const USDC = "0x3600000000000000000000000000000000000000";
 const maxUint256 = (1n << 256n) - 1n;
 const allowedNumbers = new Set(["max_transaction_usdc","daily_limit_usdc","cash_floor_usdc"]);
+const deploymentRequestTimeoutMs = 5 * 60 * 1000;
 
 async function getPolicy(token, businessId) {
   const rows = await supabaseRest(
@@ -27,7 +28,37 @@ function providerError(error) {
 }
 
 async function statusHandler(token, user, business) {
-  if (!business.policy_contract_id) return { status: "not_deployed", business, contract: null, transaction: null, allowance: null };
+  if (!business.policy_contract_id) {
+    let currentBusiness = business;
+    if (business.policy_contract_status === "deploying") {
+      const requestStartedAt = Date.parse(business.updated_at || "");
+      const requestIsStale = !Number.isFinite(requestStartedAt) || Date.now() - requestStartedAt >= deploymentRequestTimeoutMs;
+      if (requestIsStale) {
+        const message = "The policy deployment request did not produce a Circle contract. Retry deployment.";
+        const updated = await supabaseRest(
+          "businesses?id=eq." + encodeURIComponent(business.id),
+          {
+            token,
+            method: "PATCH",
+            body: {
+              policy_contract_status: "error",
+              policy_contract_error: message,
+              updated_at: new Date().toISOString()
+            }
+          }
+        );
+        currentBusiness = updated?.[0] || { ...business, policy_contract_status: "error", policy_contract_error: message };
+      }
+    }
+
+    return {
+      status: currentBusiness.policy_contract_status === "error" ? "error" : "not_deployed",
+      business: currentBusiness,
+      contract: null,
+      transaction: null,
+      allowance: null
+    };
+  }
 
   let contract = null;
   let transaction = null;
