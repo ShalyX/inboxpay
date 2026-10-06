@@ -133,10 +133,10 @@ Project:
 The production alias is:
 `tameion-ap-agent-live.vercel.app`
 
-Latest verified production deployment:
-- Deployment: `dpl_6skKxTFAmV1HEkacqDXmLg7UGdtx`
-- Commit: `2796971`
-- Message: `Record completed USDC allowance approval`
+Verified production deployment carrying the current settlement UI and backend:
+- Deployment: `dpl_2vR4L2FZ8j2MYtmKXNCumudNGc38`
+- Commit: `772e75a`
+- Message: `Record confirmed Arc settlement`
 - State: `READY`
 
 That deployment includes the auth/onboarding fixes, Circle SDK import repairs, dedicated-wallet retry protection, correct Supabase wallet persistence, financial-route/PDF runtime decoupling, Gmail PDF parsing hardening, real Arc Testnet wallet funding, and failed policy-deployment recovery described below.
