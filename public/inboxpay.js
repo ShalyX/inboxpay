@@ -15,7 +15,9 @@ const state = {
   onchainPolicy: null,
   policyAllowance: false,
   vendors: [],
-  vendorRevocationSupported: null
+  vendorRevocationSupported: null,
+  preflight: null,
+  activity: { kind: null, rows: [] }
 };
 
 let bootstrapPromise = null;
@@ -387,6 +389,33 @@ function invoicePaymentReady(invoice) {
     vendor?.onchain_status === "registered";
 }
 
+async function loadPreflight(invoice = state.selected) {
+  state.preflight = null;
+  if (!invoice?.invoiceNumber) {
+    renderDetail();
+    return;
+  }
+  try {
+    const response = await apiFetch("/api/preflight?invoice=" + encodeURIComponent(invoice.invoiceNumber));
+    const data = await readJsonResponse(response);
+    if (!response.ok) throw new Error(data.error || "Payment preflight unavailable");
+    if (state.selected?.invoiceNumber === invoice.invoiceNumber) {
+      state.preflight = data.preflight || null;
+      renderStats();
+      renderDetail();
+    }
+  } catch (error) {
+    if (state.selected?.invoiceNumber === invoice.invoiceNumber) {
+      state.preflight = {
+        eligible: false,
+        checks: [{ key: "preflight", label: "Onchain execution preflight", ok: false, value: "Unavailable", reason: error.message || "Payment preflight unavailable" }],
+        reasons: [error.message || "Payment preflight unavailable"]
+      };
+      renderDetail();
+    }
+  }
+}
+
 function setPolicyMessage(message, isError = false) {
   const node = $("policy-message");
   node.textContent = message || "";
@@ -692,8 +721,10 @@ function renderList() {
     button.addEventListener("click", () => {
       const number = decodeURIComponent(button.dataset.invoice);
       state.selected = state.invoices.find((x) => x.invoiceNumber === number);
+      state.preflight = null;
       renderList();
       renderDetail();
+      loadPreflight(state.selected);
     });
   });
 }
@@ -709,7 +740,8 @@ function renderDetail() {
   const policyPaused = Boolean(state.onchainPolicy?.paused ?? state.policyConfig?.paused);
   const vendor = state.vendors.find((item) => item.name === invoice.vendor);
   const vendorReady = vendor?.status === "verified" && vendor?.onchain_status === "registered";
-  const ready = invoicePaymentReady(invoice);
+  const preflight = state.preflight?.invoiceNumber === invoice.invoiceNumber ? state.preflight : null;
+  const ready = Boolean(preflight?.eligible);
   const detailStatus = settled
     ? "SETTLED"
     : processing
@@ -729,6 +761,17 @@ function renderDetail() {
     ? ["Payment executed and reconciled on " + settlementNetwork + "."]
     : (invoice.decisionReasons?.length ? invoice.decisionReasons : ["No decision reason recorded."]);
   const reasonsHtml = '<ul>' + reasons.map((reason) => '<li>' + escapeHtml(reason) + '</li>').join("") + '</ul>';
+  const gateReasons = preflight?.reasons || ["Checking the live policy vault and payment state…"];
+  const gateHtml = '<div class="preflight"><div class="decision-head">● Payment readiness</div><ul>' + gateReasons.map((reason) => '<li>' + escapeHtml(reason) + '</li>').join("") + '</ul></div>';
+  const checksHtml = preflight
+    ? preflight.checks.map(checkRowState).join("")
+    : checkRow("Required fields", invoice.invoiceNumber && invoice.amount !== null && invoice.dueDate ? "Complete" : "Review") +
+      checkRow("Currency rail", invoice.currency || "Unknown") +
+      checkRow("Vendor registry", vendorReady || settled ? "Verified" : "Onchain registration required") +
+      checkRow("Business wallet", state.business?.wallet_status === "ready" ? "Ready" : "Provisioning") +
+      checkRow("Policy vault", vaultReady ? "Ready" : "Not ready") +
+      checkRow("USDC authorization", state.policyAllowance ? "Ready" : "Required") +
+      checkRow("Emergency pause", policyPaused ? "Paused" : "Ready");
   $("detail").innerHTML = '<div class="detail-inner"><div class="detail-top"><div><label>INVOICE</label><h2>' +
     escapeHtml(invoice.invoiceNumber || "Needs review") + '</h2></div>' + status(detailStatus) + '</div>' +
     '<div class="merchant"><div class="avatar big">' + escapeHtml(vendorInitial) + '</div><div><strong>' +
@@ -737,18 +780,11 @@ function renderDetail() {
     Number(invoice.amount || 0).toFixed(2) + ' <span>' + escapeHtml(invoice.currency || "") + '</span></div><div class="decision"><div class="decision-head">● Agent reasoning</div>' +
     reasonsHtml + '<div class="confidence"><span>Extraction confidence</span><b>' +
     escapeHtml(invoice.extraction?.confidence || "unknown") + '</b></div></div>' +
-    '<div class="checks">' +
-    checkRow("Required fields", invoice.invoiceNumber && invoice.amount !== null && invoice.dueDate ? "Complete" : "Review") +
-    checkRow("Currency rail", invoice.currency || "Unknown") +
-    checkRow("Vendor registry", vendorReady || settled ? "Verified" : "Onchain registration required") +
-    checkRow("Business wallet", state.business?.wallet_status === "ready" ? "Ready" : "Provisioning") +
-    checkRow("Policy vault", vaultReady ? "Ready" : "Not ready") +
-    checkRow("USDC authorization", state.policyAllowance ? "Ready" : "Required") +
-    checkRow("Emergency pause", policyPaused ? "Paused" : "Ready") +
+    gateHtml + '<div class="checks">' + checksHtml +
     (processing ? checkRow("Payment recovery", "In progress") : reviewRequired ? checkRow("Payment recovery", "Manual review") : "") +
     '</div>' + (settled ? '<div class="settlement"><span>Arc confirmation</span><b>Reconciliation PASS</b></div>' : "") +
     '<button id="pay-button" class="pay"' + (ready ? "" : " disabled") +
-    '>' + (ready ? (invoice.settlement?.status === "failed" ? "Review & retry on Arc ↗" : "Review & settle on Arc ↗") : settled ? "Settled on Arc ✓" : processing ? "Payment submitted · recovering…" : reviewRequired ? "Payment under review" : "Payment blocked") + '</button></div>';
+    '>' + (ready ? (invoice.settlement?.status === "failed" ? "Review & retry on Arc ↗" : "Review & settle on Arc ↗") : settled ? "Settled on Arc ✓" : processing ? "Payment submitted · recovering…" : reviewRequired ? "Payment under review" : preflight ? "Payment blocked" : "Checking payment gates…") + '</button></div>';
 
   if (ready) $("pay-button").addEventListener("click", settle);
 }
@@ -757,6 +793,63 @@ function checkRow(label, value) {
   const ok = value === "Complete" || value === "USDC" || value === "Verified" || value === "Ready";
   return '<div class="check-row"><span class="' + (ok ? "check-ok" : "") + '">' + (ok ? "✓" : "○") + " " + escapeHtml(label) +
     '</span><b>' + escapeHtml(value) + '</b></div>';
+}
+
+function checkRowState(check) {
+  return '<div class="check-row"><span class="' + (check.ok ? "check-ok" : "") + '">' + (check.ok ? "✓" : "○") + " " + escapeHtml(check.label) +
+    '</span><b title="' + escapeHtml(check.reason || "") + '">' + escapeHtml(check.value || (check.ok ? "Ready" : "Blocked")) + '</b></div>';
+}
+
+function closeActivityModal() {
+  $("activity-modal").hidden = true;
+  $("activity-message").textContent = "";
+}
+
+function formatActivityDate(value) {
+  if (!value) return "Unknown time";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "Unknown time" : date.toLocaleString();
+}
+
+function renderActivity(kind, rows) {
+  const node = $("activity-list");
+  if (!rows.length) {
+    node.innerHTML = '<div class="activity-empty">No ' + (kind === "payments" ? "settlement attempts" : "audit events") + " recorded for this business yet.</div>";
+    return;
+  }
+  if (kind === "payments") {
+    node.innerHTML = rows.map((payment) => '<article class="activity-row"><div><strong>' + escapeHtml(payment.vendor || "Unknown vendor") + '</strong><span>' +
+      escapeHtml(payment.invoiceNumber || "Missing invoice number") + ' · ' + escapeHtml(formatActivityDate(payment.updatedAt)) + '</span></div><div class="activity-value"><b>' +
+      Number(payment.amount || 0).toFixed(2) + ' ' + escapeHtml(payment.currency || "") + '</b><span class="activity-status ' + escapeHtml(payment.status || "") + '">' +
+      escapeHtml(payment.status || "unknown") + '</span>' + (payment.paymentTxHash ? '<a href="' + (payment.network === "ARC" ? "https://arcscan.app/tx/" : "https://testnet.arcscan.app/tx/") + encodeURIComponent(payment.paymentTxHash) + '" target="_blank" rel="noreferrer">' + escapeHtml(payment.paymentTxHash.slice(0, 10) + "…") + '</a>' : '') + '</div></article>').join("");
+    return;
+  }
+  node.innerHTML = rows.map((event) => '<article class="activity-row"><div><strong>' + escapeHtml(event.event_type || "event") + '</strong><span>' +
+    escapeHtml(event.actor || "system") + ' · ' + escapeHtml(formatActivityDate(event.created_at)) + '</span></div><div class="activity-value"><span>' +
+    escapeHtml(event.invoice_id ? "Invoice event" : "Business event") + '</span><details><summary>Details</summary><pre>' + escapeHtml(JSON.stringify(event.data || {}, null, 2)) + '</pre></details></div></article>').join("");
+}
+
+async function openActivity(kind) {
+  $("activity-modal").hidden = false;
+  $("activity-kicker").textContent = kind === "payments" ? "SETTLEMENTS" : "AUDIT TRAIL";
+  $("activity-title").textContent = kind === "payments" ? "Payments" : "Audit trail";
+  $("activity-context").textContent = kind === "payments"
+    ? "Every submitted, failed, processing, or reconciled payment for this business."
+    : "Business-scoped evidence for policy, vendor, wallet, and settlement decisions.";
+  $("activity-message").textContent = "Loading live activity…";
+  $("activity-message").className = "auth-message";
+  $("activity-list").innerHTML = "";
+  try {
+    const response = await apiFetch(kind === "payments" ? "/api/payments" : "/api/audit");
+    const data = await readJsonResponse(response);
+    if (!response.ok) throw new Error(data.error || "Activity unavailable");
+    state.activity = { kind, rows: kind === "payments" ? (data.payments || []) : (data.events || []) };
+    $("activity-message").textContent = "";
+    renderActivity(kind, state.activity.rows);
+  } catch (error) {
+    $("activity-message").textContent = error.message || "Activity unavailable";
+    $("activity-message").className = "auth-message error";
+  }
 }
 
 function toast(message) {
@@ -928,6 +1021,7 @@ async function load() {
   if (!state.gmail?.status || state.gmail.status !== "connected") {
     state.invoices = [];
     state.selected = null;
+    state.preflight = null;
     renderStats();
     renderList();
     $("detail").innerHTML = '<div class="empty"><div class="empty-icon">✉</div><h3>Connect the business inbox</h3><p>InboxPay only evaluates invoices from a real connected Gmail account.</p><button id="empty-connect" class="pay">Connect Gmail</button></div>';
@@ -944,9 +1038,11 @@ async function load() {
     state.selected = state.selected
       ? state.invoices.find((x) => x.invoiceNumber === state.selected.invoiceNumber) || null
       : state.invoices[0] || null;
+    state.preflight = null;
     renderStats();
     renderList();
     renderDetail();
+    await loadPreflight(state.selected);
   } catch (error) {
     toast(error.message);
   } finally {
@@ -1010,6 +1106,9 @@ async function init() {
     $("vendor-form").addEventListener("submit", addVendor);
     $("open-policy").addEventListener("click", openPolicyModal);
     $("open-policy-top").addEventListener("click", openPolicyModal);
+    $("open-payments").addEventListener("click", () => openActivity("payments"));
+    $("open-audit").addEventListener("click", () => openActivity("audit"));
+    $("close-activity").addEventListener("click", closeActivityModal);
     $("close-policy").addEventListener("click", closePolicyModal);
     $("policy-form").addEventListener("submit", savePolicy);
     $("policy-migrate").addEventListener("click", migratePolicyVault);

@@ -33,10 +33,10 @@
     <aside class="sidebar">
       <div class="brand"><div class="mark">I</div><div><strong>InboxPay</strong><span>autonomous AP</span></div></div>
       <nav>
-        <button class="nav active"><span>▣</span> Inbox <b id="invoice-count">0</b></button>
-        <button class="nav"><span>↗</span> Payments <b id="payment-count">0</b></button>
+        <button class="nav active" data-nav="inbox"><span>▣</span> Inbox <b id="invoice-count">0</b></button>
+        <button id="open-payments" class="nav" data-nav="payments"><span>↗</span> Payments <b id="payment-count">0</b></button>
         <button id="open-policy" class="nav"><span>◇</span> Policies</button>
-        <button class="nav"><span>≡</span> Audit trail</button>
+        <button id="open-audit" class="nav" data-nav="audit"><span>≡</span> Audit trail</button>
       </nav>
       <div class="sidebar-foot"><div><i class="dot"></i><strong id="network-label">Arc Mainnet</strong></div><small>USDC settlement rail</small></div>
     </aside>
@@ -123,6 +123,14 @@
       </div>
     </div>
     <div id="toast" class="toast" hidden></div>
+    <div id="activity-modal" class="vendor-modal" hidden>
+      <div class="vendor-card activity-card" role="dialog" aria-modal="true" aria-labelledby="activity-title">
+        <div class="detail-top"><div><label id="activity-kicker">ACTIVITY</label><h2 id="activity-title">Payments</h2></div><button id="close-activity" class="ghost" type="button">Close</button></div>
+        <p id="activity-context">A business-scoped view of real settlement state and receipts.</p>
+        <div id="activity-message" class="auth-message" aria-live="polite"></div>
+        <div id="activity-list" class="activity-list"></div>
+      </div>
+    </div>
   </main>
   <script type="module" src="/inboxpay.js"></script>
 </body>

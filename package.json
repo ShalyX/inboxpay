@@ -6,6 +6,7 @@
     "start": "node dev-server.mjs",
     "scan:gmail": "node gmail-bridge.mjs scan",
     "evaluate": "node agent-evaluator.mjs",
+    "test:preflight": "node scripts/payment-preflight-check.mjs",
     "test:recovery": "node scripts/settlement-recovery-check.mjs",
     "test:migration": "node scripts/policy-migration-check.mjs",
     "compile:policy": "node scripts/compile-policy.mjs"
