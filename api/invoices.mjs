@@ -13,13 +13,13 @@ export default async function handler(req, res) {
     const { token, user } = await requireUser(req);
     if (req.method === "PATCH") {
       const action = String(req.body?.action || "").toLowerCase();
-      if (!["schedule", "cancel_schedule"].includes(action)) {
-        return res.status(400).json({ error: "Invoice action must be schedule or cancel_schedule" });
+      if (!["schedule", "reschedule", "cancel_schedule"].includes(action)) {
+        return res.status(400).json({ error: "Invoice action must be schedule, reschedule, or cancel_schedule" });
       }
       const invoiceNumber = String(req.body?.invoiceNumber || "").trim();
       if (!invoiceNumber) return res.status(400).json({ error: "Invoice number is required" });
       const result = await scheduleBusinessInvoice(token, user.id, invoiceNumber, {
-        action: action === "cancel_schedule" ? "cancel" : "schedule",
+        action: action === "cancel_schedule" ? "cancel" : action,
         scheduledFor: req.body?.scheduledFor
       });
       return res.status(result.idempotent ? 200 : 201).json({ ok: true, ...result });

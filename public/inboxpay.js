@@ -822,7 +822,7 @@ function renderDetail() {
   const scheduleHtml = scheduled
     ? '<div class="schedule-card"><div><strong>Queued for review</strong><span>' +
       escapeHtml(invoice.schedule?.scheduledFor ? new Date(invoice.schedule.scheduledFor).toLocaleString() : "Target pending audit reconciliation") +
-      '</span><small>Vendor verification and live policy preflight are still required. No payment has been submitted.</small></div><button id="cancel-schedule" class="ghost" type="button">Cancel schedule</button></div>'
+      '</span><small>Vendor verification and live policy preflight are still required. No payment has been submitted.</small></div><div class="schedule-actions"><button id="reschedule-button" class="ghost" type="button">Reschedule</button><button id="cancel-schedule" class="ghost" type="button">Cancel schedule</button></div></div>'
     : scheduleDecision
       ? '<div class="schedule-card"><div><strong>Schedule this invoice</strong><span>Queue for review on the due date</span><small>This records a durable review queue entry only. It will not move funds or bypass vendor verification.</small></div><button id="schedule-button" class="ghost" type="button">Queue for due date</button></div>'
       : "";
@@ -842,7 +842,10 @@ function renderDetail() {
 
   if (ready) $("pay-button").addEventListener("click", settle);
   if (scheduleDecision) $("schedule-button").addEventListener("click", scheduleInvoice);
-  if (scheduled) $("cancel-schedule").addEventListener("click", cancelScheduledInvoice);
+  if (scheduled) {
+    $("reschedule-button").addEventListener("click", rescheduleScheduledInvoice);
+    $("cancel-schedule").addEventListener("click", cancelScheduledInvoice);
+  }
 }
 
 function checkRow(label, value) {
@@ -1155,6 +1158,33 @@ async function cancelScheduledInvoice() {
     toast(error.message || "Unable to cancel schedule");
     button.disabled = false;
     button.textContent = "Cancel schedule";
+  }
+}
+
+async function rescheduleScheduledInvoice() {
+  const invoice = state.selected;
+  if (!invoice || invoice.settlement?.status !== "scheduled") return;
+  const current = invoice.schedule?.scheduledFor || "";
+  const scheduledFor = window.prompt("Enter the new review time as an ISO date (for example 2026-10-10T09:00:00Z). No payment will be submitted.", current);
+  if (!scheduledFor) return;
+  if (!window.confirm("Reschedule " + invoice.invoiceNumber + " for " + scheduledFor + "?\n\nThis changes only the review queue. Vendor verification and live policy preflight will still be required before any payment.")) return;
+  const button = $("reschedule-button");
+  button.disabled = true;
+  button.textContent = "Rescheduling…";
+  try {
+    const response = await apiFetch("/api/invoices", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "reschedule", invoiceNumber: invoice.invoiceNumber, scheduledFor })
+    });
+    const data = await readJsonResponse(response);
+    if (!response.ok || !data.ok) throw new Error(data.error || "Unable to reschedule invoice");
+    toast("Invoice review queue rescheduled");
+    await load();
+  } catch (error) {
+    toast(error.message || "Unable to reschedule invoice");
+    button.disabled = false;
+    button.textContent = "Reschedule";
   }
 }
 
