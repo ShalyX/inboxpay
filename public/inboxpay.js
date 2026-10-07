@@ -14,7 +14,8 @@ const state = {
   policyConfig: null,
   onchainPolicy: null,
   policyAllowance: false,
-  vendors: []
+  vendors: [],
+  vendorRevocationSupported: null
 };
 
 let bootstrapPromise = null;
@@ -731,6 +732,7 @@ async function loadVendors() {
     const data = await readJsonResponse(response);
     if (!response.ok) throw new Error(data.error || "Unable to load vendors");
     state.vendors = data.vendors || [];
+    state.vendorRevocationSupported = data.vendorRevocationSupported ?? null;
     renderVendors();
   } catch (error) {
     $("vendor-message").textContent = error.message;
@@ -740,6 +742,10 @@ async function loadVendors() {
 
 function renderVendors() {
   const node = $("vendor-list");
+  if (state.vendorRevocationSupported === false) {
+    $("vendor-message").textContent = "This vault version cannot revoke vendor addresses onchain. InboxPay can block a vendor in its registry; full chain revocation needs a vault migration.";
+    $("vendor-message").className = "auth-message error";
+  }
   if (!state.vendors.length) {
     node.innerHTML = '<div class="vendor-empty">No vendor addresses registered yet.</div>';
     return;

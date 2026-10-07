@@ -74,9 +74,12 @@ contract BusinessPolicyVault {
     }
 
     function setVendor(bytes32 vendorId, address recipient) external onlyOwner {
-        require(recipient != address(0), "RECIPIENT_ZERO");
         vendorRecipient[vendorId] = recipient;
         emit VendorSet(vendorId, recipient);
+    }
+
+    function vendorRevocationSupported() external pure returns (bool) {
+        return true;
     }
 
     function setPaused(bool value) external onlyOwner {
@@ -143,5 +146,4 @@ contract BusinessPolicyVault {
         emit PaymentExecuted(paymentId, vendorId, recipient, amount, invoiceHash);
     }
 
-}
 }

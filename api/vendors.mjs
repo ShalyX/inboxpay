@@ -1,6 +1,6 @@
 import { requireUser, supabaseRest } from "../lib/supabase-server.mjs";
 import { getBusiness } from "../lib/businesses.mjs";
-import { readVendorRecipient, writePolicy } from "../lib/policy-sync.mjs";
+import { readVendorRecipient, readVendorRevocationSupported, writePolicy } from "../lib/policy-sync.mjs";
 import { keccak256 } from "viem";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
@@ -32,7 +32,11 @@ export default async function handler(req, res) {
           return { ...vendor, onchain_status: "unavailable" };
         }
       }));
-      return res.status(200).json({ vendors: withChainState });
+      const vendorRevocationSupported = business.policy_contract_address &&
+        business.policy_contract_status === "ready"
+        ? await readVendorRevocationSupported(business.policy_contract_address, business.wallet_blockchain)
+        : null;
+      return res.status(200).json({ vendors: withChainState, vendorRevocationSupported });
     }
 
     if (req.method === "PATCH") {
@@ -48,6 +52,7 @@ export default async function handler(req, res) {
       const vendor = existingRows?.[0];
       if (!vendor) return res.status(404).json({ error: "Vendor not found" });
 
+      let revocationWarning = null;
       if (business.policy_contract_status === "ready" && business.policy_contract_address) {
         if (business.wallet_blockchain === "ARC" && req.body?.confirmMainnet !== true) {
           return res.status(409).json({
@@ -60,33 +65,48 @@ export default async function handler(req, res) {
             }
           });
         }
-        const vendorId = keccak256(new TextEncoder().encode("vendor:" + vendor.name));
-        const recipient = status === "verified" ? vendor.recipient_address : ZERO_ADDRESS;
-        const tx = await writePolicy({
-          walletId: business.wallet_id,
-          contractAddress: business.policy_contract_address,
-          abiFunctionSignature: "setVendor(bytes32,address)",
-          abiParameters: [vendorId, recipient],
-          blockchain: business.wallet_blockchain
-        });
-        await supabaseRest("audit_events", {
-          token,
-          method: "POST",
-          body: {
-            user_id: user.id,
-            business_id: business.id,
-            event_type: "vendor_policy_updated",
-            actor: "user",
-            data: { vendor: vendor.name, status, tx_hash: tx.txHash }
-          }
-        });
+        const revocationSupported = status === "verified" || await readVendorRevocationSupported(
+            business.policy_contract_address,
+            business.wallet_blockchain
+          );
+        if (status !== "verified" && !revocationSupported) {
+          revocationWarning = revocationSupported === false
+            ? "Vendor blocked in InboxPay. This policy vault cannot clear its onchain registration; onchain vendor revocation requires a policy-vault migration."
+            : "Vendor blocked in InboxPay. InboxPay could not confirm this vault's onchain revocation capability; no revocation transaction was submitted.";
+        }
+        if (!revocationWarning) {
+          const vendorId = keccak256(new TextEncoder().encode("vendor:" + vendor.name));
+          const recipient = status === "verified" ? vendor.recipient_address : ZERO_ADDRESS;
+          const tx = await writePolicy({
+            walletId: business.wallet_id,
+            contractAddress: business.policy_contract_address,
+            abiFunctionSignature: "setVendor(bytes32,address)",
+            abiParameters: [vendorId, recipient],
+            blockchain: business.wallet_blockchain
+          });
+          await supabaseRest("audit_events", {
+            token,
+            method: "POST",
+            body: {
+              user_id: user.id,
+              business_id: business.id,
+              event_type: "vendor_policy_updated",
+              actor: "user",
+              data: { vendor: vendor.name, status, tx_hash: tx.txHash }
+            }
+          });
+        }
       }
 
       const rows = await supabaseRest(
         "vendors?id=eq." + encodeURIComponent(id) + "&business_id=eq." + encodeURIComponent(business.id),
         { token, method: "PATCH", body: { status, updated_at: new Date().toISOString() } }
       );
-      return res.status(200).json({ vendor: rows?.[0] || { ...vendor, status } });
+      return res.status(200).json({
+        vendor: rows?.[0] || { ...vendor, status },
+        warning: revocationWarning,
+        onchainRevoked: revocationWarning ? false : null
+      });
     }
 
     if (req.method === "POST") {

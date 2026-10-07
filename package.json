@@ -5,7 +5,9 @@
   "scripts": {
     "start": "node dev-server.mjs",
     "scan:gmail": "node gmail-bridge.mjs scan",
-    "evaluate": "node agent-evaluator.mjs"
+    "evaluate": "node agent-evaluator.mjs",
+    "test:recovery": "node scripts/settlement-recovery-check.mjs",
+    "compile:policy": "node scripts/compile-policy.mjs"
   },
   "dependencies": {
     "@napi-rs/canvas": "0.1.80",

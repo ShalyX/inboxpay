@@ -1,43 +1,22 @@
 import fs from "node:fs";
 import path from "node:path";
-import solc from "solc";
+import { execFileSync } from "node:child_process";
 
 const root = process.cwd();
-const sourcePath = path.join(root, "contracts", "BusinessPolicyVault.sol");
-const source = fs.readFileSync(sourcePath, "utf8");
-
-const input = {
-  language: "Solidity",
-  sources: {
-    "BusinessPolicyVault.sol": { content: source }
-  },
-  settings: {
-    evmVersion: "paris",
-    optimizer: { enabled: true, runs: 200 },
-    outputSelection: {
-      "*": {
-        "*": ["abi", "evm.bytecode.object"]
-      }
-    }
-  }
-};
-
-const output = JSON.parse(solc.compile(JSON.stringify(input)));
-
-if (output.errors?.some((e) => e.severity === "error")) {
-  console.error(output.errors);
-  process.exit(1);
-}
-
-const compiled = output.contracts?.["BusinessPolicyVault.sol"]?.BusinessPolicyVault;
-if (!compiled?.evm?.bytecode?.object) throw new Error("Policy vault bytecode missing");
+execFileSync("forge", ["build"], { cwd: root, stdio: "inherit" });
+const compiledPath = path.join(root, "out", "BusinessPolicyVault.sol", "BusinessPolicyVault.json");
+const compiled = JSON.parse(fs.readFileSync(compiledPath, "utf8"));
+const bytecode = compiled.bytecode?.object;
+const compilerVersion = compiled.metadata?.compiler?.version;
+const evmVersion = compiled.metadata?.settings?.evmVersion;
+if (!bytecode || !compilerVersion || !evmVersion) throw new Error("Policy vault compiler output is incomplete");
 
 const artifact = {
   contractName: "BusinessPolicyVault",
   abi: compiled.abi,
-  bytecode: "0x" + compiled.evm.bytecode.object,
-  compiler: "solc 0.8.19",
-  evmVersion: "paris"
+  bytecode,
+  compiler: "solc " + compilerVersion.split("+")[0],
+  evmVersion
 };
 
 fs.mkdirSync(path.join(root, "contracts", "artifacts"), { recursive: true });
