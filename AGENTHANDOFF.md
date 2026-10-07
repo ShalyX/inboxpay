@@ -819,7 +819,7 @@ Commit `5fe89e8` and Vercel deployment `dpl_7hNtL7rkHDDVUhhR5ddWjrrLCh2U` are pr
 
 ### P1 — Durable invoice scheduling queue (complete for review semantics)
 
-Commit `cbe91a0` is deployed in `READY` Vercel deployment `dpl_Ehb93FyNcjZk8nDeU2RqGVDQEhLr`; the handoff-only follow-up commits `4942ab2` and `9555ed0` are the current production alias in `READY` deployment `dpl_Cmq44dssKygVKAi6vwfhURSumLkN`. The queue is intentionally review-only: it persists `SCHEDULE` state and cancellation, but it does not create a worker or authorize a payment. Keep real vendor onboarding and Business B Mainnet allowance/payment actions separately gated.
+Commit `cbe91a0` is deployed in `READY` Vercel deployment `dpl_Ehb93FyNcjZk8nDeU2RqGVDQEhLr`; the handoff-only follow-ups `4942ab2`, `9555ed0`, and later docs-only builds preserve the same production feature. The queue is intentionally review-only: it persists `SCHEDULE` state and cancellation, but it does not create a worker or authorize a payment. Keep real vendor onboarding and Business B Mainnet allowance/payment actions separately gated.
 
 ### P1 — Final submission hygiene
 Before hackathon submission:
