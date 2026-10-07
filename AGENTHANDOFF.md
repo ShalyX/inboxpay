@@ -133,10 +133,10 @@ Project:
 The production alias is:
 `tameion-ap-agent-live.vercel.app`
 
-Verified production deployment carrying the current settlement UI, payment preflight, and activity surfaces:
-- Deployment: `dpl_7hNtL7rkHDDVUhhR5ddWjrrLCh2U`
-- Commit: `5fe89e8`
-- Message: `Expose activity views in compact layout`
+Verified production deployment carrying the current settlement UI, payment preflight, activity surfaces, and business profile control:
+- Deployment: `dpl_DctJx1xVFySU6k2EPhaNx3myLUAi`
+- Commit: `32173ad`
+- Message: `Add business profile name control`
 - State: `READY`
 
 That deployment includes the auth/onboarding fixes, Circle SDK import repairs, dedicated-wallet retry protection, correct Supabase wallet persistence, financial-route/PDF runtime decoupling, Gmail PDF parsing hardening, real Arc Testnet wallet funding, and failed policy-deployment recovery described below.
@@ -388,13 +388,20 @@ The next production build flow is now shipped and verified on commit `5fe89e8` /
 - Authenticated browser verification after deployment showed Business B's dedicated Mainnet wallet and replacement vault, no invoice rows, no settlement attempts, and the real existing audit events. Browser console error/warning inspection was clean. The read-only unauthenticated route checks return `401` as expected.
 - Mainnet state is unchanged and clean: the replacement vault remains `0xbfd7f80416bda5a2c2c79ad4f8ff108c6c3b0706`, the Acme QA mapping remains blocked/zero onchain, the Business B USDC allowance remains `0`, and no Mainnet payment has been submitted.
 
+### Business profile control (2026-10-07)
+
+- Business identity editing is now available through the existing `/api/onboarding` function using the business-owner scoped `rename_business` action. Names are trimmed, whitespace-normalized, capped at 80 characters, and reject control characters.
+- The UI clearly states that renaming does not change wallet ownership, policy limits, vendor permissions, or payment authorization. The mutation records a `business_profile_updated` audit event.
+- Local `npm run test:profile` passes with invalid-length, control-character, whitespace, and Unicode cases. Production deployment `dpl_DctJx1xVFySU6k2EPhaNx3myLUAi` reached `READY`; the authenticated profile editor was verified without saving a change.
+- Real vendor onboarding is intentionally deferred. Acme remains QA-only/blocked, the Mainnet allowance remains zero, and no payment write has been submitted.
+
 Known gaps from this audit remain queued and must not be papered over:
 
 - **P0 contract migration:** new source and artifact support `setVendor(address(0))` for revocation and expose `vendorRevocationSupported()`. `forge test` passes the revocation behavior test. The generated optimized Paris artifact uses solc 0.8.24 (4,563-byte creation bytecode, excluding the `0x` prefix). The original Business B vault at `0x8d8e3e5b0ca5da40c4976cf8b7fb589f3d400942` remains deployed but is now legacy. The user-confirmed migration completed: InboxPay now points to replacement vault `0xbfd7f80416bda5a2c2c79ad4f8ff108c6c3b0706`; a direct Arc Mainnet RPC read returns `vendorRevocationSupported() = true`, 3,841 bytes of code, and `1,000,000,000 / 5,000,000,000 / 20,000,000` six-decimal USDC limits. Authenticated UI verification shows the replacement vault and `USDC access not authorized`; the vendor registry is empty after cutover. Allowance, vendor registration, and payment remain separate explicit actions.
 - **P0 reconciliation recovery:** the source implementation records Circle submission IDs and deterministic idempotency keys before waiting, keeps provider timeouts in `processing`, reconciles pending invoices on authenticated refresh, distinguishes terminal provider failure (including Circle `STUCK`) from unknown/confirming state, and validates the Arc receipt against the expected policy vault, payment ID, vendor, recipient, amount, and invoice hash. `npm run test:recovery` now passes adversarial fixtures for idempotency, bounded retries, Circle terminal states, event matching, missing/reverted receipts, and wrong vault/event data. This is source-level verification; do not call the settlement loop fully production-verified until the latest code is deployed and live recovery behavior is checked. A real settlement remains untested on Business B Mainnet.
 - **P1 product surfaces:** complete for the current slice. Payments and Audit trail are business-scoped read-only views with settlement status, receipt links, and audit event detail. Continue expanding receipt/recovery UX as real settlements accumulate.
 - **P1 policy preflight:** complete for the current slice. Daily spend, wallet balance/cash-floor headroom, allowance, limits, vendor mapping, settlement state, and the live `canExecute` reason are surfaced per invoice before submission. Continue adversarial testing with a real invoice when a real vendor is available.
-- **P1 onboarding:** the business name is inferred from sign-up metadata/domain and has no product edit flow.
+- **P1 onboarding:** business name editing is complete. New accounts still receive an inferred initial name, but the owner can now correct it from the authenticated product UI.
 - **P1 scheduling:** `SCHEDULE` is a decision label, not yet a durable scheduled-execution queue with cancel/reschedule controls.
 - **Developer workflow:** `npm start` currently fails because `dev-server.mjs` imports missing `lib/inboxpay.mjs`; production Vercel functions are separate, but local end-to-end startup is broken and must be repaired.
 
