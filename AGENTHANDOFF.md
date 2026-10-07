@@ -134,9 +134,9 @@ The production alias is:
 `tameion-ap-agent-live.vercel.app`
 
 Verified production deployment carrying the current settlement UI, payment preflight, activity surfaces, business profile control, and durable invoice scheduling queue:
-- Deployment: `dpl_7t9ecBPQ8mov559ZXLCtzFzam9Sr`
-- Commit: `a85074b`
-- Message: `Repair local runtime and add due review worker`
+- Deployment: `dpl_B78wCnZX5Q71HtChehtWaj84Qk3T`
+- Commit: `11cb676`
+- Message: `Include reschedules in schedule state queries`
 - State: `READY`
 
 That deployment includes the auth/onboarding fixes, Circle SDK import repairs, dedicated-wallet retry protection, correct Supabase wallet persistence, financial-route/PDF runtime decoupling, Gmail PDF parsing hardening, real Arc Testnet wallet funding, and failed policy-deployment recovery described below.
@@ -402,7 +402,8 @@ The next production build flow is now shipped and verified on commit `5fe89e8` /
 - A queued invoice can be rescheduled with a new bounded ISO target. Rescheduling appends `invoice_schedule_rescheduled` with the previous and new target while preserving the queued state; the UI requires an explicit confirmation and states that no payment is submitted.
 - `cancel_schedule` uses a compare-and-set update so a schedule can be cancelled without clearing a concurrent settlement state. The UI requires an explicit confirmation for queue and cancel actions, shows the review target, and states that no funds move. `/api/pay` preflight now fails closed for `scheduled` invoices until the schedule is cancelled.
 - Schedule state is reconstructed from the business-scoped audit trail during invoice refresh. No real vendor onboarding was performed for this slice; Business B's Mainnet wallet, replacement vault, zero allowance, blocked Acme QA mapping, and zero Mainnet payment state are unchanged.
-- Local verification passes: `npm run test:scheduling`, `npm run test:preflight`, `npm run test:recovery`, `npm run test:migration`, `npm run test:profile`, `forge test`, JavaScript syntax checks, and `git diff --check`.
+- The refresh query includes `invoice_schedule_rescheduled` alongside schedule and cancellation events. Commit `11cb676` adds a regression test against the generated audit-event query path; a reschedule now survives refresh with its new target instead of falling back to the original schedule.
+- Local verification passes: `npm run test:scheduling`, `npm run test:local`, `npm run test:preflight`, `npm run test:recovery`, `npm run test:migration`, `npm run test:profile`, `forge test`, JavaScript syntax checks, and `git diff --check`.
 
 ### Local runtime and due-review plumbing (2026-10-07)
 
@@ -418,7 +419,7 @@ Known gaps from this audit remain queued and must not be papered over:
 - **P1 product surfaces:** complete for the current slice. Payments and Audit trail are business-scoped read-only views with settlement status, receipt links, and audit event detail. Continue expanding receipt/recovery UX as real settlements accumulate.
 - **P1 policy preflight:** complete for the current slice. Daily spend, wallet balance/cash-floor headroom, allowance, limits, vendor mapping, settlement state, and the live `canExecute` reason are surfaced per invoice before submission. Continue adversarial testing with a real invoice when a real vendor is available.
 - **P1 onboarding:** business name editing is complete. New accounts still receive an inferred initial name, but the owner can now correct it from the authenticated product UI.
-- **P1 scheduling:** due-review transition plumbing and owner-authenticated triggering are complete. A true background worker/cron, service authentication, retry/lease semantics, execution-authority design, and automatic payment remain later slices; a queued or due invoice never authorizes payment by itself.
+- **P1 scheduling:** due-review transition plumbing and owner-authenticated triggering are complete, including persisted reschedule reconstruction. `SCHEDULE` currently means “queue for future review,” not “pay automatically at this time.” A true background worker/cron, service authentication, retry/lease semantics, execution-authority design, and automatic payment remain later slices; a queued or due invoice never authorizes payment by itself.
 - **Developer workflow:** the local runtime is repaired and `npm run test:local` passes. Local authenticated API use still requires the configured environment and an authenticated session.
 
 ### Mainnet PaymentPolicyVault
@@ -828,6 +829,8 @@ Commit `5fe89e8` and Vercel deployment `dpl_7hNtL7rkHDDVUhhR5ddWjrrLCh2U` are pr
 ### P1 — Durable invoice scheduling queue (complete for review semantics)
 
 Commits `cbe91a0`, `965c33e`, and `808feb6` are deployed in `READY` Vercel deployments `dpl_Ehb93FyNcjZk8nDeU2RqGVDQEhLr`, `dpl_BRRHbBTZCTtTgvaDwQudjMYQ1uoP`, and `dpl_5fiyqpDxK6rfURGhDdofGTDxdE64`. The latest handoff-only build `dpl_E3hzi76GG4QuLZf9qtLWeCcxkWH2` is also `READY`; authenticated production verification returned the Business B session, dedicated wallet, connected Gmail, zero invoices, and no browser warnings/errors. The queue is intentionally review-only: it persists `SCHEDULE` state, cancellation, and rescheduling, but it does not create a worker or authorize a payment. Keep real vendor onboarding and Business B Mainnet allowance/payment actions separately gated.
+
+The follow-up query-path fix is commit `11cb676`, deployed `READY` as `dpl_B78wCnZX5Q71HtChehtWaj84Qk3T`. It includes `invoice_schedule_rescheduled` in persisted audit reads and verifies that refresh reconstruction uses the new target. This remains a review queue: no background wake-up or automatic payment execution is enabled.
 
 ### P1 — Local runtime and due-review plumbing (complete)
 
