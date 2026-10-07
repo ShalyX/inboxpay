@@ -41,6 +41,6 @@ assert.match(buildPaymentPreflight({ ...base, onchain: { ...base.onchain, curren
 assert.match(buildPaymentPreflight({ ...base, onchain: { ...base.onchain, walletBalance: 30 } }).reasons.join(" "), /cash-floor/);
 assert.match(buildPaymentPreflight({ ...base, onchain: { ...base.onchain, canExecute: { checked: true, allowed: false, reason: "DUPLICATE_PAYMENT" } } }).reasons.join(" "), /DUPLICATE_PAYMENT/);
 assert.equal(buildPaymentPreflight({ ...base, invoice: { ...base.invoice, settlement_status: "confirmed" } }).eligible, false);
+assert.match(buildPaymentPreflight({ ...base, invoice: { ...base.invoice, settlement_status: "scheduled" } }).reasons.join(" "), /queued for review/);
 
 console.log("payment preflight checks passed");
-

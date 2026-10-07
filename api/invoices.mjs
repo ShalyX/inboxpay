@@ -1,15 +1,30 @@
 import { requireUser } from "../lib/supabase-server.mjs";
 import { syncBusinessInvoices } from "../lib/business-data.mjs";
 import { recoverPendingBusinessInvoices } from "../lib/business-payment.mjs";
+import { invoiceScheduleStates, scheduleBusinessInvoice } from "../lib/invoice-scheduling.mjs";
 
 export default async function handler(req, res) {
-  if (req.method !== "GET") {
-    res.setHeader("Allow", "GET");
+  if (!["GET", "PATCH"].includes(req.method)) {
+    res.setHeader("Allow", "GET, PATCH");
     return res.status(405).json({ error: "Method Not Allowed" });
   }
 
   try {
     const { token, user } = await requireUser(req);
+    if (req.method === "PATCH") {
+      const action = String(req.body?.action || "").toLowerCase();
+      if (!["schedule", "cancel_schedule"].includes(action)) {
+        return res.status(400).json({ error: "Invoice action must be schedule or cancel_schedule" });
+      }
+      const invoiceNumber = String(req.body?.invoiceNumber || "").trim();
+      if (!invoiceNumber) return res.status(400).json({ error: "Invoice number is required" });
+      const result = await scheduleBusinessInvoice(token, user.id, invoiceNumber, {
+        action: action === "cancel_schedule" ? "cancel" : "schedule",
+        scheduledFor: req.body?.scheduledFor
+      });
+      return res.status(result.idempotent ? 200 : 201).json({ ok: true, ...result });
+    }
+
     const result = await syncBusinessInvoices(token, user.id);
     const recoveredInvoices = await recoverPendingBusinessInvoices(
       token,
@@ -18,6 +33,7 @@ export default async function handler(req, res) {
       result.invoices || []
     );
 
+    const scheduleStates = await invoiceScheduleStates(token, result.business.id, user.id, recoveredInvoices);
     const invoices = recoveredInvoices.map((invoice) => ({
       vendor: invoice.vendor,
       invoiceNumber: invoice.invoice_number,
@@ -30,6 +46,9 @@ export default async function handler(req, res) {
       sourceCount: invoice.sources?.length || 0,
       sources: invoice.sources,
       paymentId: invoice.payment_id,
+      schedule: invoice.settlement_status === "scheduled"
+        ? (scheduleStates.get(invoice.id) || { status: "queued", scheduledFor: null, reason: "Schedule target is awaiting audit reconciliation" })
+        : null,
       settlement: invoice.settlement_status
         ? {
             status: invoice.settlement_status,

@@ -53,6 +53,7 @@ function status(decision) {
     HOLD: ["hold", "Held"],
     ESCALATE: ["escalate", "Review"],
     SCHEDULE: ["schedule", "Scheduled"],
+    SCHEDULED: ["schedule", "Queued"],
     SETTLED: ["approved", "Settled"],
     PROCESSING: ["schedule", "Processing"],
     FAILED: ["escalate", "Retry"],
@@ -382,6 +383,7 @@ function invoicePaymentReady(invoice) {
     !invoice.settlement?.reconciled &&
     invoice.settlement?.status !== "processing" &&
     invoice.settlement?.status !== "review" &&
+    invoice.settlement?.status !== "scheduled" &&
     policyIsReady() &&
     state.policyAllowance &&
     !paused &&
@@ -742,6 +744,8 @@ function renderList() {
       ? "SETTLED"
       : invoice.settlement?.status === "processing"
         ? "PROCESSING"
+        : invoice.settlement?.status === "scheduled"
+          ? "SCHEDULED"
         : invoice.settlement?.status === "failed"
           ? "FAILED"
           : invoice.settlement?.status === "review"
@@ -774,6 +778,8 @@ function renderDetail() {
   const settled = invoice.settlement?.reconciled === true;
   const processing = invoice.settlement?.status === "processing";
   const reviewRequired = invoice.settlement?.status === "review";
+  const scheduled = invoice.settlement?.status === "scheduled";
+  const scheduleDecision = invoice.agentDecision === "SCHEDULE" && !settled && !processing && !reviewRequired && !scheduled;
   const decisionReady = invoice.agentDecision === "PAY_NOW" && !settled;
   const vaultReady = policyIsReady();
   const policyPaused = Boolean(state.onchainPolicy?.paused ?? state.policyConfig?.paused);
@@ -785,6 +791,8 @@ function renderDetail() {
     ? "SETTLED"
     : processing
       ? "PROCESSING"
+      : invoice.settlement?.status === "scheduled"
+        ? "SCHEDULED"
       : invoice.settlement?.status === "failed"
         ? "FAILED"
         : reviewRequired
@@ -811,6 +819,13 @@ function renderDetail() {
       checkRow("Policy vault", vaultReady ? "Ready" : "Not ready") +
       checkRow("USDC authorization", state.policyAllowance ? "Ready" : "Required") +
       checkRow("Emergency pause", policyPaused ? "Paused" : "Ready");
+  const scheduleHtml = scheduled
+    ? '<div class="schedule-card"><div><strong>Queued for review</strong><span>' +
+      escapeHtml(invoice.schedule?.scheduledFor ? new Date(invoice.schedule.scheduledFor).toLocaleString() : "Target pending audit reconciliation") +
+      '</span><small>Vendor verification and live policy preflight are still required. No payment has been submitted.</small></div><button id="cancel-schedule" class="ghost" type="button">Cancel schedule</button></div>'
+    : scheduleDecision
+      ? '<div class="schedule-card"><div><strong>Schedule this invoice</strong><span>Queue for review on the due date</span><small>This records a durable review queue entry only. It will not move funds or bypass vendor verification.</small></div><button id="schedule-button" class="ghost" type="button">Queue for due date</button></div>'
+      : "";
   $("detail").innerHTML = '<div class="detail-inner"><div class="detail-top"><div><label>INVOICE</label><h2>' +
     escapeHtml(invoice.invoiceNumber || "Needs review") + '</h2></div>' + status(detailStatus) + '</div>' +
     '<div class="merchant"><div class="avatar big">' + escapeHtml(vendorInitial) + '</div><div><strong>' +
@@ -819,13 +834,15 @@ function renderDetail() {
     Number(invoice.amount || 0).toFixed(2) + ' <span>' + escapeHtml(invoice.currency || "") + '</span></div><div class="decision"><div class="decision-head">● Agent reasoning</div>' +
     reasonsHtml + '<div class="confidence"><span>Extraction confidence</span><b>' +
     escapeHtml(invoice.extraction?.confidence || "unknown") + '</b></div></div>' +
-    gateHtml + '<div class="checks">' + checksHtml +
+    gateHtml + scheduleHtml + '<div class="checks">' + checksHtml +
     (processing ? checkRow("Payment recovery", "In progress") : reviewRequired ? checkRow("Payment recovery", "Manual review") : "") +
     '</div>' + (settled ? '<div class="settlement"><span>Arc confirmation</span><b>Reconciliation PASS</b></div>' : "") +
     '<button id="pay-button" class="pay"' + (ready ? "" : " disabled") +
-    '>' + (ready ? (invoice.settlement?.status === "failed" ? "Review & retry on Arc ↗" : "Review & settle on Arc ↗") : settled ? "Settled on Arc ✓" : processing ? "Payment submitted · recovering…" : reviewRequired ? "Payment under review" : preflight ? "Payment blocked" : "Checking payment gates…") + '</button></div>';
+    '>' + (ready ? (invoice.settlement?.status === "failed" ? "Review & retry on Arc ↗" : "Review & settle on Arc ↗") : settled ? "Settled on Arc ✓" : processing ? "Payment submitted · recovering…" : scheduled ? "Queued for review" : reviewRequired ? "Payment under review" : scheduleDecision ? "Schedule this invoice above" : preflight ? "Payment blocked" : "Checking payment gates…") + '</button></div>';
 
   if (ready) $("pay-button").addEventListener("click", settle);
+  if (scheduleDecision) $("schedule-button").addEventListener("click", scheduleInvoice);
+  if (scheduled) $("cancel-schedule").addEventListener("click", cancelScheduledInvoice);
 }
 
 function checkRow(label, value) {
@@ -1086,6 +1103,58 @@ async function load() {
     toast(error.message);
   } finally {
     $("refresh").disabled = false;
+  }
+}
+
+async function scheduleInvoice() {
+  const invoice = state.selected;
+  if (!invoice || invoice.agentDecision !== "SCHEDULE") return;
+  const confirmed = window.confirm(
+    "Queue " + invoice.invoiceNumber + " for payment review on its due date?\n\n" +
+    "This records a schedule only. No funds move now, and vendor verification plus live policy preflight will still be required before any payment."
+  );
+  if (!confirmed) return;
+  const button = $("schedule-button");
+  button.disabled = true;
+  button.textContent = "Queueing…";
+  try {
+    const response = await apiFetch("/api/invoices", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "schedule", invoiceNumber: invoice.invoiceNumber })
+    });
+    const data = await readJsonResponse(response);
+    if (!response.ok || !data.ok) throw new Error(data.error || "Unable to schedule invoice");
+    toast(data.idempotent ? "Invoice was already queued" : "Invoice queued for review");
+    await load();
+  } catch (error) {
+    toast(error.message || "Unable to schedule invoice");
+    button.disabled = false;
+    button.textContent = "Queue for due date";
+  }
+}
+
+async function cancelScheduledInvoice() {
+  const invoice = state.selected;
+  if (!invoice) return;
+  if (!window.confirm("Cancel the review queue for " + invoice.invoiceNumber + "?\n\nNo payment will be submitted.")) return;
+  const button = $("cancel-schedule");
+  button.disabled = true;
+  button.textContent = "Cancelling…";
+  try {
+    const response = await apiFetch("/api/invoices", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "cancel_schedule", invoiceNumber: invoice.invoiceNumber })
+    });
+    const data = await readJsonResponse(response);
+    if (!response.ok || !data.ok) throw new Error(data.error || "Unable to cancel schedule");
+    toast(data.idempotent ? "Invoice was already unscheduled" : "Invoice schedule cancelled");
+    await load();
+  } catch (error) {
+    toast(error.message || "Unable to cancel schedule");
+    button.disabled = false;
+    button.textContent = "Cancel schedule";
   }
 }
 

@@ -7,6 +7,7 @@
     "scan:gmail": "node gmail-bridge.mjs scan",
     "evaluate": "node agent-evaluator.mjs",
     "test:profile": "node scripts/business-profile-check.mjs",
+    "test:scheduling": "node scripts/invoice-scheduling-check.mjs",
     "test:preflight": "node scripts/payment-preflight-check.mjs",
     "test:recovery": "node scripts/settlement-recovery-check.mjs",
     "test:migration": "node scripts/policy-migration-check.mjs",
