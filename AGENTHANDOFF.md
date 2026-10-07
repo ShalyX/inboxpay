@@ -361,6 +361,14 @@ The Business B deployment exposed a real product flaw: InboxPay created draft de
 - Full wallet, vault, and vendor addresses are visible and copyable.
 - The policy control is available from the top bar as well as the sidebar, so it remains reachable when the responsive layout hides the sidebar.
 
+Production verification completed on commit `5d37bea` / Vercel deployment `dpl_GYAbGmwiNELeYBJdkJqu95gECaED`:
+
+- Git-triggered Vercel Production deployment reached `READY` and the production alias points to it.
+- The authenticated Business B policy modal reads the live Arc Mainnet vault `0x8d8e3e5b0ca5da40c4976cf8b7fb589f3d400942` and shows `1,000 USDC` maximum single payment, `5,000 USDC` daily limit, `20 USDC` cash floor, and `ENFORCED ONCHAIN`.
+- The same live screen reports `USDC access not authorized`; no Mainnet allowance, vendor registration, policy update, or payment write was submitted during verification.
+- Opening the policy screen generated authenticated `GET /api/policy` reads only. The only runtime stderr was Node's existing `DEP0169 url.parse()` deprecation warning.
+- Rendered QA passed at the default narrow app viewport and at `1440×900`: the policy entry remains reachable, the modal is scrollable on narrow screens, and all policy/allowance controls are visible on desktop.
+
 Known gaps from this audit remain queued and must not be papered over:
 
 - **P0 contract migration:** the currently deployed `BusinessPolicyVault.setVendor` rejects the zero address, so an onchain vendor mapping cannot be removed. Database blocking still prevents the application from paying, and the business can pause the vault or revoke its USDC allowance, but true onchain vendor revocation requires a new artifact plus an explicit per-business vault migration plan. Do not claim vendor revocation is fully enforced onchain until this is complete.
