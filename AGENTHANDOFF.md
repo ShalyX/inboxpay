@@ -134,9 +134,9 @@ The production alias is:
 `tameion-ap-agent-live.vercel.app`
 
 Verified production deployment carrying the current settlement UI, payment preflight, activity surfaces, business profile control, and durable invoice scheduling queue:
-- Deployment: `dpl_BRRHbBTZCTtTgvaDwQudjMYQ1uoP`
-- Commit: `965c33e`
-- Message: `Validate malformed schedule dates`
+- Deployment: `dpl_5fiyqpDxK6rfURGhDdofGTDxdE64`
+- Commit: `808feb6`
+- Message: `Add explicit invoice rescheduling`
 - State: `READY`
 
 That deployment includes the auth/onboarding fixes, Circle SDK import repairs, dedicated-wallet retry protection, correct Supabase wallet persistence, financial-route/PDF runtime decoupling, Gmail PDF parsing hardening, real Arc Testnet wallet funding, and failed policy-deployment recovery described below.
@@ -820,7 +820,7 @@ Commit `5fe89e8` and Vercel deployment `dpl_7hNtL7rkHDDVUhhR5ddWjrrLCh2U` are pr
 
 ### P1 — Durable invoice scheduling queue (complete for review semantics)
 
-Commits `cbe91a0`, `965c33e`, and `808feb6` are pushed to `main`; Vercel deployment and authenticated no-write verification for the reschedule slice must be recorded here after the build reaches `READY`. The queue is intentionally review-only: it persists `SCHEDULE` state, cancellation, and rescheduling, but it does not create a worker or authorize a payment. Keep real vendor onboarding and Business B Mainnet allowance/payment actions separately gated.
+Commits `cbe91a0`, `965c33e`, and `808feb6` are deployed in `READY` Vercel deployments `dpl_Ehb93FyNcjZk8nDeU2RqGVDQEhLr`, `dpl_BRRHbBTZCTtTgvaDwQudjMYQ1uoP`, and `dpl_5fiyqpDxK6rfURGhDdofGTDxdE64`. The latest handoff-only build `dpl_E3hzi76GG4QuLZf9qtLWeCcxkWH2` is also `READY`; authenticated production verification returned the Business B session, dedicated wallet, connected Gmail, zero invoices, and no browser warnings/errors. The queue is intentionally review-only: it persists `SCHEDULE` state, cancellation, and rescheduling, but it does not create a worker or authorize a payment. Keep real vendor onboarding and Business B Mainnet allowance/payment actions separately gated.
 
 ### P1 — Final submission hygiene
 Before hackathon submission:
