@@ -134,9 +134,9 @@ The production alias is:
 `tameion-ap-agent-live.vercel.app`
 
 Verified production deployment carrying the current settlement UI, payment preflight, activity surfaces, business profile control, and durable invoice scheduling queue:
-- Deployment: `dpl_5fiyqpDxK6rfURGhDdofGTDxdE64`
-- Commit: `808feb6`
-- Message: `Add explicit invoice rescheduling`
+- Deployment: `dpl_7t9ecBPQ8mov559ZXLCtzFzam9Sr`
+- Commit: `a85074b`
+- Message: `Repair local runtime and add due review worker`
 - State: `READY`
 
 That deployment includes the auth/onboarding fixes, Circle SDK import repairs, dedicated-wallet retry protection, correct Supabase wallet persistence, financial-route/PDF runtime decoupling, Gmail PDF parsing hardening, real Arc Testnet wallet funding, and failed policy-deployment recovery described below.
@@ -831,7 +831,7 @@ Commits `cbe91a0`, `965c33e`, and `808feb6` are deployed in `READY` Vercel deplo
 
 ### P1 — Local runtime and due-review plumbing (complete)
 
-Commit `a85074b` repairs the local server and adds the authenticated `review_due` trigger plus due-review UI. The trigger is compare-and-set and audit-backed, and stops at human review; it does not call Circle or authorize payment. `npm run test:local` and the full regression suite pass. Business B production verification remains read-only with zero invoice rows and no vendor or payment mutation. A real background worker, service authentication, and automatic execution remain intentionally deferred.
+Commit `a85074b` repairs the local server and adds the authenticated `review_due` trigger plus due-review UI. The trigger is compare-and-set and audit-backed, and stops at human review; it does not call Circle or authorize payment. Feature deployment `dpl_7t9ecBPQ8mov559ZXLCtzFzam9Sr` reached `READY`; handoff-only documentation deployment `dpl_DVVrBQZ5yVz9GcaAMJziGDbrWtE3` also reached `READY`. `npm run test:local` and the full regression suite pass. Business B production verification remains read-only with zero invoice rows and no vendor or payment mutation. A real background worker, service authentication, and automatic execution remain intentionally deferred.
 
 ### P1 — Final submission hygiene
 Before hackathon submission:
