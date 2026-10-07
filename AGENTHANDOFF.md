@@ -686,7 +686,7 @@ Do not mark the product “fully working” until the following are verified liv
 - Wallet details persist to the correct business row. **Verified.**
 - A retry does not create another Circle wallet. **Verified at the Circle helper boundary.**
 - Dedicated Arc Mainnet wallet creation is **verified for separate Business B** after explicit confirmation; the existing Testnet wallet was not replaced.
-- Vercel Production `INBOXPAY_ALLOW_MAINNET_WRITES=true` is configured and verified. Business B's dedicated Mainnet replacement vault is active at `0xbfd7f80416bda5a2c2c79ad4f8ff108c6c3b0706`; the original vault remains legacy. Acme Test Hosting is registered on the replacement vault at `0x0633Ac1776C934Df935C5eA40C37ede126b158FD`, and the replacement vault now has the unlimited USDC allowance from the dedicated Business B wallet. Payment remains a separate explicit action.
+- Vercel Production `INBOXPAY_ALLOW_MAINNET_WRITES=true` is configured and verified. Business B's dedicated Mainnet replacement vault is active at `0xbfd7f80416bda5a2c2c79ad4f8ff108c6c3b0706`; the original vault remains legacy. Acme Test Hosting is registered on the replacement vault at `0x0633Ac1776C934Df935C5eA40C37ede126b158FD`, and the replacement vault now has the unlimited USDC allowance from the dedicated Business B wallet. The deployed UI now exposes a guarded Revoke vendor action for test cleanup. Payment remains a separate explicit action.
 
 - Arc Testnet policy-vault deployment succeeds after real faucet funding. **Verified.**
 - Failed provider contract state is surfaced as an actionable error and can be retried without parallel duplicate deployment. **Verified.**
