@@ -840,7 +840,7 @@ async function openActivity(kind) {
   $("activity-message").className = "auth-message";
   $("activity-list").innerHTML = "";
   try {
-    const response = await apiFetch(kind === "payments" ? "/api/payments" : "/api/audit");
+    const response = await apiFetch("/api/activity?view=" + encodeURIComponent(kind));
     const data = await readJsonResponse(response);
     if (!response.ok) throw new Error(data.error || "Activity unavailable");
     state.activity = { kind, rows: kind === "payments" ? (data.payments || []) : (data.events || []) };
