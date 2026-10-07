@@ -28,9 +28,12 @@ export default async function handler(req, res) {
     }
 
     const result = await settleBusinessInvoice(token, user.id, invoiceNumber);
-    return res.status(200).json({
+    const statusCode = result?.status === "processing" ? 202 : 200;
+    return res.status(statusCode).json({
       ok: true,
-      message: "Invoice settled from the business's dedicated Circle wallet on Arc",
+      message: result?.status === "processing"
+        ? "Payment submitted from the business's dedicated Circle wallet; Arc reconciliation is still in progress"
+        : "Invoice settled from the business's dedicated Circle wallet on Arc",
       result
     });
   } catch (error) {

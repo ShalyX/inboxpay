@@ -1,5 +1,6 @@
 import { requireUser } from "../lib/supabase-server.mjs";
 import { syncBusinessInvoices } from "../lib/business-data.mjs";
+import { recoverPendingBusinessInvoices } from "../lib/business-payment.mjs";
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
@@ -10,8 +11,14 @@ export default async function handler(req, res) {
   try {
     const { token, user } = await requireUser(req);
     const result = await syncBusinessInvoices(token, user.id);
+    const recoveredInvoices = await recoverPendingBusinessInvoices(
+      token,
+      user.id,
+      result.business,
+      result.invoices || []
+    );
 
-    const invoices = (result.invoices || []).map((invoice) => ({
+    const invoices = recoveredInvoices.map((invoice) => ({
       vendor: invoice.vendor,
       invoiceNumber: invoice.invoice_number,
       amount: Number(invoice.amount || 0),
@@ -27,7 +34,9 @@ export default async function handler(req, res) {
         ? {
             status: invoice.settlement_status,
             paymentTxHash: invoice.payment_tx_hash,
-            reconciled: invoice.settlement_status === "confirmed"
+            reconciled: invoice.settlement_status === "confirmed",
+            pending: ["processing"].includes(invoice.settlement_status),
+            retryable: invoice.settlement_status === "failed"
           }
         : null
     }));

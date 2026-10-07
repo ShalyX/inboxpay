@@ -50,7 +50,10 @@ function status(decision) {
     HOLD: ["hold", "Held"],
     ESCALATE: ["escalate", "Review"],
     SCHEDULE: ["schedule", "Scheduled"],
-    SETTLED: ["approved", "Settled"]
+    SETTLED: ["approved", "Settled"],
+    PROCESSING: ["schedule", "Processing"],
+    FAILED: ["escalate", "Retry"],
+    REVIEW: ["escalate", "Review"]
   };
   const [kind, label] = map[decision] || ["hold", decision || "Unknown"];
   return '<span class="status ' + escapeHtml(kind) + '">' + escapeHtml(label) + '</span>';
@@ -374,6 +377,8 @@ function invoicePaymentReady(invoice) {
   const paused = Boolean(state.onchainPolicy?.paused ?? state.policyConfig?.paused);
   return invoice.agentDecision === "PAY_NOW" &&
     !invoice.settlement?.reconciled &&
+    invoice.settlement?.status !== "processing" &&
+    invoice.settlement?.status !== "review" &&
     policyIsReady() &&
     state.policyAllowance &&
     !paused &&
@@ -596,7 +601,10 @@ async function togglePolicyAllowance() {
 function renderStats() {
   const settled = state.invoices.filter((x) => x.settlement?.reconciled === true);
   const payable = state.invoices.filter(invoicePaymentReady);
-  const held = state.invoices.filter((x) => !x.settlement?.reconciled && x.agentDecision !== "PAY_NOW");
+  const held = state.invoices.filter((x) => !x.settlement?.reconciled && (
+    x.agentDecision !== "PAY_NOW" ||
+    ["processing", "failed", "review"].includes(x.settlement?.status)
+  ));
   const total = payable.reduce((sum, x) => sum + Number(x.amount || 0), 0);
   $("invoice-count").textContent = state.invoices.length;
   $("payment-count").textContent = settled.length;
@@ -615,7 +623,15 @@ function renderStats() {
 function renderList() {
   $("invoice-list").innerHTML = state.invoices.map((invoice) => {
     const selected = state.selected?.invoiceNumber === invoice.invoiceNumber ? " selected" : "";
-    const displayDecision = invoice.settlement?.reconciled ? "SETTLED" : invoice.agentDecision;
+    const displayDecision = invoice.settlement?.reconciled
+      ? "SETTLED"
+      : invoice.settlement?.status === "processing"
+        ? "PROCESSING"
+        : invoice.settlement?.status === "failed"
+          ? "FAILED"
+          : invoice.settlement?.status === "review"
+            ? "REVIEW"
+            : invoice.agentDecision;
     return '<button class="invoice-row' + selected + '" data-invoice="' +
       encodeURIComponent(invoice.invoiceNumber) + '"><div class="avatar">' +
       escapeHtml((invoice.vendor || "V").slice(0, 1)) + '</div><div class="main"><div class="row-title"><strong>' +
@@ -639,12 +655,23 @@ function renderDetail() {
   const invoice = state.selected;
   if (!invoice) return;
   const settled = invoice.settlement?.reconciled === true;
+  const processing = invoice.settlement?.status === "processing";
+  const reviewRequired = invoice.settlement?.status === "review";
   const decisionReady = invoice.agentDecision === "PAY_NOW" && !settled;
   const vaultReady = policyIsReady();
   const policyPaused = Boolean(state.onchainPolicy?.paused ?? state.policyConfig?.paused);
   const vendor = state.vendors.find((item) => item.name === invoice.vendor);
   const vendorReady = vendor?.status === "verified" && vendor?.onchain_status === "registered";
   const ready = invoicePaymentReady(invoice);
+  const detailStatus = settled
+    ? "SETTLED"
+    : processing
+      ? "PROCESSING"
+      : invoice.settlement?.status === "failed"
+        ? "FAILED"
+        : reviewRequired
+          ? "REVIEW"
+          : invoice.agentDecision;
   const settlementNetwork = state.business?.wallet_blockchain === "ARC-TESTNET"
     ? "Arc Testnet"
     : state.business?.wallet_blockchain === "ARC"
@@ -656,7 +683,7 @@ function renderDetail() {
     : (invoice.decisionReasons?.length ? invoice.decisionReasons : ["No decision reason recorded."]);
   const reasonsHtml = '<ul>' + reasons.map((reason) => '<li>' + escapeHtml(reason) + '</li>').join("") + '</ul>';
   $("detail").innerHTML = '<div class="detail-inner"><div class="detail-top"><div><label>INVOICE</label><h2>' +
-    escapeHtml(invoice.invoiceNumber || "Needs review") + '</h2></div>' + status(settled ? "SETTLED" : invoice.agentDecision) + '</div>' +
+    escapeHtml(invoice.invoiceNumber || "Needs review") + '</h2></div>' + status(detailStatus) + '</div>' +
     '<div class="merchant"><div class="avatar big">' + escapeHtml(vendorInitial) + '</div><div><strong>' +
     escapeHtml(invoice.vendor || "Unknown vendor") + '</strong><span>' + escapeHtml(invoice.currency || "Unknown") +
     ' settlement · due ' + escapeHtml(invoice.dueDate || "not found") + '</span></div></div><div class="big-amount">' +
@@ -671,9 +698,10 @@ function renderDetail() {
     checkRow("Policy vault", vaultReady ? "Ready" : "Not ready") +
     checkRow("USDC authorization", state.policyAllowance ? "Ready" : "Required") +
     checkRow("Emergency pause", policyPaused ? "Paused" : "Ready") +
+    (processing ? checkRow("Payment recovery", "In progress") : reviewRequired ? checkRow("Payment recovery", "Manual review") : "") +
     '</div>' + (settled ? '<div class="settlement"><span>Arc confirmation</span><b>Reconciliation PASS</b></div>' : "") +
     '<button id="pay-button" class="pay"' + (ready ? "" : " disabled") +
-    '>' + (ready ? "Review & settle on Arc ↗" : settled ? "Settled on Arc ✓" : "Payment blocked") + '</button></div>';
+    '>' + (ready ? (invoice.settlement?.status === "failed" ? "Review & retry on Arc ↗" : "Review & settle on Arc ↗") : settled ? "Settled on Arc ✓" : processing ? "Payment submitted · recovering…" : reviewRequired ? "Payment under review" : "Payment blocked") + '</button></div>';
 
   if (ready) $("pay-button").addEventListener("click", settle);
 }
@@ -862,12 +890,16 @@ async function settle() {
     });
     const data = await readJsonResponse(response);
     if (!response.ok || !data.ok) throw new Error(data.error || "Settlement failed");
-    toast("Payment submitted");
+    toast(data.result?.status === "processing"
+      ? "Payment submitted; InboxPay is recovering the Arc receipt"
+      : "Payment settled and reconciled on Arc");
     await load();
   } catch (error) {
     toast(error.message);
     $("pay-button").disabled = false;
-    $("pay-button").textContent = "Settle invoice on Arc ↗";
+    $("pay-button").textContent = invoice.settlement?.status === "failed"
+      ? "Review & retry on Arc ↗"
+      : "Review & settle on Arc ↗";
   }
 }
 

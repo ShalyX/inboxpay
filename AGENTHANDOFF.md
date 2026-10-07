@@ -372,7 +372,7 @@ Production verification completed on commit `5d37bea` / Vercel deployment `dpl_G
 Known gaps from this audit remain queued and must not be papered over:
 
 - **P0 contract migration:** the currently deployed `BusinessPolicyVault.setVendor` rejects the zero address, so an onchain vendor mapping cannot be removed. Database blocking still prevents the application from paying, and the business can pause the vault or revoke its USDC allowance, but true onchain vendor revocation requires a new artifact plus an explicit per-business vault migration plan. Do not claim vendor revocation is fully enforced onchain until this is complete.
-- **P0 reconciliation recovery:** a provider timeout or post-transaction reconciliation-read failure currently collapses to `settlement_status=failed` without a durable provider transaction ID/recovery worker, and the current null-only claim prevents a clean retry. Persist submission identity before waiting, distinguish failed from unknown/confirming, and add idempotent reconciliation recovery before calling the settlement loop production-complete.
+- **P0 reconciliation recovery:** the source implementation now records the Circle submission ID and deterministic idempotency key before waiting, keeps provider timeouts in `processing`, reconciles pending invoices on authenticated refresh, distinguishes terminal provider failure from unknown/confirming state, and validates the Arc receipt against the expected policy vault, payment ID, vendor, recipient, amount, and invoice hash. This is pending production deployment and read-only/adversarial verification; do not call the settlement loop production-complete until that verification passes.
 - **P1 product surfaces:** the Payments and Audit trail navigation buttons are still inert; there is no complete payment-history/audit UI or Arc receipt/explorer surface.
 - **P1 policy preflight:** daily spend, available-to-spend, cash-floor headroom, and `canExecute` reason are enforced onchain but not yet surfaced per invoice before submission.
 - **P1 onboarding:** the business name is inferred from sign-up metadata/domain and has no product edit flow.
@@ -771,6 +771,12 @@ Use a genuine test/business invoice email and continue only after explicit user 
 Do not use held or unverified records as a reason to bypass the vendor gate. Business B's Mainnet vault is deployed, but USDC allowance, Mainnet vendor registration, and settlement remain separate explicit actions. Do not submit any of them merely because the vault exists.
 
 Current handoff state: Acme Test Hosting has `status=verified`, the policy-vault recipient mapping is confirmed on Arc Testnet, the selected invoice has settled as `confirmed`, the wallet allowance is approved, and reconciliation passed for the recorded Arc Testnet transaction. Business B's separate Arc Mainnet wallet is provisioned and its policy vault is deployed at `0x8d8e3e5b0ca5da40c4976cf8b7fb589f3d400942`. No Business B Mainnet allowance, vendor registration, or payment transaction has been submitted.
+
+### P0 — Durable settlement recovery (source complete, deployment pending)
+
+The settlement path now persists a `payment_submitted` audit record immediately after Circle returns a transaction ID, uses a stable idempotency key per business/payment/attempt, keeps non-terminal Circle timeouts in `processing`, and exposes recovery through the normal invoice refresh path. Arc reconciliation checks the actual receipt, transaction target, `usedPayment` marker, and `PaymentExecuted` event fields before confirming. The UI exposes `PROCESSING`, `FAILED`, and `REVIEW` states without claiming settlement prematurely. No Mainnet payment was submitted while implementing or verifying this change.
+
+Next verification is a production deployment followed by read-only refresh/retry checks and adversarial fixture coverage for Circle timeout, provider failure, missing receipt, wrong vault target, wrong event fields, and duplicate retry. A real payment remains separately gated by the existing Mainnet allowance, vendor registration, and explicit confirmation controls.
 
 ### P1 — Final submission hygiene
 Before hackathon submission:
