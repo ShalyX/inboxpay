@@ -889,6 +889,7 @@ async function init() {
     $("close-vendor").addEventListener("click", closeVendorModal);
     $("vendor-form").addEventListener("submit", addVendor);
     $("open-policy").addEventListener("click", openPolicyModal);
+    $("open-policy-top").addEventListener("click", openPolicyModal);
     $("close-policy").addEventListener("click", closePolicyModal);
     $("policy-form").addEventListener("submit", savePolicy);
     $("policy-pause").addEventListener("click", togglePolicyPause);

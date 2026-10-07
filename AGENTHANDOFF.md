@@ -359,6 +359,7 @@ The Business B deployment exposed a real product flaw: InboxPay created draft de
 - Invoice payment readiness now includes vault-ready, allowance, pause, and onchain vendor-registration gates. All agent decision reasons are visible instead of only the first reason.
 - External Gmail/vendor strings are HTML-escaped before rendering, closing an authenticated stored/content-injection path.
 - Full wallet, vault, and vendor addresses are visible and copyable.
+- The policy control is available from the top bar as well as the sidebar, so it remains reachable when the responsive layout hides the sidebar.
 
 Known gaps from this audit remain queued and must not be papered over:
 
