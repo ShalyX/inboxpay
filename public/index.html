@@ -35,7 +35,7 @@
       <nav>
         <button class="nav active"><span>▣</span> Inbox <b id="invoice-count">0</b></button>
         <button class="nav"><span>↗</span> Payments <b id="payment-count">0</b></button>
-        <button class="nav"><span>◇</span> Policies</button>
+        <button id="open-policy" class="nav"><span>◇</span> Policies</button>
         <button class="nav"><span>≡</span> Audit trail</button>
       </nav>
       <div class="sidebar-foot"><div><i class="dot"></i><strong id="network-label">Arc Mainnet</strong></div><small>USDC settlement rail</small></div>
@@ -49,7 +49,7 @@
           <p>InboxPay reads the invoice, checks business rules, then settles only what policy permits.</p>
         </div>
         <div class="account-actions">
-          <div class="account-copy"><strong id="business-name">Business</strong><span id="wallet-address">Wallet provisioning…</span></div>
+          <div class="account-copy"><strong id="business-name">Business</strong><span id="wallet-address">Wallet provisioning…</span><button id="copy-wallet" class="text-action" type="button" hidden>Copy wallet address</button></div>
           <button id="add-vendor" class="ghost">Add vendor</button>
           <button id="connect-gmail" class="ghost">Connect Gmail</button>
           <button id="sign-out" class="ghost">Sign out</button>
@@ -87,6 +87,34 @@
         </form>
         <div id="vendor-message" class="auth-message"></div>
         <div id="vendor-list" class="vendor-list"></div>
+      </div>
+    </div>
+    <div id="policy-modal" class="vendor-modal" hidden>
+      <div class="vendor-card policy-card" role="dialog" aria-modal="true" aria-labelledby="policy-title">
+        <div class="detail-top"><div><label>PAYMENT POLICY</label><h2 id="policy-title">Choose the agent's spending boundaries</h2></div><button id="close-policy" class="ghost" type="button">Close</button></div>
+        <p id="policy-context">These limits are saved to this business and enforced by its dedicated onchain policy vault.</p>
+        <div id="policy-chain-state" class="policy-chain-state"></div>
+        <form id="policy-form">
+          <div class="policy-grid">
+            <label for="policy-max"><span>Maximum single payment</span><div class="money-input"><input id="policy-max" type="number" min="0.000001" step="0.000001" required><b>USDC</b></div><small>No invoice above this amount can settle autonomously.</small></label>
+            <label for="policy-daily"><span>Daily spending limit</span><div class="money-input"><input id="policy-daily" type="number" min="0.000001" step="0.000001" required><b>USDC</b></div><small>Total settled payments cannot exceed this amount per UTC day.</small></label>
+            <label for="policy-floor"><span>Cash floor</span><div class="money-input"><input id="policy-floor" type="number" min="0" step="0.000001" required><b>USDC</b></div><small>The business wallet must retain at least this amount after payment.</small></label>
+          </div>
+          <div class="policy-locks">
+            <div><strong>Verified vendors only</strong><span>Locked safeguard · every recipient must be registered onchain.</span></div>
+            <div><strong>Duplicate protection</strong><span>Locked safeguard · each payment ID can execute once.</span></div>
+          </div>
+          <button id="policy-submit" class="pay" type="submit">Save policy</button>
+        </form>
+        <div class="policy-secondary">
+          <button id="policy-pause" class="ghost" type="button" hidden>Pause all payments</button>
+          <span id="policy-pause-note">Emergency pause becomes available after the vault is deployed.</span>
+        </div>
+        <div id="policy-allowance-control" class="policy-allowance" hidden>
+          <div><strong id="policy-allowance-title">USDC access not authorized</strong><span id="policy-allowance-note">The vault cannot move funds until this business explicitly authorizes it.</span></div>
+          <button id="policy-allowance" class="ghost" type="button">Authorize vault</button>
+        </div>
+        <div id="policy-message" class="auth-message" aria-live="polite"></div>
       </div>
     </div>
     <div id="toast" class="toast" hidden></div>

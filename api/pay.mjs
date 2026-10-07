@@ -1,5 +1,6 @@
 import { requireUser } from "../lib/supabase-server.mjs";
 import { settleBusinessInvoice } from "../lib/business-payment.mjs";
+import { getBusiness } from "../lib/businesses.mjs";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -11,6 +12,20 @@ export default async function handler(req, res) {
     const { token, user } = await requireUser(req);
     const invoiceNumber = String(req.body?.invoiceNumber || "").trim();
     if (!invoiceNumber) return res.status(400).json({ error: "invoiceNumber is required" });
+
+    const business = await getBusiness(token, user.id);
+    if (!business) return res.status(409).json({ error: "Complete business onboarding first" });
+    if (business.wallet_blockchain === "ARC" && req.body?.confirmMainnet !== true) {
+      return res.status(409).json({
+        error: "Arc Mainnet payment requires explicit confirmation",
+        confirmation: {
+          network: "Arc Mainnet",
+          invoiceNumber,
+          wallet: business.wallet_address,
+          policyVault: business.policy_contract_address
+        }
+      });
+    }
 
     const result = await settleBusinessInvoice(token, user.id, invoiceNumber);
     return res.status(200).json({

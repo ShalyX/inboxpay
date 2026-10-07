@@ -1,7 +1,9 @@
 import { requireUser, supabaseRest } from "../lib/supabase-server.mjs";
 import { getBusiness } from "../lib/businesses.mjs";
-import { writePolicy } from "../lib/policy-sync.mjs";
+import { readVendorRecipient, writePolicy } from "../lib/policy-sync.mjs";
 import { keccak256 } from "viem";
+
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 export default async function handler(req, res) {
   try {
@@ -14,7 +16,23 @@ export default async function handler(req, res) {
         "vendors?select=id,name,recipient_address,currency,status&business_id=eq." + encodeURIComponent(business.id) + "&order=name",
         { token }
       );
-      return res.status(200).json({ vendors: vendors || [] });
+      const withChainState = await Promise.all((vendors || []).map(async (vendor) => {
+        if (vendor.status !== "verified" || business.policy_contract_status !== "ready" || !business.policy_contract_address) {
+          return { ...vendor, onchain_status: null };
+        }
+        try {
+          const vendorId = keccak256(new TextEncoder().encode("vendor:" + vendor.name));
+          const recipient = await readVendorRecipient(business.policy_contract_address, vendorId, business.wallet_blockchain);
+          return {
+            ...vendor,
+            onchain_status: recipient.toLowerCase() === vendor.recipient_address.toLowerCase() ? "registered" : "missing",
+            onchain_recipient: recipient
+          };
+        } catch {
+          return { ...vendor, onchain_status: "unavailable" };
+        }
+      }));
+      return res.status(200).json({ vendors: withChainState });
     }
 
     if (req.method === "PATCH") {
@@ -31,8 +49,19 @@ export default async function handler(req, res) {
       if (!vendor) return res.status(404).json({ error: "Vendor not found" });
 
       if (business.policy_contract_status === "ready" && business.policy_contract_address) {
+        if (business.wallet_blockchain === "ARC" && req.body?.confirmMainnet !== true) {
+          return res.status(409).json({
+            error: "Mainnet vendor-policy changes require explicit confirmation",
+            confirmation: {
+              network: "Arc Mainnet",
+              vendor: vendor.name,
+              recipientAddress: vendor.recipient_address,
+              status
+            }
+          });
+        }
         const vendorId = keccak256(new TextEncoder().encode("vendor:" + vendor.name));
-        const recipient = status === "verified" ? vendor.recipient_address : "0x0000000000000000000000000000000000000000";
+        const recipient = status === "verified" ? vendor.recipient_address : ZERO_ADDRESS;
         const tx = await writePolicy({
           walletId: business.wallet_id,
           contractAddress: business.policy_contract_address,

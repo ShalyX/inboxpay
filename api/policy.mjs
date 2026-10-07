@@ -1,13 +1,25 @@
-import { parseAbi } from "viem";
+import { formatUnits, parseAbi } from "viem";
 import { requireUser, supabaseRest } from "../lib/supabase-server.mjs";
 import { getBusiness } from "../lib/businesses.mjs";
 import { deployBusinessPolicyVault, getBusinessPolicyVault, getWalletTransaction } from "../lib/policy-contract.mjs";
-import { policyClient, writePolicy } from "../lib/policy-sync.mjs";
+import { policyClient, readPolicyState, writePolicy } from "../lib/policy-sync.mjs";
 
 const USDC = "0x3600000000000000000000000000000000000000";
 const maxUint256 = (1n << 256n) - 1n;
 const allowedNumbers = new Set(["max_transaction_usdc","daily_limit_usdc","cash_floor_usdc"]);
 const deploymentRequestTimeoutMs = 5 * 60 * 1000;
+
+function parseUsdcValue(value, key) {
+  const number = Number(value);
+  const units = Math.round(number * 1e6);
+  if (!Number.isFinite(number) || number < 0 || !Number.isSafeInteger(units)) {
+    throw new Error(key + " must be a non-negative USDC amount");
+  }
+  if (Math.abs(number * 1e6 - units) > 1e-6) {
+    throw new Error(key + " cannot have more than 6 decimal places");
+  }
+  return number;
+}
 
 async function getPolicy(token, businessId) {
   const rows = await supabaseRest(
@@ -84,7 +96,8 @@ async function statusHandler(token, user, business) {
       business: currentBusiness,
       contract: null,
       transaction: null,
-      allowance: null
+      allowance: null,
+      onchainPolicy: null
     };
   }
 
@@ -100,12 +113,14 @@ async function statusHandler(token, user, business) {
       error: error instanceof Error ? error.message : String(error),
       contract: null,
       transaction: null,
-      allowance: null
+      allowance: null,
+      onchainPolicy: null
     };
   }
 
   const address = contract?.contractAddress || contract?.address || null;
   let allowance = null;
+  let onchainPolicy = null;
   if (address && business.wallet_address) {
     try {
       const client = policyClient(business.wallet_blockchain);
@@ -115,6 +130,16 @@ async function statusHandler(token, user, business) {
         functionName: "allowance",
         args: [business.wallet_address, address]
       });
+    } catch {}
+
+    try {
+      const values = await readPolicyState(address, business.wallet_blockchain);
+      onchainPolicy = {
+        max_transaction_usdc: formatUnits(values.maxTransaction, 6),
+        daily_limit_usdc: formatUnits(values.dailyLimit, 6),
+        cash_floor_usdc: formatUnits(values.cashFloor, 6),
+        paused: values.paused
+      };
     } catch {}
   }
 
@@ -148,7 +173,8 @@ async function statusHandler(token, user, business) {
     business: updatedBusiness,
     contract,
     transaction,
-    allowance: allowance === null ? null : String(allowance)
+    allowance: allowance === null ? null : String(allowance),
+    onchainPolicy
   };
 }
 
@@ -173,21 +199,45 @@ export default async function handler(req, res) {
       const updates = {};
       for (const [key, value] of Object.entries(req.body || {})) {
         if (allowedNumbers.has(key)) {
-          const number = Number(value);
-          if (!Number.isFinite(number) || number < 0) return res.status(400).json({ error: key + " must be a non-negative number" });
-          updates[key] = number;
+          try {
+            updates[key] = parseUsdcValue(value, key);
+          } catch (error) {
+            return res.status(400).json({ error: error.message });
+          }
         }
       }
-      if (typeof req.body?.requireVerifiedVendor === "boolean") updates.require_verified_vendor = req.body.requireVerifiedVendor;
+      if (req.body?.requireVerifiedVendor === false) {
+        return res.status(400).json({ error: "Verified vendors are enforced by the policy vault and cannot be disabled" });
+      }
+      if (req.body?.requireVerifiedVendor === true) updates.require_verified_vendor = true;
       if (typeof req.body?.paused === "boolean") updates.paused = req.body.paused;
 
       const maxTx = updates.max_transaction_usdc ?? Number(policy.max_transaction_usdc);
       const daily = updates.daily_limit_usdc ?? Number(policy.daily_limit_usdc);
       const floor = updates.cash_floor_usdc ?? Number(policy.cash_floor_usdc);
+      if (maxTx <= 0) return res.status(400).json({ error: "Per-payment limit must be greater than zero" });
       if (maxTx > daily) return res.status(400).json({ error: "Per-payment limit cannot exceed the daily limit" });
 
+      const changesLimits = [...allowedNumbers].some((key) => key in updates);
+      const changesPause = "paused" in updates;
+      const writesOnchain = business.policy_contract_status === "ready" && business.policy_contract_address && (changesLimits || changesPause);
+      if (writesOnchain && business.wallet_blockchain === "ARC" && req.body?.confirmMainnet !== true) {
+        return res.status(409).json({
+          error: "Mainnet policy changes require explicit confirmation",
+          confirmation: {
+            network: "Arc Mainnet",
+            wallet: business.wallet_address,
+            policyVault: business.policy_contract_address,
+            max_transaction_usdc: maxTx,
+            daily_limit_usdc: daily,
+            cash_floor_usdc: floor,
+            paused: updates.paused ?? Boolean(policy.paused)
+          }
+        });
+      }
+
       if (business.policy_contract_status === "ready" && business.policy_contract_address) {
-        if ("max_transaction_usdc" in updates || "daily_limit_usdc" in updates || "cash_floor_usdc" in updates) {
+        if (changesLimits) {
           const tx = await writePolicy({
             walletId: business.wallet_id,
             contractAddress: business.policy_contract_address,
@@ -295,19 +345,20 @@ export default async function handler(req, res) {
         return res.status(202).json({ business: updated?.[0] || { ...business, ...deployment, policy_contract_status: "deploying" }, deployment });
       }
 
-      if (action === "approve") {
+      if (action === "approve" || action === "revoke") {
         if (!business.wallet_id || !business.wallet_address || !business.policy_contract_address || business.policy_contract_status !== "ready") {
           return res.status(409).json({ error: "Onchain policy vault is not ready" });
         }
 
         if (business.wallet_blockchain === "ARC" && req.body?.confirmMainnet !== true) {
           return res.status(409).json({
-            error: "USDC approval on Arc Mainnet requires explicit confirmation",
+            error: "USDC allowance change on Arc Mainnet requires explicit confirmation",
             confirmation: {
               network: "Arc Mainnet",
               token: "USDC",
               owner: business.wallet_address,
-              spender: business.policy_contract_address
+              spender: business.policy_contract_address,
+              action
             }
           });
         }
@@ -320,27 +371,29 @@ export default async function handler(req, res) {
           args: [business.wallet_address, business.policy_contract_address]
         });
 
-        if (current < maxUint256 / 2n) {
+        const target = action === "approve" ? maxUint256 : 0n;
+        const needsWrite = action === "approve" ? current < maxUint256 / 2n : current > 0n;
+        if (needsWrite) {
           const tx = await writePolicy({
             walletId: business.wallet_id,
             contractAddress: USDC,
             abiFunctionSignature: "approve(address,uint256)",
-            abiParameters: [business.policy_contract_address, String(maxUint256)],
+            abiParameters: [business.policy_contract_address, String(target)],
             blockchain: business.wallet_blockchain
           });
 
           await audit(token, {
             user_id: user.id,
             business_id: business.id,
-            event_type: "policy_allowance_approved",
+            event_type: action === "approve" ? "policy_allowance_approved" : "policy_allowance_revoked",
             actor: "user",
             data: { approval_tx_hash: tx.txHash, owner_wallet: business.wallet_address, policy_vault: business.policy_contract_address }
           });
 
-          return res.status(200).json({ ok: true, status: "approved", approvalTxHash: tx.txHash });
+          return res.status(200).json({ ok: true, status: action === "approve" ? "approved" : "revoked", approvalTxHash: tx.txHash });
         }
 
-        return res.status(200).json({ ok: true, status: "already_approved", approvalTxHash: null });
+        return res.status(200).json({ ok: true, status: action === "approve" ? "already_approved" : "already_revoked", approvalTxHash: null });
       }
 
       return res.status(400).json({ error: "Unknown policy action" });

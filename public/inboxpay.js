@@ -11,6 +11,9 @@ const state = {
   gmail: null,
   wallet: null,
   policy: null,
+  policyConfig: null,
+  onchainPolicy: null,
+  policyAllowance: false,
   vendors: []
 };
 
@@ -32,6 +35,15 @@ async function readJsonResponse(response) {
 
 const $ = (id) => document.getElementById(id);
 
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
 function status(decision) {
   const map = {
     PAY_NOW: ["approved", "Pay now"],
@@ -41,7 +53,7 @@ function status(decision) {
     SETTLED: ["approved", "Settled"]
   };
   const [kind, label] = map[decision] || ["hold", decision || "Unknown"];
-  return '<span class="status ' + kind + '">' + label + '</span>';
+  return '<span class="status ' + escapeHtml(kind) + '">' + escapeHtml(label) + '</span>';
 }
 
 function showAuth() {
@@ -166,7 +178,7 @@ async function bootstrap() {
     const wallet = await readJsonResponse(walletResponse);
     if (walletResponse.ok) state.wallet = wallet;
 
-    await loadPolicyStatus();
+    await Promise.all([loadPolicyStatus(), loadPolicyConfig(), loadVendors()]);
 
     renderAccount();
     renderSetup();
@@ -184,6 +196,11 @@ function shortAddress(address) {
   return address ? address.slice(0, 8) + "…" + address.slice(-6) : "Wallet provisioning…";
 }
 
+async function copyText(value, label) {
+  await navigator.clipboard.writeText(value);
+  toast(label + " copied");
+}
+
 async function loadPolicyStatus() {
   try {
     const response = await apiFetch("/api/policy?view=status");
@@ -191,9 +208,22 @@ async function loadPolicyStatus() {
     if (!response.ok) throw new Error(data.error || "Policy status unavailable");
     state.business = data.business || state.business;
     state.policy = data.contract || null;
+    state.onchainPolicy = data.onchainPolicy || null;
     state.policyAllowance = data.allowance ? BigInt(data.allowance) > 0n : false;
   } catch (error) {
     state.policy = null;
+    state.onchainPolicy = null;
+  }
+}
+
+async function loadPolicyConfig() {
+  try {
+    const response = await apiFetch("/api/policy");
+    const data = await readJsonResponse(response);
+    if (!response.ok) throw new Error(data.error || "Policy configuration unavailable");
+    state.policyConfig = data.policy || null;
+  } catch (error) {
+    state.policyConfig = null;
   }
 }
 
@@ -206,9 +236,10 @@ function renderAccount() {
       : "Arc";
   $("network-label").textContent = networkLabel;
   $("wallet-address").textContent = state.business?.wallet_address
-    ? (state.business.wallet_blockchain || "Arc") + " · Circle wallet · " + shortAddress(state.business.wallet_address) +
+    ? (state.business.wallet_blockchain || "Arc") + " · Circle wallet · " + state.business.wallet_address +
       (state.wallet ? " · " + Number(state.wallet.balance || 0).toFixed(2) + " USDC" : "")
     : "Wallet provisioning…";
+  $("copy-wallet").hidden = !state.business?.wallet_address;
   $("connect-gmail").textContent = state.gmail?.status === "connected" ? "Gmail connected ✓" : "Connect Gmail";
   $("connect-gmail").disabled = state.gmail?.status === "connected";
   $("feed-label").textContent = state.gmail?.status === "connected" ? "live Gmail operator" : "connect Gmail";
@@ -244,8 +275,8 @@ function renderSetup() {
     '<span class="' + (gmailReady ? "done" : "") + '">✓ Business Gmail</span>' +
     '<span class="' + (policyReady ? "done" : "") + '">✓ Onchain payment policy</span>' +
     (walletReady && !policyReady
-      ? '<button id="deploy-policy" class="ghost"' + (testnetNeedsFunding ? ' disabled' : '') + '>' +
-        (testnetNeedsFunding ? "Fund wallet first" : state.business?.policy_contract_status === "deploying" ? "Policy deployment running…" : "Deploy policy guard") + '</button>'
+      ? '<button id="setup-policy" class="ghost"' + (testnetNeedsFunding || state.business?.policy_contract_status === "deploying" ? ' disabled' : '') + '>' +
+        (testnetNeedsFunding ? "Fund wallet first" : state.business?.policy_contract_status === "deploying" ? "Policy deployment running…" : "Review policy & deploy") + '</button>'
       : policyReady
         ? '<span class="setup-contract">Vault · ' + shortAddress(state.business.policy_contract_address) +
           (state.wallet?.policyVaultBalance != null ? " · " + Number(state.wallet.policyVaultBalance).toFixed(2) + " USDC" : "") +
@@ -256,7 +287,7 @@ function renderSetup() {
   if (!walletReady) $("provision-wallet").addEventListener("click", provisionWallet);
   if (testnetNeedsFunding) $("fund-test-wallet").addEventListener("click", fundTestWallet);
   if (walletReady && !policyReady && !testnetNeedsFunding && state.business?.policy_contract_status !== "deploying") {
-    $("deploy-policy").addEventListener("click", deployPolicy);
+    $("setup-policy").addEventListener("click", openPolicyModal);
   }
 }
 
@@ -334,64 +365,244 @@ async function provisionWallet() {
   }
 }
 
-async function deployPolicy() {
-  const button = $("deploy-policy");
-  if (button) {
-    button.disabled = true;
-    button.textContent = "Starting deployment…";
-  }
+function policyIsReady() {
+  return state.business?.policy_contract_status === "ready" && Boolean(state.business?.policy_contract_address);
+}
 
+function invoicePaymentReady(invoice) {
+  const vendor = state.vendors.find((item) => item.name === invoice.vendor);
+  const paused = Boolean(state.onchainPolicy?.paused ?? state.policyConfig?.paused);
+  return invoice.agentDecision === "PAY_NOW" &&
+    !invoice.settlement?.reconciled &&
+    policyIsReady() &&
+    state.policyAllowance &&
+    !paused &&
+    vendor?.status === "verified" &&
+    vendor?.onchain_status === "registered";
+}
+
+function setPolicyMessage(message, isError = false) {
+  const node = $("policy-message");
+  node.textContent = message || "";
+  node.className = "auth-message" + (isError ? " error" : "");
+}
+
+function policyAmount(value) {
+  if (value === null || value === undefined || value === "") return "";
+  const amount = Number(value);
+  return Number.isFinite(amount) ? String(amount) : "";
+}
+
+function renderPolicyModal() {
+  const ready = policyIsReady();
+  const paused = Boolean(state.onchainPolicy?.paused ?? state.policyConfig?.paused);
+  const policy = ready && state.onchainPolicy ? state.onchainPolicy : state.policyConfig;
+  const network = state.business?.wallet_blockchain === "ARC" ? "Arc Mainnet" : "Arc Testnet";
+
+  $("policy-max").value = policyAmount(policy?.max_transaction_usdc);
+  $("policy-daily").value = policyAmount(policy?.daily_limit_usdc);
+  $("policy-floor").value = policyAmount(policy?.cash_floor_usdc);
+  $("policy-submit").textContent = ready ? "Update onchain policy" : "Save and deploy this policy";
+
+  const chainState = $("policy-chain-state");
+  chainState.innerHTML = ready
+    ? '<div><strong>Live on ' + network + '</strong><span>' + state.business.policy_contract_address + '</span><button class="text-action copy-address" type="button" data-address="' + state.business.policy_contract_address + '" data-label="Policy vault address">Copy address</button></div><b class="' + (paused ? "paused" : "ready") + '">' + (paused ? "Payments paused" : "Enforced onchain") + '</b>'
+    : '<div><strong>Not deployed yet</strong><span>Review these values before creating this business\'s policy vault.</span></div><b>Draft</b>';
+
+  const pauseButton = $("policy-pause");
+  pauseButton.hidden = !ready;
+  pauseButton.dataset.paused = String(paused);
+  pauseButton.textContent = paused ? "Resume payments" : "Pause all payments";
+  $("policy-pause-note").textContent = ready
+    ? (paused ? "No payments can execute until this business resumes them." : "Emergency control for this business's policy vault.")
+    : "Emergency pause becomes available after the vault is deployed.";
+
+  const allowanceControl = $("policy-allowance-control");
+  allowanceControl.hidden = !ready;
+  $("policy-allowance-title").textContent = state.policyAllowance ? "USDC access authorized" : "USDC access not authorized";
+  $("policy-allowance-note").textContent = state.policyAllowance
+    ? "The vault can move this wallet's USDC only through the enforced policy checks."
+    : "The vault cannot move funds until this business explicitly authorizes it.";
+  const allowanceButton = $("policy-allowance");
+  allowanceButton.dataset.authorized = String(state.policyAllowance);
+  allowanceButton.textContent = state.policyAllowance ? "Revoke USDC access" : "Authorize vault";
+  document.querySelectorAll("#policy-modal .copy-address").forEach((button) => {
+    button.addEventListener("click", () => copyText(button.dataset.address, button.dataset.label));
+  });
+}
+
+async function openPolicyModal() {
+  $("policy-modal").hidden = false;
+  setPolicyMessage("Loading this business's policy…");
+  await Promise.all([loadPolicyConfig(), loadPolicyStatus()]);
+  renderPolicyModal();
+  setPolicyMessage(state.policyConfig ? "" : "Policy configuration is unavailable. Try again before deploying.", !state.policyConfig);
+}
+
+function closePolicyModal() {
+  $("policy-modal").hidden = true;
+  setPolicyMessage("");
+}
+
+function readPolicyForm() {
+  const amount = (id, label) => {
+    const raw = $(id).value.trim();
+    if (!/^(?:\d+|\d*\.\d{1,6})$/.test(raw)) {
+      throw new Error(label + " must be a non-negative USDC amount with no more than 6 decimal places");
+    }
+    const value = Number(raw);
+    if (!Number.isFinite(value) || !Number.isSafeInteger(Math.round(value * 1e6))) {
+      throw new Error(label + " is outside the supported USDC range");
+    }
+    return value;
+  };
+  const draft = {
+    max_transaction_usdc: amount("policy-max", "Maximum single payment"),
+    daily_limit_usdc: amount("policy-daily", "Daily spending limit"),
+    cash_floor_usdc: amount("policy-floor", "Cash floor")
+  };
+  if (draft.max_transaction_usdc <= 0) throw new Error("Maximum single payment must be greater than zero");
+  if (draft.max_transaction_usdc > draft.daily_limit_usdc) throw new Error("Maximum single payment cannot exceed the daily limit");
+  return draft;
+}
+
+function policyConfirmation(action, policy) {
+  const network = state.business?.wallet_blockchain === "ARC" ? "Arc Mainnet" : "Arc Testnet";
+  return action + " on " + network + "?\n\n" +
+    "Maximum single payment: " + policy.max_transaction_usdc + " USDC\n" +
+    "Daily spending limit: " + policy.daily_limit_usdc + " USDC\n" +
+    "Cash floor: " + policy.cash_floor_usdc + " USDC\n\n" +
+    "Verified vendors and duplicate protection stay enforced.";
+}
+
+async function savePolicy(event) {
+  event.preventDefault();
+  const submit = $("policy-submit");
   try {
-    let confirmed = false;
-    if (state.business?.wallet_blockchain === "ARC") {
-      confirmed = window.confirm(
-        "Deploy InboxPay's policy guard on Arc Mainnet?\\n\\n" +
-        "The guard controls payments from this business's dedicated wallet."
-      );
-      if (!confirmed) {
-        renderSetup();
-        return;
-      }
+    const draft = readPolicyForm();
+    const ready = policyIsReady();
+    const mainnet = state.business?.wallet_blockchain === "ARC";
+    const action = ready ? "Update this business's live payment policy" : "Deploy this business's policy vault";
+    if (!window.confirm(policyConfirmation(action, draft))) return;
+
+    submit.disabled = true;
+    submit.textContent = ready ? "Updating onchain…" : "Saving policy…";
+    setPolicyMessage(ready ? "Waiting for the policy transaction to complete…" : "Saving the policy before deployment…");
+
+    const updateResponse = await apiFetch("/api/policy", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...draft,
+        requireVerifiedVendor: true,
+        ...(mainnet && ready ? { confirmMainnet: true } : {})
+      })
+    });
+    const updateData = await readJsonResponse(updateResponse);
+    if (!updateResponse.ok) throw new Error(updateData.error || "Policy update failed");
+    state.policyConfig = updateData.policy || { ...state.policyConfig, ...draft };
+
+    if (!ready) {
+      submit.textContent = "Starting deployment…";
+      setPolicyMessage("Starting the dedicated policy-vault deployment…");
+      const deployResponse = await apiFetch("/api/policy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "deploy", ...(mainnet ? { confirmMainnet: true } : {}) })
+      });
+      const deployData = await readJsonResponse(deployResponse);
+      if (!deployResponse.ok) throw new Error(deployData.error || "Policy deployment failed");
+      state.business = deployData.business || state.business;
+      toast("Policy vault deployment started");
+    } else {
+      toast("Business policy updated onchain");
     }
 
+    await Promise.all([loadPolicyConfig(), loadPolicyStatus()]);
+    renderPolicyModal();
+    renderAccount();
+    renderSetup();
+    setPolicyMessage(ready ? "The live policy now matches these limits." : "Deployment started. InboxPay will show the vault when Arc confirms it.");
+  } catch (error) {
+    setPolicyMessage(error.message || "Policy update failed", true);
+  } finally {
+    submit.disabled = false;
+    submit.textContent = policyIsReady() ? "Update onchain policy" : "Save and deploy this policy";
+  }
+}
+
+async function togglePolicyPause() {
+  if (!policyIsReady()) return;
+  const button = $("policy-pause");
+  const paused = Boolean(state.onchainPolicy?.paused ?? state.policyConfig?.paused);
+  const nextPaused = !paused;
+  const network = state.business?.wallet_blockchain === "ARC" ? "Arc Mainnet" : "Arc Testnet";
+  const verb = nextPaused ? "Pause all payments" : "Resume payments";
+  if (!window.confirm(verb + " for this business on " + network + "?\n\nThis submits an onchain policy transaction.")) return;
+
+  button.disabled = true;
+  setPolicyMessage((nextPaused ? "Pausing" : "Resuming") + " payments onchain…");
+  try {
+    const response = await apiFetch("/api/policy", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ paused: nextPaused, ...(state.business?.wallet_blockchain === "ARC" ? { confirmMainnet: true } : {}) })
+    });
+    const data = await readJsonResponse(response);
+    if (!response.ok) throw new Error(data.error || "Policy pause update failed");
+    state.policyConfig = data.policy || state.policyConfig;
+    await loadPolicyStatus();
+    renderPolicyModal();
+    setPolicyMessage(nextPaused ? "All payments are paused." : "Payments are enabled again.");
+  } catch (error) {
+    setPolicyMessage(error.message || "Policy pause update failed", true);
+  } finally {
+    button.disabled = false;
+  }
+}
+
+async function togglePolicyAllowance() {
+  if (!policyIsReady()) return;
+  const button = $("policy-allowance");
+  const action = state.policyAllowance ? "revoke" : "approve";
+  const network = state.business?.wallet_blockchain === "ARC" ? "Arc Mainnet" : "Arc Testnet";
+  const message = action === "approve"
+    ? "Authorize this business's policy vault to access USDC on " + network + "?\n\nThis is an unlimited token allowance. The vault contract still enforces the payment limit, daily limit, cash floor, verified-vendor registry, duplicate protection, and emergency pause."
+    : "Revoke this business's policy vault access to USDC on " + network + "?\n\nAll payments will remain blocked until access is authorized again.";
+  if (!window.confirm(message)) return;
+
+  button.disabled = true;
+  setPolicyMessage(action === "approve" ? "Authorizing the policy vault onchain…" : "Revoking the policy vault's USDC access…");
+  try {
     const response = await apiFetch("/api/policy", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "deploy",
-        ...(confirmed ? { confirmMainnet: true } : {})
-      })
+      body: JSON.stringify({ action, ...(state.business?.wallet_blockchain === "ARC" ? { confirmMainnet: true } : {}) })
     });
     const data = await readJsonResponse(response);
-
-    if (!response.ok) {
-      throw new Error(data.error || "Policy deployment failed");
-    }
-
-    state.business = data.business || state.business;
-    toast("Policy guard deployment started");
+    if (!response.ok) throw new Error(data.error || "USDC allowance update failed");
     await loadPolicyStatus();
-    renderAccount();
-    renderSetup();
+    renderPolicyModal();
+    renderDetail();
+    setPolicyMessage(action === "approve" ? "USDC access is authorized." : "USDC access has been revoked.");
   } catch (error) {
-    toast(error.message || "Policy deployment failed");
-    await loadPolicyStatus();
-    renderAccount();
-    renderSetup();
+    setPolicyMessage(error.message || "USDC allowance update failed", true);
+  } finally {
+    button.disabled = false;
   }
 }
 
 
 function renderStats() {
   const settled = state.invoices.filter((x) => x.settlement?.reconciled === true);
-  const payable = state.invoices.filter((x) => x.agentDecision === "PAY_NOW" && !x.settlement?.reconciled);
+  const payable = state.invoices.filter(invoicePaymentReady);
   const held = state.invoices.filter((x) => !x.settlement?.reconciled && x.agentDecision !== "PAY_NOW");
   const total = payable.reduce((sum, x) => sum + Number(x.amount || 0), 0);
   $("invoice-count").textContent = state.invoices.length;
   $("payment-count").textContent = settled.length;
   $("queue-count").textContent = state.invoices.length + (state.invoices.length === 1 ? " invoice" : " invoices");
   $("stats").innerHTML = [
-    ["◎", "Ready to pay", total.toFixed(2) + " USDC", payable.length + " approved invoices"],
+    ["◎", "Ready to review", total.toFixed(2) + " USDC", payable.length + " policy-eligible invoices"],
     ["◷", "Needs attention", String(held.length), "held or escalated"],
     ["✓", "Settled", String(settled.length), "reconciled on Arc"],
     ["⌁", "Execution", state.business?.wallet_status === "ready" ? "Dedicated" : "Provisioning", "business wallet"]
@@ -407,11 +618,11 @@ function renderList() {
     const displayDecision = invoice.settlement?.reconciled ? "SETTLED" : invoice.agentDecision;
     return '<button class="invoice-row' + selected + '" data-invoice="' +
       encodeURIComponent(invoice.invoiceNumber) + '"><div class="avatar">' +
-      (invoice.vendor || "V").slice(0, 1) + '</div><div class="main"><div class="row-title"><strong>' +
-      (invoice.vendor || "Unknown vendor") + '</strong>' + status(displayDecision) + '</div><span class="sub">' +
-      (invoice.invoiceNumber || "Missing invoice number") + ' · due ' + (invoice.dueDate || "not found") +
+      escapeHtml((invoice.vendor || "V").slice(0, 1)) + '</div><div class="main"><div class="row-title"><strong>' +
+      escapeHtml(invoice.vendor || "Unknown vendor") + '</strong>' + status(displayDecision) + '</div><span class="sub">' +
+      escapeHtml(invoice.invoiceNumber || "Missing invoice number") + ' · due ' + escapeHtml(invoice.dueDate || "not found") +
       '</span></div><div class="amount">' + Number(invoice.amount || 0).toFixed(2) + ' ' +
-      (invoice.currency || "") + '</div><span class="chev">›</span></button>';
+      escapeHtml(invoice.currency || "") + '</div><span class="chev">›</span></button>';
   }).join("");
 
   document.querySelectorAll(".invoice-row").forEach((button) => {
@@ -428,38 +639,49 @@ function renderDetail() {
   const invoice = state.selected;
   if (!invoice) return;
   const settled = invoice.settlement?.reconciled === true;
-  const ready = invoice.agentDecision === "PAY_NOW" && !settled;
+  const decisionReady = invoice.agentDecision === "PAY_NOW" && !settled;
+  const vaultReady = policyIsReady();
+  const policyPaused = Boolean(state.onchainPolicy?.paused ?? state.policyConfig?.paused);
+  const vendor = state.vendors.find((item) => item.name === invoice.vendor);
+  const vendorReady = vendor?.status === "verified" && vendor?.onchain_status === "registered";
+  const ready = invoicePaymentReady(invoice);
   const settlementNetwork = state.business?.wallet_blockchain === "ARC-TESTNET"
     ? "Arc Testnet"
     : state.business?.wallet_blockchain === "ARC"
       ? "Arc Mainnet"
       : "Arc";
   const vendorInitial = (invoice.vendor || "V").slice(0, 1);
+  const reasons = settled
+    ? ["Payment executed and reconciled on " + settlementNetwork + "."]
+    : (invoice.decisionReasons?.length ? invoice.decisionReasons : ["No decision reason recorded."]);
+  const reasonsHtml = '<ul>' + reasons.map((reason) => '<li>' + escapeHtml(reason) + '</li>').join("") + '</ul>';
   $("detail").innerHTML = '<div class="detail-inner"><div class="detail-top"><div><label>INVOICE</label><h2>' +
-    (invoice.invoiceNumber || "Needs review") + '</h2></div>' + status(settled ? "SETTLED" : invoice.agentDecision) + '</div>' +
-    '<div class="merchant"><div class="avatar big">' + vendorInitial + '</div><div><strong>' +
-    (invoice.vendor || "Unknown vendor") + '</strong><span>' + (invoice.currency || "Unknown") +
-    ' settlement · due ' + (invoice.dueDate || "not found") + '</span></div></div><div class="big-amount">' +
-    Number(invoice.amount || 0).toFixed(2) + ' <span>' + (invoice.currency || "") + '</span></div><div class="decision"><div class="decision-head">● Agent reasoning</div><p>' +
-    (settled ? "Payment executed and reconciled on " + settlementNetwork + "." : invoice.decisionReasons?.[0] || "No decision reason recorded.") +
-    '</p><div class="confidence"><span>Extraction confidence</span><b>' +
-    (invoice.extraction?.confidence || "unknown") + '</b></div></div>' +
+    escapeHtml(invoice.invoiceNumber || "Needs review") + '</h2></div>' + status(settled ? "SETTLED" : invoice.agentDecision) + '</div>' +
+    '<div class="merchant"><div class="avatar big">' + escapeHtml(vendorInitial) + '</div><div><strong>' +
+    escapeHtml(invoice.vendor || "Unknown vendor") + '</strong><span>' + escapeHtml(invoice.currency || "Unknown") +
+    ' settlement · due ' + escapeHtml(invoice.dueDate || "not found") + '</span></div></div><div class="big-amount">' +
+    Number(invoice.amount || 0).toFixed(2) + ' <span>' + escapeHtml(invoice.currency || "") + '</span></div><div class="decision"><div class="decision-head">● Agent reasoning</div>' +
+    reasonsHtml + '<div class="confidence"><span>Extraction confidence</span><b>' +
+    escapeHtml(invoice.extraction?.confidence || "unknown") + '</b></div></div>' +
     '<div class="checks">' +
     checkRow("Required fields", invoice.invoiceNumber && invoice.amount !== null && invoice.dueDate ? "Complete" : "Review") +
     checkRow("Currency rail", invoice.currency || "Unknown") +
-    checkRow("Vendor registry", ready || settled ? "Verified" : "Check required") +
+    checkRow("Vendor registry", vendorReady || settled ? "Verified" : "Onchain registration required") +
     checkRow("Business wallet", state.business?.wallet_status === "ready" ? "Ready" : "Provisioning") +
+    checkRow("Policy vault", vaultReady ? "Ready" : "Not ready") +
+    checkRow("USDC authorization", state.policyAllowance ? "Ready" : "Required") +
+    checkRow("Emergency pause", policyPaused ? "Paused" : "Ready") +
     '</div>' + (settled ? '<div class="settlement"><span>Arc confirmation</span><b>Reconciliation PASS</b></div>' : "") +
     '<button id="pay-button" class="pay"' + (ready ? "" : " disabled") +
-    '>' + (ready ? "Settle invoice on Arc ↗" : settled ? "Settled on Arc ✓" : "Payment blocked") + '</button></div>';
+    '>' + (ready ? "Review & settle on Arc ↗" : settled ? "Settled on Arc ✓" : "Payment blocked") + '</button></div>';
 
   if (ready) $("pay-button").addEventListener("click", settle);
 }
 
 function checkRow(label, value) {
   const ok = value === "Complete" || value === "USDC" || value === "Verified" || value === "Ready";
-  return '<div class="check-row"><span class="' + (ok ? "check-ok" : "") + '">' + (ok ? "✓" : "○") + " " + label +
-    '</span><b>' + value + '</b></div>';
+  return '<div class="check-row"><span class="' + (ok ? "check-ok" : "") + '">' + (ok ? "✓" : "○") + " " + escapeHtml(label) +
+    '</span><b>' + escapeHtml(value) + '</b></div>';
 }
 
 function toast(message) {
@@ -495,11 +717,12 @@ function renderVendors() {
     return;
   }
   node.innerHTML = state.vendors.map((vendor) =>
-    '<div class="vendor-row"><div><strong>' + vendor.name + '</strong><span>' +
-    vendor.recipient_address.slice(0, 10) + "…" + vendor.recipient_address.slice(-8) +
-    '</span></div><div><b class="vendor-status ' + vendor.status + '">' + vendor.status + '</b>' +
-    (vendor.status === "review"
-      ? '<button class="ghost verify-vendor" data-id="' + vendor.id + '">Verify</button>'
+    '<div class="vendor-row"><div><strong>' + escapeHtml(vendor.name) + '</strong><span>' +
+    escapeHtml(vendor.recipient_address) +
+    '</span><button class="text-action copy-address" type="button" data-address="' + escapeHtml(vendor.recipient_address) + '" data-label="Vendor address">Copy address</button></div><div><b class="vendor-status ' + escapeHtml(["missing", "unavailable"].includes(vendor.onchain_status) ? "review" : vendor.status) + '">' +
+    escapeHtml(vendor.onchain_status === "registered" ? "onchain" : vendor.onchain_status === "missing" ? "not onchain" : vendor.onchain_status === "unavailable" ? "chain unavailable" : vendor.status) + '</b>' +
+    (vendor.status === "review" || vendor.onchain_status === "missing"
+      ? '<button class="ghost verify-vendor" data-id="' + escapeHtml(vendor.id) + '">' + (vendor.onchain_status === "missing" ? "Register onchain" : "Verify") + '</button>'
       : "") +
     '</div></div>'
   ).join("");
@@ -507,14 +730,28 @@ function renderVendors() {
   document.querySelectorAll(".verify-vendor").forEach((button) => {
     button.addEventListener("click", () => verifyVendor(button.dataset.id));
   });
+  document.querySelectorAll("#vendor-list .copy-address").forEach((button) => {
+    button.addEventListener("click", () => copyText(button.dataset.address, button.dataset.label));
+  });
 }
 
 async function verifyVendor(id) {
   try {
+    const vendor = state.vendors.find((item) => item.id === id);
+    if (!vendor) throw new Error("Vendor not found");
+    const network = state.business?.wallet_blockchain === "ARC" ? "Arc Mainnet" : "Arc Testnet";
+    const onchain = policyIsReady();
+    const prompt = "Verify " + vendor.name + " for payments?\n\nRecipient: " + vendor.recipient_address +
+      "\nNetwork: " + network + (onchain ? "\n\nThis updates the business's onchain vendor registry." : "\n\nThis saves the verification. After the vault is deployed, InboxPay will require a separate onchain registration before payment.");
+    if (!window.confirm(prompt)) return;
     const response = await apiFetch("/api/vendors", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, status: "verified" })
+      body: JSON.stringify({
+        id,
+        status: "verified",
+        ...(state.business?.wallet_blockchain === "ARC" && onchain ? { confirmMainnet: true } : {})
+      })
     });
     const data = await readJsonResponse(response);
     if (!response.ok) throw new Error(data.error || "Unable to verify vendor");
@@ -604,13 +841,24 @@ async function load() {
 async function settle() {
   const invoice = state.selected;
   if (!invoice) return;
+  const network = state.business?.wallet_blockchain === "ARC" ? "Arc Mainnet" : "Arc Testnet";
+  const vendor = state.vendors.find((item) => item.name === invoice.vendor);
+  const recipient = vendor?.recipient_address || "the verified vendor address";
+  const confirmed = window.confirm(
+    "Settle " + Number(invoice.amount || 0).toFixed(2) + " " + invoice.currency + " to " + invoice.vendor + " on " + network + "?\n\n" +
+    "Invoice: " + invoice.invoiceNumber + "\nRecipient: " + recipient + "\n\nInboxPay will submit the payment through this business's policy vault and reconcile the Arc receipt."
+  );
+  if (!confirmed) return;
   $("pay-button").disabled = true;
   $("pay-button").textContent = "Executing…";
   try {
     const response = await apiFetch("/api/pay", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({ invoiceNumber: invoice.invoiceNumber })
+      body: JSON.stringify({
+        invoiceNumber: invoice.invoiceNumber,
+        ...(state.business?.wallet_blockchain === "ARC" ? { confirmMainnet: true } : {})
+      })
     });
     const data = await readJsonResponse(response);
     if (!response.ok || !data.ok) throw new Error(data.error || "Settlement failed");
@@ -640,6 +888,12 @@ async function init() {
     $("add-vendor").addEventListener("click", openVendorModal);
     $("close-vendor").addEventListener("click", closeVendorModal);
     $("vendor-form").addEventListener("submit", addVendor);
+    $("open-policy").addEventListener("click", openPolicyModal);
+    $("close-policy").addEventListener("click", closePolicyModal);
+    $("policy-form").addEventListener("submit", savePolicy);
+    $("policy-pause").addEventListener("click", togglePolicyPause);
+    $("policy-allowance").addEventListener("click", togglePolicyAllowance);
+    $("copy-wallet").addEventListener("click", () => copyText(state.business.wallet_address, "Wallet address"));
     $("sign-out").addEventListener("click", async () => {
       await state.supabase.auth.signOut();
     });
@@ -656,6 +910,9 @@ async function init() {
         state.gmail = null;
         state.wallet = null;
         state.policy = null;
+        state.policyConfig = null;
+        state.onchainPolicy = null;
+        state.policyAllowance = false;
         showAuth();
         return;
       }

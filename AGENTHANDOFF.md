@@ -316,11 +316,11 @@ This is a dedicated business policy vault. It is not the executor/deployer walle
 A separate authenticated Business B account now has its own Circle wallet on Arc Mainnet:
 - blockchain: `ARC`
 - wallet address: `0xa5639e…f4f80b`
-- balance at creation: `0 USDC`; the wallet now shows `0.05 USDC` after the user's external funding
-- policy vault: the confirmed deployment reached Circle after funding and created Circle contract record `01a11292-867f-71f5-b129-80bba31e335d`, but Circle reports `FAILED` with `TX_NOT_INITIATED`; no onchain address or transaction ID was produced
+- balance at creation: `0 USDC`; the wallet was later funded to `0.15 USDC`, then spent `0.0248842075 USDC` on the successful policy-vault deployment
+- policy vault: the first Circle record `01a11292-867f-71f5-b129-80bba31e335d` failed with `TX_NOT_INITIATED`, but the later funded retry succeeded at `0x8d8e3e5b0ca5da40c4976cf8b7fb589f3d400942`
 - Mainnet wallet creation was explicitly confirmed; no Mainnet funds or payments have been moved.
 - Refresh/reconnect restored the same Business B account, wallet, and Gmail connection after provisioning.
-- Vercel Production now has `INBOXPAY_ALLOW_MAINNET_WRITES=true` configured. A fresh Git-triggered Production build loaded the flag: the first funded deployment request reached Circle and returned `202` with contract record `01a11292-867f-71f5-b129-80bba31e335d`; Circle later marked it `FAILED` with `TX_NOT_INITIATED`, with no onchain address or transaction ID.
+- Vercel Production has `INBOXPAY_ALLOW_MAINNET_WRITES=true` configured. The first funded deployment record failed before broadcast, a second attempt exposed the provider's aggregate fee requirement, and the final funded retry deployed successfully as documented below.
 
 ### Business B Mainnet deployment diagnosis (2026-10-06)
 
@@ -345,6 +345,30 @@ A separate authenticated Business B account now has its own Circle wallet on Arc
 - Deployed policy vault: `0x8d8e3e5b0ca5da40c4976cf8b7fb589f3d400942`. Read-only RPC bytecode verification returns `4,676` bytes at that address.
 - The deployment transaction constructor data binds the vault to Business B wallet `0xa5639edc94b68af952f6744a8cd6a8b25ef4f80b`, Arc USDC `0x3600000000000000000000000000000000000000`, per-payment limit `1,000 USDC`, daily limit `5,000 USDC`, and cash floor `20 USDC`. Gas used was `1,157,405` at `21.5 gwei` (`0.0248842075 USDC`).
 - This proves the onchain deployment succeeded. The next verification is an authenticated production status refresh to reconcile Circle's contract/transaction records into `policy_contract_status=ready`. USDC allowance and payment remain unapproved/unattempted.
+
+### Product control-gap correction (2026-10-07)
+
+The Business B deployment exposed a real product flaw: InboxPay created draft defaults during onboarding, but the setup UI let the user deploy them without first reviewing or configuring the business's own limits. A production control-surface pass is now implemented in source and pending/under production verification:
+
+- Policy setup now requires the business to review maximum single payment, daily limit, and cash floor before its vault is deployed.
+- An existing vault loads the authoritative onchain limits, exposes policy updates and emergency pause/resume, and requires an exact confirmation before any Arc Mainnet write.
+- Verified-vendor enforcement and duplicate protection are shown as locked contract safeguards; the API rejects attempts to disable verified-vendor enforcement.
+- USDC allowance is now an explicit business control with authorize and revoke actions. The UI discloses that authorization is an unlimited ERC-20 allowance while the vault contract continues to enforce bounded payment rules.
+- Vendor reads compare the database record to the deployed vault mapping. A database-verified vendor missing from the vault is shown as `not onchain` and cannot make an invoice payment-ready.
+- Vendor registration and payment submission now require explicit Mainnet confirmations in both UI and API. Payment confirmation shows the invoice, vendor, amount, network, and recipient.
+- Invoice payment readiness now includes vault-ready, allowance, pause, and onchain vendor-registration gates. All agent decision reasons are visible instead of only the first reason.
+- External Gmail/vendor strings are HTML-escaped before rendering, closing an authenticated stored/content-injection path.
+- Full wallet, vault, and vendor addresses are visible and copyable.
+
+Known gaps from this audit remain queued and must not be papered over:
+
+- **P0 contract migration:** the currently deployed `BusinessPolicyVault.setVendor` rejects the zero address, so an onchain vendor mapping cannot be removed. Database blocking still prevents the application from paying, and the business can pause the vault or revoke its USDC allowance, but true onchain vendor revocation requires a new artifact plus an explicit per-business vault migration plan. Do not claim vendor revocation is fully enforced onchain until this is complete.
+- **P0 reconciliation recovery:** a provider timeout or post-transaction reconciliation-read failure currently collapses to `settlement_status=failed` without a durable provider transaction ID/recovery worker, and the current null-only claim prevents a clean retry. Persist submission identity before waiting, distinguish failed from unknown/confirming, and add idempotent reconciliation recovery before calling the settlement loop production-complete.
+- **P1 product surfaces:** the Payments and Audit trail navigation buttons are still inert; there is no complete payment-history/audit UI or Arc receipt/explorer surface.
+- **P1 policy preflight:** daily spend, available-to-spend, cash-floor headroom, and `canExecute` reason are enforced onchain but not yet surfaced per invoice before submission.
+- **P1 onboarding:** the business name is inferred from sign-up metadata/domain and has no product edit flow.
+- **P1 scheduling:** `SCHEDULE` is a decision label, not yet a durable scheduled-execution queue with cancel/reschedule controls.
+- **Developer workflow:** `npm start` currently fails because `dev-server.mjs` imports missing `lib/inboxpay.mjs`; production Vercel functions are separate, but local end-to-end startup is broken and must be repaired.
 
 ### Mainnet PaymentPolicyVault
 
@@ -644,8 +668,8 @@ Do not mark the product “fully working” until the following are verified liv
 - Dedicated Arc Testnet wallet creation succeeds. **Verified.**
 - Wallet details persist to the correct business row. **Verified.**
 - A retry does not create another Circle wallet. **Verified at the Circle helper boundary.**
-- Dedicated Arc Mainnet wallet creation is **verified for separate Business B** after explicit confirmation; the existing Testnet wallet was not replaced. Mainnet policy deployment remains separately gated.
-- Vercel Production `INBOXPAY_ALLOW_MAINNET_WRITES=true` is configured and verified in a fresh Ready build. The real deployment path reaches Circle. Business B's wallet now has `0.05 USDC`, but the first funded attempt ended `FAILED` / `TX_NOT_INITIATED`; no provider contract address exists. Do not retry blindly until the provider failure is understood or the wallet has a safer deployment-fee buffer.
+- Dedicated Arc Mainnet wallet creation is **verified for separate Business B** after explicit confirmation; the existing Testnet wallet was not replaced.
+- Vercel Production `INBOXPAY_ALLOW_MAINNET_WRITES=true` is configured and verified. Business B's dedicated Mainnet vault deployment succeeded at `0x8d8e3e5b0ca5da40c4976cf8b7fb589f3d400942`; allowance, vendor registration, and payment remain separate explicit actions.
 
 - Arc Testnet policy-vault deployment succeeds after real faucet funding. **Verified.**
 - Failed provider contract state is surfaced as an actionable error and can be retried without parallel duplicate deployment. **Verified.**
@@ -735,9 +759,9 @@ Use a genuine test/business invoice email and continue only after explicit user 
 - settle only from this business's dedicated wallet on the intended network
 - reconcile the actual Arc transaction and receipt
 
-Do not use the currently held/unverified records as a reason to bypass the vendor gate. Business B's Mainnet deployment retry, USDC approval, funding buffer, and settlement all remain explicit actions; the first funded deployment ended `FAILED` / `TX_NOT_INITIATED` and requires provider-level diagnosis before another write.
+Do not use held or unverified records as a reason to bypass the vendor gate. Business B's Mainnet vault is deployed, but USDC allowance, Mainnet vendor registration, and settlement remain separate explicit actions. Do not submit any of them merely because the vault exists.
 
-Current handoff state: Acme Test Hosting has `status=verified`, the policy-vault recipient mapping is confirmed on Arc Testnet, the selected invoice has settled as `confirmed`, the wallet allowance is approved, and reconciliation passed for the recorded Arc Testnet transaction. Business B's separate Arc Mainnet wallet is provisioned and persisted with `0.05 USDC`; the Mainnet policy path is enabled in the verified production runtime, but the first funded deployment has Circle record `01a11292-867f-71f5-b129-80bba31e335d` in `FAILED` / `TX_NOT_INITIATED` with no onchain address or transaction ID. Allowance and payment writes remain blocked.
+Current handoff state: Acme Test Hosting has `status=verified`, the policy-vault recipient mapping is confirmed on Arc Testnet, the selected invoice has settled as `confirmed`, the wallet allowance is approved, and reconciliation passed for the recorded Arc Testnet transaction. Business B's separate Arc Mainnet wallet is provisioned and its policy vault is deployed at `0x8d8e3e5b0ca5da40c4976cf8b7fb589f3d400942`. No Business B Mainnet allowance, vendor registration, or payment transaction has been submitted.
 
 ### P1 — Final submission hygiene
 Before hackathon submission:
