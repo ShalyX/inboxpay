@@ -92,7 +92,7 @@ The Gmail connector is a separate Google OAuth flow. Its callback is:
 
 ## Deployment
 
-This repo is intentionally framework-light: static HTML/CSS/JS in `public/` plus native Vercel Node functions under `api/`. There is no frontend build step. `dev-server.mjs` is for local development only; production API traffic goes directly to the Vercel functions.
+This repo is intentionally framework-light: static HTML/CSS/JS in `public/` plus native Vercel Node functions under `api/`. There is no frontend build step. `dev-server.mjs` is for local development only, but it dispatches to the same production-shaped API handlers rather than a mock invoice/payment layer; local API calls still require the configured environment and an authenticated session. Production traffic goes directly to the Vercel functions.
 
 Set the infrastructure secrets in Vercel, including Circle credentials, Supabase configuration, Gmail OAuth client credentials, and token-encryption secrets. Users supply their own OAuth consent through the product; they never configure infrastructure secrets.
 

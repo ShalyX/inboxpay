@@ -779,6 +779,7 @@ function renderDetail() {
   const processing = invoice.settlement?.status === "processing";
   const reviewRequired = invoice.settlement?.status === "review";
   const scheduled = invoice.settlement?.status === "scheduled";
+  const dueReview = reviewRequired && invoice.schedule?.status === "queued";
   const scheduleDecision = invoice.agentDecision === "SCHEDULE" && !settled && !processing && !reviewRequired && !scheduled;
   const decisionReady = invoice.agentDecision === "PAY_NOW" && !settled;
   const vaultReady = policyIsReady();
@@ -823,6 +824,10 @@ function renderDetail() {
     ? '<div class="schedule-card"><div><strong>Queued for review</strong><span>' +
       escapeHtml(invoice.schedule?.scheduledFor ? new Date(invoice.schedule.scheduledFor).toLocaleString() : "Target pending audit reconciliation") +
       '</span><small>Vendor verification and live policy preflight are still required. No payment has been submitted.</small></div><div class="schedule-actions"><button id="reschedule-button" class="ghost" type="button">Reschedule</button><button id="cancel-schedule" class="ghost" type="button">Cancel schedule</button></div></div>'
+    : dueReview
+      ? '<div class="schedule-card"><div><strong>Due for review</strong><span>' +
+        escapeHtml(invoice.schedule?.scheduledFor ? new Date(invoice.schedule.scheduledFor).toLocaleString() : "Target reached") +
+        '</span><small>The queue has paused this invoice for owner review. Releasing it changes no funds; vendor verification and live policy preflight still gate payment.</small></div><button id="cancel-schedule" class="ghost" type="button">Release to review</button></div>'
     : scheduleDecision
       ? '<div class="schedule-card"><div><strong>Schedule this invoice</strong><span>Queue for review on the due date</span><small>This records a durable review queue entry only. It will not move funds or bypass vendor verification.</small></div><button id="schedule-button" class="ghost" type="button">Queue for due date</button></div>'
       : "";
@@ -842,8 +847,8 @@ function renderDetail() {
 
   if (ready) $("pay-button").addEventListener("click", settle);
   if (scheduleDecision) $("schedule-button").addEventListener("click", scheduleInvoice);
-  if (scheduled) {
-    $("reschedule-button").addEventListener("click", rescheduleScheduledInvoice);
+  if (scheduled) $("reschedule-button").addEventListener("click", rescheduleScheduledInvoice);
+  if (scheduled || dueReview) {
     $("cancel-schedule").addEventListener("click", cancelScheduledInvoice);
   }
 }
@@ -1140,7 +1145,8 @@ async function scheduleInvoice() {
 async function cancelScheduledInvoice() {
   const invoice = state.selected;
   if (!invoice) return;
-  if (!window.confirm("Cancel the review queue for " + invoice.invoiceNumber + "?\n\nNo payment will be submitted.")) return;
+  const dueReview = invoice.settlement?.status === "review";
+  if (!window.confirm((dueReview ? "Release " : "Cancel ") + "the review queue for " + invoice.invoiceNumber + "?\n\nNo payment will be submitted.")) return;
   const button = $("cancel-schedule");
   button.disabled = true;
   button.textContent = "Cancelling…";
@@ -1152,7 +1158,7 @@ async function cancelScheduledInvoice() {
     });
     const data = await readJsonResponse(response);
     if (!response.ok || !data.ok) throw new Error(data.error || "Unable to cancel schedule");
-    toast(data.idempotent ? "Invoice was already unscheduled" : "Invoice schedule cancelled");
+    toast(data.idempotent ? "Invoice was already outside the review queue" : dueReview ? "Invoice released for payment review" : "Invoice schedule cancelled");
     await load();
   } catch (error) {
     toast(error.message || "Unable to cancel schedule");
