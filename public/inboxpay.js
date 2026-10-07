@@ -404,6 +404,7 @@ function renderPolicyModal() {
   const paused = Boolean(state.onchainPolicy?.paused ?? state.policyConfig?.paused);
   const policy = ready && state.onchainPolicy ? state.onchainPolicy : state.policyConfig;
   const network = state.business?.wallet_blockchain === "ARC" ? "Arc Mainnet" : "Arc Testnet";
+  const migrationNeeded = ready && state.business?.wallet_blockchain === "ARC" && state.vendorRevocationSupported === false;
 
   $("policy-max").value = policyAmount(policy?.max_transaction_usdc);
   $("policy-daily").value = policyAmount(policy?.daily_limit_usdc);
@@ -423,6 +424,13 @@ function renderPolicyModal() {
     ? (paused ? "No payments can execute until this business resumes them." : "Emergency control for this business's policy vault.")
     : "Emergency pause becomes available after the vault is deployed.";
 
+  const migrationControl = $("policy-migration-control");
+  migrationControl.hidden = !migrationNeeded;
+  $("policy-migrate").disabled = false;
+  $("policy-migrate-note").textContent = migrationNeeded
+    ? "This vault cannot revoke vendors onchain. Migration deploys a replacement vault with the same limits; USDC access and vendor registrations must be authorized again."
+    : "";
+
   const allowanceControl = $("policy-allowance-control");
   allowanceControl.hidden = !ready;
   $("policy-allowance-title").textContent = state.policyAllowance ? "USDC access authorized" : "USDC access not authorized";
@@ -435,6 +443,44 @@ function renderPolicyModal() {
   document.querySelectorAll("#policy-modal .copy-address").forEach((button) => {
     button.addEventListener("click", () => copyText(button.dataset.address, button.dataset.label));
   });
+}
+
+async function migratePolicyVault() {
+  const policy = {
+    max_transaction_usdc: Number($("policy-max").value),
+    daily_limit_usdc: Number($("policy-daily").value),
+    cash_floor_usdc: Number($("policy-floor").value)
+  };
+  const confirmed = window.confirm(
+    "Migrate this business's policy vault on Arc Mainnet?\n\n" +
+    "Current vault: " + state.business.policy_contract_address + "\n" +
+    "A replacement vault will use the same limits: " + policy.max_transaction_usdc + " / " + policy.daily_limit_usdc + " / " + policy.cash_floor_usdc + " USDC.\n\n" +
+    "The old vault remains deployed. USDC access and vendor registrations must be authorized again after migration. No payment will be submitted."
+  );
+  if (!confirmed) return;
+
+  const button = $("policy-migrate");
+  button.disabled = true;
+  setPolicyMessage("Starting the replacement policy-vault deployment…");
+  try {
+    const response = await apiFetch("/api/policy", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "migrate", confirmMainnet: true })
+    });
+    const data = await readJsonResponse(response);
+    if (!response.ok) throw new Error(data.error || "Policy-vault migration failed");
+    state.business = data.business || state.business;
+    toast("Replacement policy-vault deployment started");
+    await loadPolicyStatus();
+    renderPolicyModal();
+    renderAccount();
+    renderSetup();
+    setPolicyMessage("Migration started. InboxPay will show the replacement vault after Arc confirms it.");
+  } catch (error) {
+    setPolicyMessage(error.message || "Policy-vault migration failed", true);
+    button.disabled = false;
+  }
 }
 
 async function openPolicyModal() {
@@ -930,6 +976,7 @@ async function init() {
     $("open-policy-top").addEventListener("click", openPolicyModal);
     $("close-policy").addEventListener("click", closePolicyModal);
     $("policy-form").addEventListener("submit", savePolicy);
+    $("policy-migrate").addEventListener("click", migratePolicyVault);
     $("policy-pause").addEventListener("click", togglePolicyPause);
     $("policy-allowance").addEventListener("click", togglePolicyAllowance);
     $("copy-wallet").addEventListener("click", () => copyText(state.business.wallet_address, "Wallet address"));

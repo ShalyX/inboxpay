@@ -107,6 +107,10 @@
           </div>
           <button id="policy-submit" class="pay" type="submit">Save policy</button>
         </form>
+        <div id="policy-migration-control" class="policy-secondary" hidden>
+          <button id="policy-migrate" class="ghost" type="button">Migrate policy vault</button>
+          <span id="policy-migrate-note">This vault cannot revoke vendors onchain. Migration deploys a replacement vault with the same limits; USDC access and vendor registrations must be authorized again.</span>
+        </div>
         <div class="policy-secondary">
           <button id="policy-pause" class="ghost" type="button" hidden>Pause all payments</button>
           <span id="policy-pause-note">Emergency pause becomes available after the vault is deployed.</span>

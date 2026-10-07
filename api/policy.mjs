@@ -2,6 +2,7 @@ import { formatUnits, parseAbi } from "viem";
 import { requireUser, supabaseRest } from "../lib/supabase-server.mjs";
 import { getBusiness } from "../lib/businesses.mjs";
 import { deployBusinessPolicyVault, getBusinessPolicyVault, getWalletTransaction } from "../lib/policy-contract.mjs";
+import { migrationDeploymentAttempt, migrationEligibility } from "../lib/policy-migration.mjs";
 import { policyClient, readPolicyState, writePolicy } from "../lib/policy-sync.mjs";
 
 const USDC = "0x3600000000000000000000000000000000000000";
@@ -282,6 +283,119 @@ export default async function handler(req, res) {
 
     if (req.method === "POST") {
       const action = String(req.body?.action || "");
+
+      if (action === "migrate") {
+        const eligibility = migrationEligibility(business);
+        if (!eligibility.ok) return res.status(409).json({ error: eligibility.reason });
+        const policy = await getPolicy(token, business.id);
+        if (!policy) throw new Error("Business payment policy is not configured");
+        if (business.wallet_blockchain === "ARC" && req.body?.confirmMainnet !== true) {
+          return res.status(409).json({
+            error: "Mainnet policy-vault migration requires explicit confirmation",
+            confirmation: {
+              network: "Arc Mainnet",
+              wallet: business.wallet_address,
+              currentPolicyVault: business.policy_contract_address,
+              token: "USDC",
+              limits: {
+                max_transaction_usdc: Number(policy.max_transaction_usdc),
+                daily_limit_usdc: Number(policy.daily_limit_usdc),
+                cash_floor_usdc: Number(policy.cash_floor_usdc)
+              }
+            }
+          });
+        }
+
+        const previousStatus = business.policy_contract_status;
+        const previousVault = business.policy_contract_address;
+        const deploymentAttempt = migrationDeploymentAttempt({
+          activeAddress: previousVault,
+          activeContractId: business.policy_contract_id
+        });
+        const claim = await supabaseRest(
+          "businesses?id=eq." + encodeURIComponent(business.id) +
+            "&policy_contract_status=eq." + encodeURIComponent(previousStatus),
+          {
+            token,
+            method: "PATCH",
+            body: {
+              policy_contract_status: "deploying",
+              policy_contract_error: null,
+              policy_contract_blockchain: business.wallet_blockchain,
+              updated_at: new Date().toISOString()
+            }
+          }
+        );
+        if (!claim?.length) {
+          const current = await getBusiness(token, user.id);
+          if (current?.policy_contract_status === "deploying" && current.policy_contract_id) {
+            return res.status(202).json({
+              business: current,
+              deployment: { contractId: current.policy_contract_id, transactionId: current.policy_contract_tx_id }
+            });
+          }
+          return res.status(409).json({ error: "The policy vault changed before migration could start. Refresh and try again." });
+        }
+
+        let deployment;
+        try {
+          deployment = await deployBusinessPolicyVault({
+            businessId: business.id,
+            deploymentAttempt,
+            walletId: business.wallet_id,
+            walletAddress: business.wallet_address,
+            maxTransaction: policy.max_transaction_usdc,
+            dailyLimit: policy.daily_limit_usdc,
+            cashFloor: policy.cash_floor_usdc,
+            blockchain: business.wallet_blockchain
+          });
+        } catch (error) {
+          const message = providerError(error);
+          await supabaseRest("businesses?id=eq." + encodeURIComponent(business.id), {
+            token,
+            method: "PATCH",
+            body: {
+              policy_contract_status: previousStatus,
+              policy_contract_error: message,
+              updated_at: new Date().toISOString()
+            }
+          });
+          console.error("Circle policy migration rejected", { ...providerErrorContext(error), message });
+          throw new Error(message);
+        }
+
+        const updated = await supabaseRest("businesses?id=eq." + encodeURIComponent(business.id), {
+          token,
+          method: "PATCH",
+          body: {
+            policy_contract_id: deployment.contractId,
+            policy_contract_tx_id: deployment.transactionId,
+            policy_contract_blockchain: deployment.blockchain,
+            policy_contract_status: "deploying",
+            policy_contract_error: null,
+            updated_at: new Date().toISOString()
+          }
+        });
+        await audit(token, {
+          user_id: user.id,
+          business_id: business.id,
+          event_type: "policy_vault_migration_started",
+          actor: "user",
+          data: {
+            previous_policy_vault: previousVault,
+            previous_policy_contract_id: business.policy_contract_id,
+            new_policy_contract_id: deployment.contractId,
+            deployment_tx_id: deployment.transactionId,
+            network: deployment.blockchain,
+            migration: "vendor-revocation-v1"
+          }
+        });
+        return res.status(202).json({
+          business: updated?.[0] || { ...business, ...deployment, policy_contract_status: "deploying" },
+          deployment,
+          previousPolicyVault: previousVault
+        });
+      }
 
       if (action === "deploy") {
         if (!business.wallet_id || !business.wallet_address) return res.status(409).json({ error: "Dedicated business wallet is not ready" });
