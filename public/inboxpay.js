@@ -389,6 +389,45 @@ function invoicePaymentReady(invoice) {
     vendor?.onchain_status === "registered";
 }
 
+function openBusinessModal() {
+  $("business-name-input").value = state.business?.name || "";
+  $("business-message").textContent = "";
+  $("business-message").className = "auth-message";
+  $("business-modal").hidden = false;
+  $("business-name-input").focus();
+}
+
+function closeBusinessModal() {
+  $("business-modal").hidden = true;
+  $("business-message").textContent = "";
+}
+
+async function saveBusinessName(event) {
+  event.preventDefault();
+  const submit = $("business-submit");
+  submit.disabled = true;
+  $("business-message").textContent = "Saving business name…";
+  $("business-message").className = "auth-message";
+  try {
+    const response = await apiFetch("/api/onboarding", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "rename_business", name: $("business-name-input").value })
+    });
+    const data = await readJsonResponse(response);
+    if (!response.ok) throw new Error(data.error || "Business name update failed");
+    state.business = data.business || state.business;
+    renderAccount();
+    closeBusinessModal();
+    toast("Business name updated");
+  } catch (error) {
+    $("business-message").textContent = error.message || "Business name update failed";
+    $("business-message").className = "auth-message error";
+  } finally {
+    submit.disabled = false;
+  }
+}
+
 async function loadPreflight(invoice = state.selected) {
   state.preflight = null;
   if (!invoice?.invoiceNumber) {
@@ -1101,6 +1140,9 @@ async function init() {
     $("auth-signup").addEventListener("click", signup);
     $("auth-google").addEventListener("click", signInWithGoogle);
     $("connect-gmail").addEventListener("click", connectGmail);
+    $("edit-business").addEventListener("click", openBusinessModal);
+    $("close-business").addEventListener("click", closeBusinessModal);
+    $("business-form").addEventListener("submit", saveBusinessName);
     $("add-vendor").addEventListener("click", openVendorModal);
     $("close-vendor").addEventListener("click", closeVendorModal);
     $("vendor-form").addEventListener("submit", addVendor);

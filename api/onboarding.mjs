@@ -1,4 +1,5 @@
 import { requireUser, supabaseRest } from "../lib/supabase-server.mjs";
+import { normalizeBusinessName } from "../lib/business-profile.mjs";
 
 function slugify(value) {
   const slug = String(value || "business").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
@@ -83,6 +84,38 @@ export default async function handler(req, res) {
 
   try {
     const { token, user } = await requireUser(req);
+
+    if (req.body?.action === "rename_business") {
+      const business = await findBusiness(token, user.id);
+      if (!business) return res.status(409).json({ error: "Complete business onboarding first" });
+      let name;
+      try {
+        name = normalizeBusinessName(req.body?.name);
+      } catch (error) {
+        return res.status(400).json({ error: error.message });
+      }
+      const rows = await supabaseRest(
+        "businesses?id=eq." + encodeURIComponent(business.id) + "&owner_user_id=eq." + encodeURIComponent(user.id),
+        {
+          token,
+          method: "PATCH",
+          body: { name, updated_at: new Date().toISOString() }
+        }
+      );
+      const updatedBusiness = rows?.[0] || { ...business, name };
+      await supabaseRest("audit_events", {
+        token,
+        method: "POST",
+        body: {
+          user_id: user.id,
+          business_id: business.id,
+          event_type: "business_profile_updated",
+          actor: "user",
+          data: { field: "name" }
+        }
+      }).catch((error) => console.error("InboxPay business profile audit failed", { businessId: business.id, message: error.message }));
+      return res.status(200).json({ business: updatedBusiness });
+    }
 
     if (req.body?.action === "provision_wallet") {
       const business = await findBusiness(token, user.id);

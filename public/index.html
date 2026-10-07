@@ -49,7 +49,7 @@
           <p>InboxPay reads the invoice, checks business rules, then settles only what policy permits.</p>
         </div>
         <div class="account-actions">
-          <div class="account-copy"><strong id="business-name">Business</strong><span id="wallet-address">Wallet provisioning…</span><button id="copy-wallet" class="text-action" type="button" hidden>Copy wallet address</button></div>
+          <div class="account-copy"><strong id="business-name">Business</strong><button id="edit-business" class="text-action" type="button">Edit business name</button><span id="wallet-address">Wallet provisioning…</span><button id="copy-wallet" class="text-action" type="button" hidden>Copy wallet address</button></div>
           <button id="open-payments-top" class="ghost" type="button">Payments</button>
           <button id="open-audit-top" class="ghost" type="button">Audit trail</button>
           <button id="open-policy-top" class="ghost">Manage policy</button>
@@ -131,6 +131,14 @@
         <p id="activity-context">A business-scoped view of real settlement state and receipts.</p>
         <div id="activity-message" class="auth-message" aria-live="polite"></div>
         <div id="activity-list" class="activity-list"></div>
+      </div>
+    </div>
+    <div id="business-modal" class="vendor-modal" hidden>
+      <div class="vendor-card business-card" role="dialog" aria-modal="true" aria-labelledby="business-title">
+        <div class="detail-top"><div><label>BUSINESS PROFILE</label><h2 id="business-title">Business identity</h2></div><button id="close-business" class="ghost" type="button">Close</button></div>
+        <p>This name identifies the business across InboxPay. It does not change wallet ownership, policy limits, vendors, or payment permissions.</p>
+        <form id="business-form"><label for="business-name-input">Business name</label><input id="business-name-input" maxlength="80" required><button id="business-submit" class="pay" type="submit">Save business name</button></form>
+        <div id="business-message" class="auth-message" aria-live="polite"></div>
       </div>
     </div>
   </main>
