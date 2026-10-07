@@ -369,6 +369,14 @@ Production verification completed on commit `5d37bea` / Vercel deployment `dpl_G
 - Opening the policy screen generated authenticated `GET /api/policy` reads only. The only runtime stderr was Node's existing `DEP0169 url.parse()` deprecation warning.
 - Rendered QA passed at the default narrow app viewport and at `1440×900`: the policy entry remains reachable, the modal is scrollable on narrow screens, and all policy/allowance controls are visible on desktop.
 
+### Durable settlement recovery deployment (2026-10-07)
+
+- Commit `66e12be` (`Harden settlement recovery and reconciliation`) was pushed to `main` and deployed Ready as Vercel deployment `dpl_9T98AuTzVtsoBe9zQyrsf6sV9gHB`; the production alias `tameion-ap-agent-live.vercel.app` points to it.
+- The deployed financial routes include durable Circle submission tracking, deterministic payment idempotency keys, non-terminal `processing` state, refresh-time pending reconciliation, and Arc receipt/event validation before `confirmed`.
+- Authenticated production read verification after deployment returned HTTP 200 from `/api/invoices` with `liveGmail=true`, Gmail status `connected`, Business B's dedicated Mainnet wallet/vault, and zero current invoice rows. No payment or allowance/vendor/policy write was submitted.
+- The live policy control reads the deployed Mainnet vault `0x8d8e3e5b0ca5da40c4976cf8b7fb589f3d400942` with `1000 / 5000 / 20 USDC` limits and still reports USDC access as not authorized.
+- Static module checks and `npm run evaluate` passed locally. This verifies deployment integrity and the no-write live path; adversarial recovery cases and a real settlement still require explicit test execution.
+
 Known gaps from this audit remain queued and must not be papered over:
 
 - **P0 contract migration:** the currently deployed `BusinessPolicyVault.setVendor` rejects the zero address, so an onchain vendor mapping cannot be removed. Database blocking still prevents the application from paying, and the business can pause the vault or revoke its USDC allowance, but true onchain vendor revocation requires a new artifact plus an explicit per-business vault migration plan. Do not claim vendor revocation is fully enforced onchain until this is complete.
