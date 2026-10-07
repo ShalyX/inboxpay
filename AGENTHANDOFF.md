@@ -397,8 +397,9 @@ The next production build flow is now shipped and verified on commit `5fe89e8` /
 
 ### Durable invoice scheduling queue (2026-10-07)
 
-- Commits `cbe91a0` and `965c33e` add a durable, review-only queue for invoices whose bounded agent decision is `SCHEDULE`, including clean malformed-date validation. `PATCH /api/invoices` records an `invoice_scheduled` audit event and atomically moves the business-owned invoice to `settlement_status=scheduled`; no Circle, vendor, allowance, policy, or payment write is performed.
+- Commits `cbe91a0`, `965c33e`, and `808feb6` add a durable, review-only queue for invoices whose bounded agent decision is `SCHEDULE`, including clean malformed-date validation and explicit rescheduling. `PATCH /api/invoices` records an `invoice_scheduled` audit event and atomically moves the business-owned invoice to `settlement_status=scheduled`; no Circle, vendor, allowance, policy, or payment write is performed.
 - The queue target defaults to 09:00 UTC on the invoice due date and is bounded to the next 366 days. A caller may supply a future ISO target within that bound. The schedule reason explicitly states that vendor verification and live policy preflight remain required.
+- A queued invoice can be rescheduled with a new bounded ISO target. Rescheduling appends `invoice_schedule_rescheduled` with the previous and new target while preserving the queued state; the UI requires an explicit confirmation and states that no payment is submitted.
 - `cancel_schedule` uses a compare-and-set update so a schedule can be cancelled without clearing a concurrent settlement state. The UI requires an explicit confirmation for queue and cancel actions, shows the review target, and states that no funds move. `/api/pay` preflight now fails closed for `scheduled` invoices until the schedule is cancelled.
 - Schedule state is reconstructed from the business-scoped audit trail during invoice refresh. No real vendor onboarding was performed for this slice; Business B's Mainnet wallet, replacement vault, zero allowance, blocked Acme QA mapping, and zero Mainnet payment state are unchanged.
 - Local verification passes: `npm run test:scheduling`, `npm run test:preflight`, `npm run test:recovery`, `npm run test:migration`, `npm run test:profile`, `forge test`, JavaScript syntax checks, and `git diff --check`.
@@ -410,7 +411,7 @@ Known gaps from this audit remain queued and must not be papered over:
 - **P1 product surfaces:** complete for the current slice. Payments and Audit trail are business-scoped read-only views with settlement status, receipt links, and audit event detail. Continue expanding receipt/recovery UX as real settlements accumulate.
 - **P1 policy preflight:** complete for the current slice. Daily spend, wallet balance/cash-floor headroom, allowance, limits, vendor mapping, settlement state, and the live `canExecute` reason are surfaced per invoice before submission. Continue adversarial testing with a real invoice when a real vendor is available.
 - **P1 onboarding:** business name editing is complete. New accounts still receive an inferred initial name, but the owner can now correct it from the authenticated product UI.
-- **P1 scheduling:** durable review queue with cancel control is complete. Automated execution, due-date worker/retry behavior, and explicit rescheduling controls remain a later slice; a queued invoice never authorizes payment by itself.
+- **P1 scheduling:** durable review queue with cancel and reschedule controls is complete. Automated execution, due-date worker/retry behavior, and an execution-authority design remain a later slice; a queued invoice never authorizes payment by itself.
 - **Developer workflow:** `npm start` currently fails because `dev-server.mjs` imports missing `lib/inboxpay.mjs`; production Vercel functions are separate, but local end-to-end startup is broken and must be repaired.
 
 ### Mainnet PaymentPolicyVault
@@ -819,7 +820,7 @@ Commit `5fe89e8` and Vercel deployment `dpl_7hNtL7rkHDDVUhhR5ddWjrrLCh2U` are pr
 
 ### P1 — Durable invoice scheduling queue (complete for review semantics)
 
-Commits `cbe91a0` and `965c33e` are deployed in `READY` Vercel deployments `dpl_Ehb93FyNcjZk8nDeU2RqGVDQEhLr` and `dpl_BRRHbBTZCTtTgvaDwQudjMYQ1uoP`; the handoff-only follow-ups and later docs-only builds preserve the same production feature. The queue is intentionally review-only: it persists `SCHEDULE` state and cancellation, but it does not create a worker or authorize a payment. Keep real vendor onboarding and Business B Mainnet allowance/payment actions separately gated.
+Commits `cbe91a0`, `965c33e`, and `808feb6` are pushed to `main`; Vercel deployment and authenticated no-write verification for the reschedule slice must be recorded here after the build reaches `READY`. The queue is intentionally review-only: it persists `SCHEDULE` state, cancellation, and rescheduling, but it does not create a worker or authorize a payment. Keep real vendor onboarding and Business B Mainnet allowance/payment actions separately gated.
 
 ### P1 — Final submission hygiene
 Before hackathon submission:
