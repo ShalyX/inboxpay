@@ -804,11 +804,17 @@ function renderVendors() {
     (vendor.status === "review" || vendor.onchain_status === "missing"
       ? '<button class="ghost verify-vendor" data-id="' + escapeHtml(vendor.id) + '">' + (vendor.onchain_status === "missing" ? "Register onchain" : "Verify") + '</button>'
       : "") +
+    (vendor.status === "verified" || vendor.onchain_status === "registered"
+      ? '<button class="ghost revoke-vendor" data-id="' + escapeHtml(vendor.id) + '">Revoke vendor</button>'
+      : "") +
     '</div></div>'
   ).join("");
 
   document.querySelectorAll(".verify-vendor").forEach((button) => {
     button.addEventListener("click", () => verifyVendor(button.dataset.id));
+  });
+  document.querySelectorAll(".revoke-vendor").forEach((button) => {
+    button.addEventListener("click", () => revokeVendor(button.dataset.id));
   });
   document.querySelectorAll("#vendor-list .copy-address").forEach((button) => {
     button.addEventListener("click", () => copyText(button.dataset.address, button.dataset.label));
@@ -836,6 +842,36 @@ async function verifyVendor(id) {
     const data = await readJsonResponse(response);
     if (!response.ok) throw new Error(data.error || "Unable to verify vendor");
     $("vendor-message").textContent = "Vendor verified. InboxPay can now consider matching invoices for payment.";
+    $("vendor-message").className = "auth-message";
+    await loadVendors();
+    await load();
+  } catch (error) {
+    $("vendor-message").textContent = error.message;
+    $("vendor-message").className = "auth-message error";
+  }
+}
+
+async function revokeVendor(id) {
+  try {
+    const vendor = state.vendors.find((item) => item.id === id);
+    if (!vendor) throw new Error("Vendor not found");
+    const network = state.business?.wallet_blockchain === "ARC" ? "Arc Mainnet" : "Arc Testnet";
+    if (!window.confirm(
+      "Revoke " + vendor.name + " from payments?\n\nRecipient: " + vendor.recipient_address +
+      "\nNetwork: " + network + "\n\nThis clears the vendor mapping on the policy vault and blocks the vendor in InboxPay."
+    )) return;
+    const response = await apiFetch("/api/vendors", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id,
+        status: "blocked",
+        ...(state.business?.wallet_blockchain === "ARC" ? { confirmMainnet: true } : {})
+      })
+    });
+    const data = await readJsonResponse(response);
+    if (!response.ok) throw new Error(data.error || "Unable to revoke vendor");
+    $("vendor-message").textContent = data.warning || "Vendor revoked onchain and blocked in InboxPay.";
     $("vendor-message").className = "auth-message";
     await loadVendors();
     await load();
