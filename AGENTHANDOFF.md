@@ -339,6 +339,13 @@ A separate authenticated Business B account now has its own Circle wallet on Arc
 - A read-only Arc Mainnet RPC balance check against the exact dedicated Business B wallet `0xa5639edc94b68af952f6744a8cd6a8b25ef4f80b` returned `0.15` native USDC (`eth_getBalance`, `0x214e8348c4f0000`). This is above the last Circle aggregate pending-fee requirement of `0.0654236295 USDC`.
 - This verifies the external funding onchain, but it does not by itself mutate InboxPay state. The next write must be one authenticated production `POST /api/policy` deployment retry with `confirmMainnet: true`, followed by Circle contract/transaction polling. No allowance or payment write is authorized by this funding event.
 
+### Business B Mainnet deployment (2026-10-07)
+
+- The user started the authenticated production policy deployment after funding. Arc Mainnet now shows a successful contract-creation transaction from the dedicated Business B wallet: `0x4522a912f73e02e42cc3cb0e0f524207ad07365c1b5b40672fd75bb28e770154` (block `24,641,418`, receipt status `0x1`).
+- Deployed policy vault: `0x8d8e3e5b0ca5da40c4976cf8b7fb589f3d400942`. Read-only RPC bytecode verification returns `4,676` bytes at that address.
+- The deployment transaction constructor data binds the vault to Business B wallet `0xa5639edc94b68af952f6744a8cd6a8b25ef4f80b`, Arc USDC `0x3600000000000000000000000000000000000000`, per-payment limit `1,000 USDC`, daily limit `5,000 USDC`, and cash floor `20 USDC`. Gas used was `1,157,405` at `21.5 gwei` (`0.0248842075 USDC`).
+- This proves the onchain deployment succeeded. The next verification is an authenticated production status refresh to reconcile Circle's contract/transaction records into `policy_contract_status=ready`. USDC allowance and payment remain unapproved/unattempted.
+
 ### Mainnet PaymentPolicyVault
 
 Production vault:
