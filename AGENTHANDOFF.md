@@ -397,7 +397,7 @@ The next production build flow is now shipped and verified on commit `5fe89e8` /
 
 ### Durable invoice scheduling queue (2026-10-07)
 
-- Commit `cbe91a0` adds a durable, review-only queue for invoices whose bounded agent decision is `SCHEDULE`. `PATCH /api/invoices` records an `invoice_scheduled` audit event and atomically moves the business-owned invoice to `settlement_status=scheduled`; no Circle, vendor, allowance, policy, or payment write is performed.
+- Commits `cbe91a0` and `965c33e` add a durable, review-only queue for invoices whose bounded agent decision is `SCHEDULE`, including clean malformed-date validation. `PATCH /api/invoices` records an `invoice_scheduled` audit event and atomically moves the business-owned invoice to `settlement_status=scheduled`; no Circle, vendor, allowance, policy, or payment write is performed.
 - The queue target defaults to 09:00 UTC on the invoice due date and is bounded to the next 366 days. A caller may supply a future ISO target within that bound. The schedule reason explicitly states that vendor verification and live policy preflight remain required.
 - `cancel_schedule` uses a compare-and-set update so a schedule can be cancelled without clearing a concurrent settlement state. The UI requires an explicit confirmation for queue and cancel actions, shows the review target, and states that no funds move. `/api/pay` preflight now fails closed for `scheduled` invoices until the schedule is cancelled.
 - Schedule state is reconstructed from the business-scoped audit trail during invoice refresh. No real vendor onboarding was performed for this slice; Business B's Mainnet wallet, replacement vault, zero allowance, blocked Acme QA mapping, and zero Mainnet payment state are unchanged.
