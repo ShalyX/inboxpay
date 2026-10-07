@@ -134,9 +134,9 @@ The production alias is:
 `tameion-ap-agent-live.vercel.app`
 
 Verified production deployment carrying the current settlement UI, payment preflight, activity surfaces, business profile control, and durable invoice scheduling queue:
-- Deployment: `dpl_Cmq44dssKygVKAi6vwfhURSumLkN`
-- Commit: `9555ed0`
-- Message: `Record scheduling deployment state`
+- Deployment: `dpl_BRRHbBTZCTtTgvaDwQudjMYQ1uoP`
+- Commit: `965c33e`
+- Message: `Validate malformed schedule dates`
 - State: `READY`
 
 That deployment includes the auth/onboarding fixes, Circle SDK import repairs, dedicated-wallet retry protection, correct Supabase wallet persistence, financial-route/PDF runtime decoupling, Gmail PDF parsing hardening, real Arc Testnet wallet funding, and failed policy-deployment recovery described below.
@@ -819,7 +819,7 @@ Commit `5fe89e8` and Vercel deployment `dpl_7hNtL7rkHDDVUhhR5ddWjrrLCh2U` are pr
 
 ### P1 — Durable invoice scheduling queue (complete for review semantics)
 
-Commit `cbe91a0` is deployed in `READY` Vercel deployment `dpl_Ehb93FyNcjZk8nDeU2RqGVDQEhLr`; the handoff-only follow-ups `4942ab2`, `9555ed0`, and later docs-only builds preserve the same production feature. The queue is intentionally review-only: it persists `SCHEDULE` state and cancellation, but it does not create a worker or authorize a payment. Keep real vendor onboarding and Business B Mainnet allowance/payment actions separately gated.
+Commits `cbe91a0` and `965c33e` are deployed in `READY` Vercel deployments `dpl_Ehb93FyNcjZk8nDeU2RqGVDQEhLr` and `dpl_BRRHbBTZCTtTgvaDwQudjMYQ1uoP`; the handoff-only follow-ups and later docs-only builds preserve the same production feature. The queue is intentionally review-only: it persists `SCHEDULE` state and cancellation, but it does not create a worker or authorize a payment. Keep real vendor onboarding and Business B Mainnet allowance/payment actions separately gated.
 
 ### P1 — Final submission hygiene
 Before hackathon submission:
