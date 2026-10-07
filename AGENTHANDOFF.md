@@ -133,10 +133,10 @@ Project:
 The production alias is:
 `tameion-ap-agent-live.vercel.app`
 
-Verified production deployment carrying the current settlement UI and backend:
-- Deployment: `dpl_4Laj6q2MDKwJuHjE6ppmAKqYz9t8`
-- Commit: `fc81e98`
-- Message: `Handle stuck provider payments during recovery`
+Verified production deployment carrying the current settlement UI, payment preflight, and activity surfaces:
+- Deployment: `dpl_7hNtL7rkHDDVUhhR5ddWjrrLCh2U`
+- Commit: `5fe89e8`
+- Message: `Expose activity views in compact layout`
 - State: `READY`
 
 That deployment includes the auth/onboarding fixes, Circle SDK import repairs, dedicated-wallet retry protection, correct Supabase wallet persistence, financial-route/PDF runtime decoupling, Gmail PDF parsing hardening, real Arc Testnet wallet funding, and failed policy-deployment recovery described below.
@@ -348,7 +348,7 @@ A separate authenticated Business B account now has its own Circle wallet on Arc
 
 ### Product control-gap correction (2026-10-07)
 
-The Business B deployment exposed a real product flaw: InboxPay created draft defaults during onboarding, but the setup UI let the user deploy them without first reviewing or configuring the business's own limits. A production control-surface pass is now implemented in source and pending/under production verification:
+The Business B deployment exposed a real product flaw: InboxPay created draft defaults during onboarding, but the setup UI let the user deploy them without first reviewing or configuring the business's own limits. A production control-surface pass is now implemented in source and production-verified:
 
 - Policy setup now requires the business to review maximum single payment, daily limit, and cash floor before its vault is deployed.
 - An existing vault loads the authoritative onchain limits, exposes policy updates and emergency pause/resume, and requires an exact confirmation before any Arc Mainnet write.
@@ -377,12 +377,23 @@ Production verification completed on commit `5d37bea` / Vercel deployment `dpl_G
 - The live policy control reads the replacement Mainnet vault `0xbfd7f80416bda5a2c2c79ad4f8ff108c6c3b0706` with `1000 / 5000 / 20 USDC` limits and reports USDC access as not authorized. The old vault remains deployed but is no longer the active InboxPay policy vault.
 - Static module checks and `npm run evaluate` passed locally. This verifies deployment integrity and the no-write live path. Adversarial recovery fixtures and the revocation contract test now pass locally as recorded below; a real settlement remains separately gated and untested on Business B Mainnet.
 
+### Payment-readiness and activity surfaces (2026-10-07)
+
+The next production build flow is now shipped and verified on commit `5fe89e8` / Vercel deployment `dpl_7hNtL7rkHDDVUhhR5ddWjrrLCh2U` (`READY`, production alias live):
+
+- `GET /api/preflight?invoice=...` performs a read-only, business-scoped live check before payment authorization. It reads the active policy vault, vendor mapping, USDC allowance, wallet balance, daily spend, policy limits, pause state, settlement state, and the vault's `canExecute` reason. It fails closed when a live read is unavailable.
+- The selected-invoice detail now separates the bounded agent decision reasons from payment-readiness reasons and displays each deterministic check. The settlement button stays disabled until the server preflight returns `eligible=true`; no payment write is performed by preflight.
+- Payments and Audit trail now use a business-scoped read-only `GET /api/activity?view=payments|audit` endpoint. Payments exposes settlement status and Arc receipt links; Audit exposes the real policy, vendor, wallet, allowance, and settlement events.
+- The first attempt exceeded the Vercel Hobby plan's 12-function deployment limit. The activity reads were consolidated into one route, leaving exactly 12 serverless functions; the subsequent production build reached `READY`.
+- Authenticated browser verification after deployment showed Business B's dedicated Mainnet wallet and replacement vault, no invoice rows, no settlement attempts, and the real existing audit events. Browser console error/warning inspection was clean. The read-only unauthenticated route checks return `401` as expected.
+- Mainnet state is unchanged and clean: the replacement vault remains `0xbfd7f80416bda5a2c2c79ad4f8ff108c6c3b0706`, the Acme QA mapping remains blocked/zero onchain, the Business B USDC allowance remains `0`, and no Mainnet payment has been submitted.
+
 Known gaps from this audit remain queued and must not be papered over:
 
 - **P0 contract migration:** new source and artifact support `setVendor(address(0))` for revocation and expose `vendorRevocationSupported()`. `forge test` passes the revocation behavior test. The generated optimized Paris artifact uses solc 0.8.24 (4,563-byte creation bytecode, excluding the `0x` prefix). The original Business B vault at `0x8d8e3e5b0ca5da40c4976cf8b7fb589f3d400942` remains deployed but is now legacy. The user-confirmed migration completed: InboxPay now points to replacement vault `0xbfd7f80416bda5a2c2c79ad4f8ff108c6c3b0706`; a direct Arc Mainnet RPC read returns `vendorRevocationSupported() = true`, 3,841 bytes of code, and `1,000,000,000 / 5,000,000,000 / 20,000,000` six-decimal USDC limits. Authenticated UI verification shows the replacement vault and `USDC access not authorized`; the vendor registry is empty after cutover. Allowance, vendor registration, and payment remain separate explicit actions.
 - **P0 reconciliation recovery:** the source implementation records Circle submission IDs and deterministic idempotency keys before waiting, keeps provider timeouts in `processing`, reconciles pending invoices on authenticated refresh, distinguishes terminal provider failure (including Circle `STUCK`) from unknown/confirming state, and validates the Arc receipt against the expected policy vault, payment ID, vendor, recipient, amount, and invoice hash. `npm run test:recovery` now passes adversarial fixtures for idempotency, bounded retries, Circle terminal states, event matching, missing/reverted receipts, and wrong vault/event data. This is source-level verification; do not call the settlement loop fully production-verified until the latest code is deployed and live recovery behavior is checked. A real settlement remains untested on Business B Mainnet.
-- **P1 product surfaces:** the Payments and Audit trail navigation buttons are still inert; there is no complete payment-history/audit UI or Arc receipt/explorer surface.
-- **P1 policy preflight:** daily spend, available-to-spend, cash-floor headroom, and `canExecute` reason are enforced onchain but not yet surfaced per invoice before submission.
+- **P1 product surfaces:** complete for the current slice. Payments and Audit trail are business-scoped read-only views with settlement status, receipt links, and audit event detail. Continue expanding receipt/recovery UX as real settlements accumulate.
+- **P1 policy preflight:** complete for the current slice. Daily spend, wallet balance/cash-floor headroom, allowance, limits, vendor mapping, settlement state, and the live `canExecute` reason are surfaced per invoice before submission. Continue adversarial testing with a real invoice when a real vendor is available.
 - **P1 onboarding:** the business name is inferred from sign-up metadata/domain and has no product edit flow.
 - **P1 scheduling:** `SCHEDULE` is a decision label, not yet a durable scheduled-execution queue with cancel/reschedule controls.
 - **Developer workflow:** `npm start` currently fails because `dev-server.mjs` imports missing `lib/inboxpay.mjs`; production Vercel functions are separate, but local end-to-end startup is broken and must be repaired.
@@ -785,6 +796,10 @@ Current handoff state: Acme Test Hosting has `status=verified` for the Testnet Q
 The settlement path now persists a `payment_submitted` audit record immediately after Circle returns a transaction ID, uses a stable idempotency key per business/payment/attempt, keeps non-terminal Circle timeouts in `processing`, and exposes recovery through the normal invoice refresh path. Arc reconciliation checks the actual receipt, transaction target, `usedPayment` marker, and `PaymentExecuted` event fields before confirming. The UI exposes `PROCESSING`, `FAILED`, and `REVIEW` states without claiming settlement prematurely. No Mainnet payment was submitted while implementing or verifying this change.
 
 Local checks: `npm run test:recovery` and `npm run test:migration` pass; `forge test` passes the zero-address vendor-revocation test; `npm run compile:policy` regenerates the optimized Paris artifact with solc 0.8.24. The migration UI/API shipped in `b930c3e434c66130f19b1199dd63e852fe6fd658` / `dpl_FeepTti4C4E7B3W9yW2xXugzzP6B`, and the user confirmed the Mainnet migration. The vendor revoke control shipped in `4029eceac2617c689d4523cb5c45ae332e7e4c5d` / `dpl_38GsRfWABB6JBpxVs21HuvMDJQwy`; authenticated production verification shows Acme blocked and direct RPC confirms its recipient mapping is zero. Authenticated UI and public RPC now confirm the replacement vault's USDC allowance is revoked (`0`). No Business B Mainnet payment has been submitted.
+
+### P1 — Payment-readiness and activity surfaces (complete)
+
+Commit `5fe89e8` and Vercel deployment `dpl_7hNtL7rkHDDVUhhR5ddWjrrLCh2U` are production-ready. Local `npm run test:preflight`, `npm run test:recovery`, `npm run test:migration`, `forge test`, JavaScript syntax checks, and `git diff --check` pass. The live authenticated read path verified the compact-layout Payments and Audit entry points, the clean Business B payment history, and the existing audit trail without any Mainnet write. Keep the payment button fail-closed until a real invoice, intended real vendor, allowance, and explicit payment confirmation are all present.
 
 ### P1 — Final submission hygiene
 Before hackathon submission:
