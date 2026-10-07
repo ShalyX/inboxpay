@@ -1108,6 +1108,8 @@ async function init() {
     $("open-policy-top").addEventListener("click", openPolicyModal);
     $("open-payments").addEventListener("click", () => openActivity("payments"));
     $("open-audit").addEventListener("click", () => openActivity("audit"));
+    $("open-payments-top").addEventListener("click", () => openActivity("payments"));
+    $("open-audit-top").addEventListener("click", () => openActivity("audit"));
     $("close-activity").addEventListener("click", closeActivityModal);
     $("close-policy").addEventListener("click", closePolicyModal);
     $("policy-form").addEventListener("submit", savePolicy);
