@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { isScheduleDue, resolveScheduleEvents, scheduleForDueDate, validateScheduleTarget } from "../lib/invoice-scheduling.mjs";
+import { isScheduleDue, resolveScheduleEvents, scheduleEvents, scheduleForDueDate, validateScheduleTarget } from "../lib/invoice-scheduling.mjs";
 
 const now = new Date("2026-10-07T12:00:00.000Z");
 assert.equal(scheduleForDueDate("2026-10-08", now), "2026-10-08T09:00:00.000Z");
@@ -21,5 +21,16 @@ const queued = resolveScheduleEvents([
 ]);
 assert.deepEqual(queued, { status: "queued", scheduledFor: "2026-10-10T09:00:00.000Z", reason: "owner moved review", createdAt: "2026-10-07T12:04:00Z", eventId: "reschedule-1" });
 assert.equal(resolveScheduleEvents([{ event_type: "invoice_schedule_cancelled", created_at: "2026-10-07T12:03:00Z", data: {} }]), null);
+
+let requestedPath = "";
+const queriedEvents = await scheduleEvents("token", "business-1", "user-1", "invoice-1", async (path) => {
+  requestedPath = path;
+  return [
+    { id: "schedule-1", event_type: "invoice_scheduled", created_at: "2026-10-07T12:01:00Z", data: { scheduled_for: "2026-10-08T09:00:00.000Z", reason: "review" } },
+    { id: "reschedule-1", event_type: "invoice_schedule_rescheduled", created_at: "2026-10-07T12:04:00Z", data: { scheduled_for: "2026-10-10T09:00:00.000Z", reason: "owner moved review" } }
+  ];
+});
+assert.match(requestedPath, /event_type=in\.\(invoice_scheduled,invoice_schedule_rescheduled,invoice_schedule_cancelled\)/);
+assert.equal(resolveScheduleEvents(queriedEvents)?.scheduledFor, "2026-10-10T09:00:00.000Z");
 
 console.log("invoice scheduling checks passed");
