@@ -134,9 +134,9 @@ The production alias is:
 `tameion-ap-agent-live.vercel.app`
 
 Verified production deployment carrying the current settlement UI and backend:
-- Deployment: `dpl_9T98AuTzVtsoBe9zQyrsf6sV9gHB`
-- Commit: `66e12be`
-- Message: `Harden settlement recovery and reconciliation`
+- Deployment: `dpl_4Laj6q2MDKwJuHjE6ppmAKqYz9t8`
+- Commit: `fc81e98`
+- Message: `Handle stuck provider payments during recovery`
 - State: `READY`
 
 That deployment includes the auth/onboarding fixes, Circle SDK import repairs, dedicated-wallet retry protection, correct Supabase wallet persistence, financial-route/PDF runtime decoupling, Gmail PDF parsing hardening, real Arc Testnet wallet funding, and failed policy-deployment recovery described below.
@@ -371,7 +371,7 @@ Production verification completed on commit `5d37bea` / Vercel deployment `dpl_G
 
 ### Durable settlement recovery deployment (2026-10-07)
 
-- Commit `66e12be` (`Harden settlement recovery and reconciliation`) was pushed to `main` and deployed Ready as Vercel deployment `dpl_9T98AuTzVtsoBe9zQyrsf6sV9gHB`. Follow-up handoff-only commits `3f85e02` and `975570e` also built Ready; the production alias follows `main` and serves the same recovery code.
+- Commit `66e12be` (`Harden settlement recovery and reconciliation`) was pushed to `main` and deployed Ready as Vercel deployment `dpl_9T98AuTzVtsoBe9zQyrsf6sV9gHB`. The terminal-`STUCK` recovery fix landed in commit `fc81e98` and is Ready as `dpl_4Laj6q2MDKwJuHjE6ppmAKqYz9t8`; handoff-only follow-ups also built Ready, and the production alias serves the same recovery code.
 - The deployed financial routes include durable Circle submission tracking, deterministic payment idempotency keys, non-terminal `processing` state, refresh-time pending reconciliation, and Arc receipt/event validation before `confirmed`.
 - Authenticated production read verification after deployment returned HTTP 200 from `/api/invoices` with `liveGmail=true`, Gmail status `connected`, Business B's dedicated Mainnet wallet/vault, and zero current invoice rows. No payment or allowance/vendor/policy write was submitted.
 - The live policy control reads the deployed Mainnet vault `0x8d8e3e5b0ca5da40c4976cf8b7fb589f3d400942` with `1000 / 5000 / 20 USDC` limits and still reports USDC access as not authorized.
