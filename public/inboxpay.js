@@ -1200,9 +1200,18 @@ async function settle() {
   const network = state.business?.wallet_blockchain === "ARC" ? "Arc Mainnet" : "Arc Testnet";
   const vendor = state.vendors.find((item) => item.name === invoice.vendor);
   const recipient = vendor?.recipient_address || "the verified vendor address";
+  const walletAddress = state.business?.wallet_address || "Unavailable";
+  const policyVault = state.business?.policy_contract_address || "Unavailable";
+  const amount = Number(invoice.amount || 0).toFixed(6);
   const confirmed = window.confirm(
-    "Settle " + Number(invoice.amount || 0).toFixed(2) + " " + invoice.currency + " to " + invoice.vendor + " on " + network + "?\n\n" +
-    "Invoice: " + invoice.invoiceNumber + "\nRecipient: " + recipient + "\n\nInboxPay will submit the payment through this business's policy vault and reconcile the Arc receipt."
+    "Confirm settlement on " + network + "?\n\n" +
+    "Invoice: " + invoice.invoiceNumber + "\n" +
+    "Amount: " + amount + " " + invoice.currency + "\n" +
+    "Vendor: " + invoice.vendor + "\n" +
+    "Recipient: " + recipient + "\n" +
+    "Business wallet: " + walletAddress + "\n" +
+    "Policy vault: " + policyVault + "\n\n" +
+    "This submits a real payment from this business's dedicated Circle wallet. InboxPay will run live policy checks and reconcile the Arc receipt. Continue only if every detail matches."
   );
   if (!confirmed) return;
   $("pay-button").disabled = true;

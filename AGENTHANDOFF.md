@@ -346,12 +346,15 @@ A separate authenticated Business B account now has its own Circle wallet on Arc
 - The deployment transaction constructor data binds the vault to Business B wallet `0xa5639edc94b68af952f6744a8cd6a8b25ef4f80b`, Arc USDC `0x3600000000000000000000000000000000000000`, per-payment limit `1,000 USDC`, daily limit `5,000 USDC`, and cash floor `20 USDC`. Gas used was `1,157,405` at `21.5 gwei` (`0.0248842075 USDC`).
 - This proves the onchain deployment succeeded. The next verification is an authenticated production status refresh to reconcile Circle's contract/transaction records into `policy_contract_status=ready`. USDC allowance and payment remain unapproved/unattempted.
 
-### Business B Mainnet settlement-proof readiness (2026-10-07)
+### Business B Mainnet settlement-proof readiness (updated 2026-10-09)
 
 - Read-only Arc Mainnet RPC verification confirms chain `5042`, active replacement vault `0xbfd7f80416bda5a2c2c79ad4f8ff108c6c3b0706`, and dedicated wallet `0xa5639edc94b68af952f6744a8cd6a8b25ef4f80b`.
 - The wallet currently holds `0.092142 USDC` (native Arc gas balance and the configured USDC balance read agree). The active policy cash floor is `20 USDC`, so no invoice can pass `canExecute` until the same business wallet is funded above `cash floor + invoice amount` and fees.
 - The active vault allowance is `0`, the daily spend is `0`, and no production Business B invoice or real vendor is currently available for settlement. No policy, allowance, vendor, or payment write was submitted during this readiness check.
-- The next proof requires a genuine invoice from the connected business Gmail, an explicitly verified vendor recipient, sufficient funding, explicit USDC authorization, a live eligible preflight, and one final confirmation naming the exact invoice, amount, recipient, Arc Mainnet network, wallet, and vault.
+- The 2026-10-09 read-only production check found one Mainnet-business invoice: `TA-GMAIL-0001`, `0.500000 USDC`, vendor `Acme Test Hosting`, with a `gmail-live` extraction source but `ESCALATE` decision because the vendor is not verified. The DB vendor is intentionally `blocked`, and the active vault's `vendorRecipient` is the zero address. Do not unblock or pay this QA vendor to force the milestone; it is not an acceptable Mainnet proof invoice.
+- The same check confirms the wallet currently holds `0.092142 USDC`, the active vault allowance is `0`, the cash floor is `20 USDC`, daily spend is `0`, and `canExecute` rejects this invoice with `VENDOR_NOT_ALLOWED`. No financial write was performed.
+- The final settle confirmation UI has been hardened to display the exact network, invoice number, six-decimal amount, vendor, recipient, dedicated business wallet, and active policy vault before asking the user to continue. The API and contract still perform their own live checks; this confirmation is not a substitute for preflight.
+- The next proof requires a genuine payable invoice from the business's real Gmail, an explicitly verified vendor recipient that can receive USDC on Arc, sufficient funding above `cashFloor + invoice amount` plus transaction-fee headroom, explicit USDC authorization, a live eligible preflight, and the exact final confirmation.
 
 ### Product control-gap correction (2026-10-07)
 
@@ -697,7 +700,7 @@ At last inspection:
 - Arc Testnet Circle credentials are configured under the server's expected production variable names
 - Google login completed and remained authenticated as the existing `gmail.com` business
 - authenticated Arc Testnet wallet creation and business-row persistence completed
-- a separate Business B account was authenticated and its dedicated Arc Mainnet wallet was created and persisted; no Mainnet policy, allowance, funding, or payment write has occurred
+- a separate Business B account was authenticated and its dedicated Arc Mainnet wallet was created and persisted; the active replacement Mainnet policy vault is deployed and ready, the wallet has been funded, the allowance is currently revoked (`0`), and no Business B Mainnet payment has been submitted
 - refresh/reconnect after Mainnet wallet provisioning restored the same Business B wallet and Gmail state
 - the confirmed Business B Mainnet policy deployment reached the real Circle provider after the runtime flag was loaded; with `0.05 USDC` funded, Circle created contract record `01a11292-867f-71f5-b129-80bba31e335d` and later returned `FAILED` / `TX_NOT_INITIATED`, with no onchain contract address or transaction ID
 - deterministic retry behavior was verified against the real Circle test account
@@ -708,7 +711,7 @@ At last inspection:
 - The selected `TA-GMAIL-0001` invoice for `Acme Test Hosting` was settled from the dedicated business wallet on Arc Testnet after explicit authorization. The production API records `settlement_status=confirmed`, payment transaction `0x7dc26bc15519137fdf28b07f1d72bbf38dd001ac14f47be3daf3a3b77ca33090`, and `reconciled=true`; the `payment_settled` audit event records the same hash. The live UI shows `0.00 USDC` ready to pay, `0 approved invoices`, `1 settled`, and `Reconciliation PASS`. The wallet balance is `39.45334 USDC` after the 0.50 USDC payment and network fees.
 - The policy-vault deployment path is live on Arc Testnet and currently ready.
 - The intended live invoice vendor, `Acme Test Hosting`, is now registered and verified against the documented Arc/EVM recipient address.
-- The durable `SCHEDULE` queue is deployed and read-only verified: it persists review state and cancellation without authorizing payment. The authenticated Business B account currently has no invoice rows, so no scheduling mutation was performed in production.
+- The durable `SCHEDULE` queue is deployed and read-only verified: it persists review state, cancellation, and rescheduling without authorizing payment. The Mainnet Business B account now has one invoice row (`TA-GMAIL-0001`), but it is a QA/test-hosting record in `ESCALATE` state with the vendor intentionally blocked; no scheduling or payment mutation was performed for it.
 - The Mainnet settlement-proof readiness check found Business B's dedicated wallet at `0.092142 USDC`, active cash floor `20 USDC`, and vault allowance `0`; the proof remains blocked until the real invoice/vendor/funding/authorization gates are satisfied.
 
 The `audit_events` RLS policy is now corrected in Supabase. Authenticated inserts require `user_id = auth.uid()` and ownership of the referenced business. A real authenticated `vendor_registered` audit insert returned HTTP 201. The earlier testnet-funding audit failure should be retested on the next real funding request; no server-authorized bypass was added.
