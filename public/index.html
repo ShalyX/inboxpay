@@ -55,7 +55,6 @@
           <button id="open-policy-top" class="ghost">Manage policy</button>
           <button id="add-vendor" class="ghost">Add vendor</button>
           <button id="connect-gmail" class="ghost">Connect Gmail</button>
-          <button id="create-operator-handoff" class="ghost">Create QA handoff</button>
           <button id="sign-out" class="ghost">Sign out</button>
           <button id="refresh" class="ghost">↻ Refresh inbox</button>
         </div>
@@ -123,16 +122,6 @@
           <button id="policy-allowance" class="ghost" type="button">Authorize vault</button>
         </div>
         <div id="policy-message" class="auth-message" aria-live="polite"></div>
-      </div>
-    </div>
-    <div id="operator-handoff-modal" class="vendor-modal" hidden>
-      <div class="vendor-card business-card" role="dialog" aria-modal="true" aria-labelledby="operator-handoff-title">
-        <div class="detail-top"><div><label>REMOTE QA</label><h2 id="operator-handoff-title">Operator handoff</h2></div><button id="close-operator-handoff" class="ghost" type="button">Close</button></div>
-        <p>This grants a short-lived rehearsal token for this business only. It can read state and refresh Gmail invoices; it cannot settle payments, change policy, manage vendors, or provision wallets.</p>
-        <div id="operator-handoff-message" class="auth-message" aria-live="polite"></div>
-        <label for="operator-handoff-token">Copy this token into the Hermes session</label>
-        <textarea id="operator-handoff-token" rows="4" readonly hidden></textarea>
-        <div id="operator-handoff-expiry" class="policy-secondary"></div>
       </div>
     </div>
     <div id="toast" class="toast" hidden></div>

@@ -13,8 +13,6 @@ const API_ROUTES = Object.freeze({
   "/api/gmail/callback": "api/gmail/callback.mjs",
   "/api/invoices": "api/invoices.mjs",
   "/api/onboarding": "api/onboarding.mjs",
-  "/api/operator/handoff": "api/operator/handoff.mjs",
-  "/api/operator/state": "api/operator/state.mjs",
   "/api/pay": "api/pay.mjs",
   "/api/policy": "api/policy.mjs",
   "/api/preflight": "api/preflight.mjs",
