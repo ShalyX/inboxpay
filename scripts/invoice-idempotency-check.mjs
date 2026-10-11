@@ -41,6 +41,7 @@ assert.equal(result.settlement_status, "confirmed");
 assert.equal(result.payment_tx_hash, "0xsettled");
 assert.equal(result.payment_id, "payment-1");
 assert.equal(calls.filter(({ options }) => options.method === "POST").length, 0);
+assert.ok(calls.some(({ url }) => url.includes("external_message_id=eq.new-reminder-message")), "exact unique-key lookup was not attempted");
 
 const deduped = dedupeInvoiceRows([
   { id: "fresh-reminder", vendor: "Acme Test Hosting", invoice_number: "TA-GMAIL-0001", due_date: "2026-10-02", settlement_status: null, updated_at: "2026-10-12T00:00:00Z" },
