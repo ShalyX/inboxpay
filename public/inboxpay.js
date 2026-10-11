@@ -290,7 +290,7 @@ function renderSetup() {
         (testnetNeedsFunding ? "Fund wallet first" : state.business?.policy_contract_status === "deploying" ? "Policy deployment running…" : "Review policy & deploy") + '</button>'
       : policyReady
         ? '<span class="setup-contract">Vault · ' + shortAddress(state.business.policy_contract_address) +
-          (state.wallet?.policyVaultBalance != null ? " · " + Number(state.wallet.policyVaultBalance).toFixed(2) + " USDC" : "") +
+          (state.wallet?.policyVaultBalance != null ? " · Business wallet balance: " + Number(state.wallet.policyVaultBalance).toFixed(2) + " USDC" : "") +
           '</span>'
         : '') +
     '</div>';
