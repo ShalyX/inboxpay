@@ -854,7 +854,8 @@ function renderDetail() {
     ' settlement · due ' + escapeHtml(invoice.dueDate || "not found") + '</span></div></div><div class="big-amount">' +
     Number(invoice.amount || 0).toFixed(2) + ' <span>' + escapeHtml(invoice.currency || "") + '</span></div><div class="decision"><div class="decision-head">● Agent reasoning</div>' +
     reasonsHtml + '<div class="confidence"><span>Extraction confidence</span><b>' +
-    escapeHtml(invoice.extraction?.confidence || "unknown") + '</b></div></div>' +
+    escapeHtml(invoice.extraction?.confidence || "unknown") + '</b></div><div class="confidence"><span>Invoice evidence</span><b>' +
+    Number(invoice.sourceCount || invoice.sources?.length || 0) + " source" + (Number(invoice.sourceCount || invoice.sources?.length || 0) === 1 ? "" : "s") + '</b></div></div>' +
     gateHtml + scheduleHtml + '<div class="checks">' + checksHtml +
     (processing ? checkRow("Payment recovery", "In progress") : reviewRequired ? checkRow("Payment recovery", "Manual review") : "") +
     '</div>' + (settled ? '<div class="settlement"><span>Arc confirmation</span><b>Reconciliation PASS</b></div>' : "") +
@@ -1115,6 +1116,13 @@ async function load() {
     const data = await readJsonResponse(response);
     if (!response.ok) throw new Error(data.error || "Invoice data unavailable");
     state.invoices = data.invoices || [];
+    state.feedSource = data.source || "unknown";
+    state.liveGmail = data.liveGmail === true;
+    state.evaluatedAt = data.evaluatedAt || null;
+    const evaluatedLabel = state.evaluatedAt ? new Date(state.evaluatedAt).toLocaleString() : "not recorded";
+    $("feed-meta").textContent = state.liveGmail
+      ? "Source: " + state.feedSource + " · Live Gmail: yes · Evaluated: " + evaluatedLabel + " · " + state.invoices.length + " invoices"
+      : "Source: " + state.feedSource + " · Live Gmail: no";
     state.selected = state.selected
       ? state.invoices.find((x) => x.invoiceNumber === state.selected.invoiceNumber) || null
       : state.invoices[0] || null;
