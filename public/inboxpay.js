@@ -48,7 +48,9 @@ function escapeHtml(value) {
 }
 
 function invoiceSettled(invoice) {
-  return invoice?.settlement?.reconciled === true || invoice?.settlement?.onchainDuplicate === true;
+  return invoice?.settlement?.status === "confirmed" ||
+    invoice?.settlement?.reconciled === true ||
+    invoice?.settlement?.onchainDuplicate === true;
 }
 
 function status(decision) {
