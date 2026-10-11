@@ -21,8 +21,11 @@ jobs:
         with:
           node-version: 24
 
-      - name: Install compiler
-        run: npm install --no-save --ignore-scripts solc@0.8.19
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Verify compiler
+        run: forge --version
 
       - name: Compile
         run: node scripts/compile-policy.mjs
