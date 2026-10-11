@@ -970,19 +970,23 @@ function renderVendors() {
     node.innerHTML = '<div class="vendor-empty">No vendor addresses registered yet.</div>';
     return;
   }
-  node.innerHTML = state.vendors.map((vendor) =>
-    '<div class="vendor-row"><div><strong>' + escapeHtml(vendor.name) + '</strong><span>' +
+  node.innerHTML = state.vendors.map((vendor) => {
+    const registryStatus = vendor.status || "review";
+    const chainStatus = vendor.onchain_status || "unavailable";
+    const recipientMatch = registryStatus === "verified" && chainStatus === "registered";
+    const chainLabel = chainStatus === "registered" ? "Registered" : chainStatus === "missing" ? "Missing" : chainStatus === "unavailable" ? "Unavailable" : "Not checked";
+    return '<div class="vendor-row"><div><strong>' + escapeHtml(vendor.name) + '</strong><span>' +
     escapeHtml(vendor.recipient_address) +
-    '</span><button class="text-action copy-address" type="button" data-address="' + escapeHtml(vendor.recipient_address) + '" data-label="Vendor address">Copy address</button></div><div><b class="vendor-status ' + escapeHtml(["missing", "unavailable"].includes(vendor.onchain_status) ? "review" : vendor.status) + '">' +
-    escapeHtml(vendor.onchain_status === "registered" ? "onchain" : vendor.onchain_status === "missing" ? "not onchain" : vendor.onchain_status === "unavailable" ? "chain unavailable" : vendor.status) + '</b>' +
-    (vendor.status === "review" || vendor.onchain_status === "missing"
-      ? '<button class="ghost verify-vendor" data-id="' + escapeHtml(vendor.id) + '">' + (vendor.onchain_status === "missing" ? "Register onchain" : "Verify") + '</button>'
+    '</span><button class="text-action copy-address" type="button" data-address="' + escapeHtml(vendor.recipient_address) + '" data-label="Vendor address">Copy address</button></div><div class="vendor-state"><span class="vendor-state-line"><b>Registry</b> ' + escapeHtml(registryStatus) + '</span><span class="vendor-state-line"><b>Onchain</b> ' + escapeHtml(chainLabel) + '</span><span class="vendor-state-line"><b>Recipient</b> ' + (recipientMatch ? "matches registry" : "does not match / unavailable") + '</span><b class="vendor-status ' + (recipientMatch ? "verified" : "review") + '">' +
+    (recipientMatch ? "payment ready" : "payment blocked") + '</b>' +
+    (registryStatus === "review" || chainStatus === "missing"
+      ? '<button class="ghost verify-vendor" data-id="' + escapeHtml(vendor.id) + '">' + (chainStatus === "missing" ? "Register onchain" : "Verify") + '</button>'
       : "") +
-    (vendor.status === "verified" || vendor.onchain_status === "registered"
+    (registryStatus === "verified" || chainStatus === "registered"
       ? '<button class="ghost revoke-vendor" data-id="' + escapeHtml(vendor.id) + '">Revoke vendor</button>'
       : "") +
-    '</div></div>'
-  ).join("");
+    '</div></div>';
+  }).join("");
 
   document.querySelectorAll(".verify-vendor").forEach((button) => {
     button.addEventListener("click", () => verifyVendor(button.dataset.id));
