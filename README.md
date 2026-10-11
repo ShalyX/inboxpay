@@ -98,11 +98,9 @@ Set the infrastructure secrets in Vercel, including Circle credentials, Supabase
 
 ### Remote QA handoff
 
-For authenticated rehearsal from a separate Hermes/VPS environment, configure `SUPABASE_SERVICE_ROLE_KEY` in Vercel and apply `supabase/operator-handoffs.sql` to the hosted Supabase project. The service-role key is server-only and must never be exposed to the browser.
+For authenticated rehearsal from a separate Hermes/VPS environment, an authenticated business user can click **Create QA handoff**. InboxPay creates a short-lived, encrypted, business-bound `rehearsal_read_refresh` token using the existing token-encryption secret. The user may paste that token into the Hermes session. The operator API can read redacted business, wallet, Gmail, policy, vendor, and invoice state and can request a live Gmail refresh. It cannot settle payments, modify policy, manage vendors, provision wallets, or expose OAuth tokens. Handoffs expire automatically after ten minutes; no Supabase migration or service-role key is required.
 
-An authenticated business user can click **Create QA handoff**. InboxPay creates a short-lived, business-bound `rehearsal_read_refresh` token. The user may paste that token into the Hermes session. The operator API can read redacted business, wallet, Gmail, policy, vendor, and invoice state and can request a live Gmail refresh. It cannot settle payments, modify policy, manage vendors, provision wallets, or expose OAuth tokens. Handoffs expire after ten minutes and can be revoked from the UI.
-
-Do not paste handoff tokens into GitHub, issue trackers, screenshots, or public chat. Revoke the handoff after the rehearsal.
+Do not paste handoff tokens into GitHub, issue trackers, screenshots, or public chat. Close the handoff dialog after copying and wait for expiry after the rehearsal.
 
 Do not commit Gmail tokens, Circle wallet exports, OAuth credentials, local invoice files, or evaluator output.
 
