@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 
 process.env.SUPABASE_PUBLISHABLE_KEY = "test-publishable-key";
 const { dedupeInvoiceRows, persistInvoice } = await import("../lib/business-data.mjs");
+const { invoicePaymentId } = await import("../lib/invoice-identity.mjs");
 
 const settled = {
   id: "settled-row",
@@ -49,5 +50,17 @@ const deduped = dedupeInvoiceRows([
 ]);
 assert.equal(deduped.length, 1);
 assert.equal(deduped[0].settlement_status, "confirmed");
+
+const stableIdentity = {
+  business_id: "business-1",
+  vendor: "Acme Test Hosting",
+  invoice_number: "TA-GMAIL-0001",
+  due_date: "2026-10-02"
+};
+assert.equal(
+  invoicePaymentId({ ...stableIdentity, external_message_id: "message-a" }),
+  invoicePaymentId({ ...stableIdentity, external_message_id: "message-b" }),
+  "Gmail reminders must share one stable onchain payment ID"
+);
 
 console.log("invoice idempotency regression passed");
