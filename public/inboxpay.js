@@ -910,11 +910,13 @@ function renderActivity(kind, rows) {
     node.innerHTML = rows.map((payment) => '<article class="activity-row"><div><strong>' + escapeHtml(payment.vendor || "Unknown vendor") + '</strong><span>' +
       escapeHtml(payment.invoiceNumber || "Missing invoice number") + ' · ' + escapeHtml(formatActivityDate(payment.updatedAt)) + '</span></div><div class="activity-value"><b>' +
       Number(payment.amount || 0).toFixed(2) + ' ' + escapeHtml(payment.currency || "") + '</b><span class="activity-status ' + escapeHtml(payment.status || "") + '">' +
-      escapeHtml(payment.status || "unknown") + '</span>' + (payment.paymentTxHash ? '<a href="' + (payment.network === "ARC" ? "https://arcscan.app/tx/" : "https://testnet.arcscan.app/tx/") + encodeURIComponent(payment.paymentTxHash) + '" target="_blank" rel="noreferrer">' + escapeHtml(payment.paymentTxHash.slice(0, 10) + "…") + '</a>' : '') + '</div></article>').join("");
+      escapeHtml(payment.status || "unknown") + '</span><span>' + escapeHtml(payment.network === "ARC" ? "Arc Mainnet" : "Arc Testnet") + '</span>' +
+      (payment.paymentId ? '<span>Payment ID: ' + escapeHtml(payment.paymentId.slice(0, 12) + "…") + '</span>' : '') +
+      (payment.paymentTxHash ? '<a href="' + (payment.network === "ARC" ? "https://arcscan.app/tx/" : "https://testnet.arcscan.app/tx/") + encodeURIComponent(payment.paymentTxHash) + '" target="_blank" rel="noreferrer">Tx: ' + escapeHtml(payment.paymentTxHash.slice(0, 10) + "…") + '</a>' : '') + '</div></article>').join("");
     return;
   }
   node.innerHTML = rows.map((event) => '<article class="activity-row"><div><strong>' + escapeHtml(event.event_type || "event") + '</strong><span>' +
-    escapeHtml(event.actor || "system") + ' · ' + escapeHtml(formatActivityDate(event.created_at)) + '</span></div><div class="activity-value"><span>' +
+    escapeHtml(event.actor || "system") + ' · ' + escapeHtml(formatActivityDate(event.created_at)) + '</span></div><div class="activity-value"><span>Business scope: ' + escapeHtml(event.business_id || "current business") + '</span><span>' +
     escapeHtml(event.invoice_id ? "Invoice event" : "Business event") + '</span><details><summary>Details</summary><pre>' + escapeHtml(JSON.stringify(event.data || {}, null, 2)) + '</pre></details></div></article>').join("");
 }
 

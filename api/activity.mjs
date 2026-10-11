@@ -33,7 +33,7 @@ export default async function handler(req, res) {
     }
     if (view === "audit") {
       const events = await supabaseRest(
-        "audit_events?select=id,event_type,actor,data,invoice_id,created_at&business_id=eq." + encodeURIComponent(business.id) + "&user_id=eq." + encodeURIComponent(user.id) + "&order=created_at.desc&limit=100",
+        "audit_events?select=id,event_type,actor,data,invoice_id,business_id,created_at&business_id=eq." + encodeURIComponent(business.id) + "&user_id=eq." + encodeURIComponent(user.id) + "&order=created_at.desc&limit=100",
         { token }
       );
       return res.status(200).json({ business, count: events?.length || 0, events: events || [] });
