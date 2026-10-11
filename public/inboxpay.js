@@ -1240,6 +1240,52 @@ async function settle() {
   }
 }
 
+function closeOperatorHandoff() {
+  $("operator-handoff-modal").hidden = true;
+  $("operator-handoff-message").textContent = "";
+  $("operator-handoff-token").value = "";
+  $("operator-handoff-token").hidden = true;
+  $("operator-handoff-expiry").textContent = "";
+  $("revoke-operator-handoff").hidden = true;
+}
+
+async function createOperatorHandoff() {
+  $("operator-handoff-modal").hidden = false;
+  $("operator-handoff-message").textContent = "Creating a short-lived rehearsal handoff…";
+  $("operator-handoff-message").className = "auth-message";
+  $("operator-handoff-token").hidden = true;
+  $("revoke-operator-handoff").hidden = true;
+  try {
+    const response = await apiFetch("/api/operator/handoff", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" }
+    });
+    const data = await readJsonResponse(response);
+    if (!response.ok) throw new Error(data.error || "Unable to create operator handoff");
+    $("operator-handoff-message").textContent = "Copy this token into the Hermes session. It expires automatically and can only read this business plus refresh Gmail invoices.";
+    $("operator-handoff-token").value = data.operatorToken;
+    $("operator-handoff-token").hidden = false;
+    $("operator-handoff-expiry").textContent = "Expires: " + new Date(data.expiresAt).toLocaleString() + " · Network: " + (data.business?.network || "unknown");
+    $("revoke-operator-handoff").hidden = false;
+  } catch (error) {
+    $("operator-handoff-message").textContent = error.message || "Unable to create operator handoff";
+    $("operator-handoff-message").className = "auth-message error";
+  }
+}
+
+async function revokeOperatorHandoff() {
+  try {
+    const response = await apiFetch("/api/operator/handoff", { method: "DELETE" });
+    const data = await readJsonResponse(response);
+    if (!response.ok) throw new Error(data.error || "Unable to revoke operator handoff");
+    toast("Operator handoff revoked");
+    closeOperatorHandoff();
+  } catch (error) {
+    $("operator-handoff-message").textContent = error.message || "Unable to revoke operator handoff";
+    $("operator-handoff-message").className = "auth-message error";
+  }
+}
+
 async function init() {
   try {
     const configResponse = await fetch("/api/config");
@@ -1254,6 +1300,9 @@ async function init() {
     $("auth-signup").addEventListener("click", signup);
     $("auth-google").addEventListener("click", signInWithGoogle);
     $("connect-gmail").addEventListener("click", connectGmail);
+    $("create-operator-handoff").addEventListener("click", createOperatorHandoff);
+    $("close-operator-handoff").addEventListener("click", closeOperatorHandoff);
+    $("revoke-operator-handoff").addEventListener("click", revokeOperatorHandoff);
     $("edit-business").addEventListener("click", openBusinessModal);
     $("close-business").addEventListener("click", closeBusinessModal);
     $("business-form").addEventListener("submit", saveBusinessName);
