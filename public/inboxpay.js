@@ -762,6 +762,10 @@ function renderStats() {
 }
 
 function renderList() {
+  if (!state.invoices.length) {
+    $("invoice-list").innerHTML = '<div class="empty queue-empty"><div class="empty-icon">✉</div><h3>No invoices found</h3><p>The live Gmail evaluation returned no invoice records for this business.</p></div>';
+    return;
+  }
   $("invoice-list").innerHTML = state.invoices.map((invoice) => {
     const selected = state.selected?.invoiceNumber === invoice.invoiceNumber ? " selected" : "";
     const displayDecision = invoiceSettled(invoice)
@@ -1146,7 +1150,14 @@ async function load() {
     renderDetail();
     await loadPreflight(state.selected);
   } catch (error) {
-    toast(error.message);
+    state.invoices = [];
+    state.selected = null;
+    state.preflight = null;
+    $("feed-meta").textContent = "Source: live Gmail unavailable · Evaluation failed";
+    renderStats();
+    renderList();
+    $("detail").innerHTML = '<div class="empty"><div class="empty-icon">!</div><h3>Live inbox unavailable</h3><p>' + escapeHtml(error.message || "Inbox evaluation failed") + '</p><button id="empty-refresh" class="pay">Retry inbox evaluation</button></div>';
+    $("empty-refresh").addEventListener("click", load);
   } finally {
     $("refresh").disabled = false;
   }
