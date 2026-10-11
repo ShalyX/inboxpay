@@ -96,12 +96,6 @@ This repo is intentionally framework-light: static HTML/CSS/JS in `public/` plus
 
 Set the infrastructure secrets in Vercel, including Circle credentials, Supabase configuration, Gmail OAuth client credentials, and token-encryption secrets. Users supply their own OAuth consent through the product; they never configure infrastructure secrets.
 
-### Remote QA handoff
-
-For authenticated rehearsal from a separate Hermes/VPS environment, an authenticated business user can click **Create QA handoff**. InboxPay creates a short-lived, encrypted, business-bound `rehearsal_read_refresh` token using the existing token-encryption secret. The user may paste that token into the Hermes session. The operator API can read redacted business, wallet, Gmail, policy, vendor, and invoice state and can request a live Gmail refresh. It cannot settle payments, modify policy, manage vendors, provision wallets, or expose OAuth tokens. Handoffs expire automatically after ten minutes; no Supabase migration or service-role key is required.
-
-Do not paste handoff tokens into GitHub, issue trackers, screenshots, or public chat. Close the handoff dialog after copying and wait for expiry after the rehearsal.
-
 Do not commit Gmail tokens, Circle wallet exports, OAuth credentials, local invoice files, or evaluator output.
 
 ## Hackathon proof
