@@ -458,6 +458,7 @@ async function loadPreflight(invoice = state.selected) {
         };
       }
       renderStats();
+      renderList();
       renderDetail();
     }
   } catch (error) {
