@@ -805,7 +805,7 @@ function renderDetail() {
   const dueReview = reviewRequired && invoice.schedule?.status === "queued";
   const preflight = state.preflight?.invoiceNumber === invoice.invoiceNumber ? state.preflight : null;
   const settled = invoiceSettled(invoice) || preflightSettled(preflight);
-  const scheduleDecision = !settled && !processing && !reviewRequired && !scheduled;
+  const scheduleDecision = invoice.agentDecision === "SCHEDULE" && !settled && !processing && !reviewRequired && !scheduled;
   const decisionReady = invoice.agentDecision === "PAY_NOW" && !settled;
   const vaultReady = policyIsReady();
   const policyPaused = Boolean(state.onchainPolicy?.paused ?? state.policyConfig?.paused);
