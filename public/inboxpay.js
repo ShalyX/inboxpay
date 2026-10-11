@@ -47,6 +47,10 @@ function escapeHtml(value) {
     .replaceAll("'", "&#039;");
 }
 
+function invoiceSettled(invoice) {
+  return invoice?.settlement?.reconciled === true || invoice?.settlement?.onchainDuplicate === true;
+}
+
 function status(decision) {
   const map = {
     PAY_NOW: ["approved", "Pay now"],
@@ -380,7 +384,7 @@ function invoicePaymentReady(invoice) {
   const vendor = state.vendors.find((item) => item.name === invoice.vendor);
   const paused = Boolean(state.onchainPolicy?.paused ?? state.policyConfig?.paused);
   return invoice.agentDecision === "PAY_NOW" &&
-    !invoice.settlement?.reconciled &&
+    !invoiceSettled(invoice) &&
     invoice.settlement?.status !== "processing" &&
     invoice.settlement?.status !== "review" &&
     invoice.settlement?.status !== "scheduled" &&
@@ -442,6 +446,17 @@ async function loadPreflight(invoice = state.selected) {
     if (!response.ok) throw new Error(data.error || "Payment preflight unavailable");
     if (state.selected?.invoiceNumber === invoice.invoiceNumber) {
       state.preflight = data.preflight || null;
+      const duplicatePayment = (data.preflight?.checks || []).some((check) =>
+        check.key === "onchain_can_execute" && check.value === "DUPLICATE_PAYMENT"
+      );
+      if (duplicatePayment && !invoiceSettled(invoice)) {
+        invoice.settlement = {
+          ...(invoice.settlement || {}),
+          status: "confirmed",
+          reconciled: true,
+          onchainDuplicate: true
+        };
+      }
       renderStats();
       renderDetail();
     }
@@ -716,9 +731,9 @@ async function togglePolicyAllowance() {
 
 
 function renderStats() {
-  const settled = state.invoices.filter((x) => x.settlement?.reconciled === true);
+  const settled = state.invoices.filter(invoiceSettled);
   const payable = state.invoices.filter(invoicePaymentReady);
-  const held = state.invoices.filter((x) => !x.settlement?.reconciled && (
+  const held = state.invoices.filter((x) => !invoiceSettled(x) && (
     x.agentDecision !== "PAY_NOW" ||
     ["processing", "failed", "review"].includes(x.settlement?.status)
   ));
@@ -740,7 +755,7 @@ function renderStats() {
 function renderList() {
   $("invoice-list").innerHTML = state.invoices.map((invoice) => {
     const selected = state.selected?.invoiceNumber === invoice.invoiceNumber ? " selected" : "";
-    const displayDecision = invoice.settlement?.reconciled
+    const displayDecision = invoiceSettled(invoice)
       ? "SETTLED"
       : invoice.settlement?.status === "processing"
         ? "PROCESSING"
@@ -775,7 +790,7 @@ function renderList() {
 function renderDetail() {
   const invoice = state.selected;
   if (!invoice) return;
-  const settled = invoice.settlement?.reconciled === true;
+  const settled = invoiceSettled(invoice);
   const processing = invoice.settlement?.status === "processing";
   const reviewRequired = invoice.settlement?.status === "review";
   const scheduled = invoice.settlement?.status === "scheduled";
