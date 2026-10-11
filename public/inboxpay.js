@@ -53,6 +53,12 @@ function invoiceSettled(invoice) {
     invoice?.settlement?.onchainDuplicate === true;
 }
 
+function preflightSettled(preflight) {
+  return (preflight?.checks || []).some((check) =>
+    check.key === "settlement_state" && check.value === "Already settled"
+  );
+}
+
 function status(decision) {
   const map = {
     PAY_NOW: ["approved", "Pay now"],
@@ -793,18 +799,18 @@ function renderList() {
 function renderDetail() {
   const invoice = state.selected;
   if (!invoice) return;
-  const settled = invoiceSettled(invoice);
   const processing = invoice.settlement?.status === "processing";
   const reviewRequired = invoice.settlement?.status === "review";
   const scheduled = invoice.settlement?.status === "scheduled";
   const dueReview = reviewRequired && invoice.schedule?.status === "queued";
+  const preflight = state.preflight?.invoiceNumber === invoice.invoiceNumber ? state.preflight : null;
+  const settled = invoiceSettled(invoice) || preflightSettled(preflight);
   const scheduleDecision = invoice.agentDecision === "SCHEDULE" && !settled && !processing && !reviewRequired && !scheduled;
   const decisionReady = invoice.agentDecision === "PAY_NOW" && !settled;
   const vaultReady = policyIsReady();
   const policyPaused = Boolean(state.onchainPolicy?.paused ?? state.policyConfig?.paused);
   const vendor = state.vendors.find((item) => item.name === invoice.vendor);
   const vendorReady = vendor?.status === "verified" && vendor?.onchain_status === "registered";
-  const preflight = state.preflight?.invoiceNumber === invoice.invoiceNumber ? state.preflight : null;
   const ready = Boolean(preflight?.eligible);
   const detailStatus = settled
     ? "SETTLED"
