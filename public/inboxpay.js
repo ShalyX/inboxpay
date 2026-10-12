@@ -19,6 +19,7 @@ const state = {
   vendors: [],
   vendorRevocationSupported: null,
   preflight: null,
+  preflightLoading: false,
   activity: { kind: null, rows: [] }
 };
 
@@ -71,6 +72,7 @@ function status(decision) {
     SETTLED: ["approved", "Settled"],
     PROCESSING: ["schedule", "Processing"],
     FAILED: ["escalate", "Retry"],
+    CHECKING: ["schedule", "Checking"],
     REVIEW: ["escalate", "Review"]
   };
   const [kind, label] = map[decision] || ["hold", decision || "Unknown"];
@@ -450,7 +452,9 @@ async function saveBusinessName(event) {
 
 async function loadPreflight(invoice = state.selected) {
   state.preflight = null;
+  state.preflightLoading = Boolean(invoice?.invoiceNumber);
   if (!invoice?.invoiceNumber) {
+    state.preflightLoading = false;
     renderDetail();
     return;
   }
@@ -460,6 +464,7 @@ async function loadPreflight(invoice = state.selected) {
     if (!response.ok) throw new Error(data.error || "Payment preflight unavailable");
     if (state.selected?.invoiceNumber === invoice.invoiceNumber) {
       state.preflight = data.preflight || null;
+      state.preflightLoading = false;
       const duplicatePayment = (data.preflight?.checks || []).some((check) =>
         check.key === "onchain_can_execute" && check.value === "DUPLICATE_PAYMENT"
       );
@@ -482,6 +487,7 @@ async function loadPreflight(invoice = state.selected) {
         checks: [{ key: "preflight", label: "Onchain execution preflight", ok: false, value: "Unavailable", reason: error.message || "Payment preflight unavailable" }],
         reasons: [error.message || "Payment preflight unavailable"]
       };
+      state.preflightLoading = false;
       renderDetail();
     }
   }
@@ -778,7 +784,9 @@ function renderList() {
   }
   $("invoice-list").innerHTML = state.invoices.map((invoice) => {
     const selected = state.selected?.invoiceNumber === invoice.invoiceNumber ? " selected" : "";
-    const displayDecision = invoiceSettled(invoice)
+    const displayDecision = state.preflightLoading && selected
+      ? "CHECKING"
+      : invoiceSettled(invoice)
       ? "SETTLED"
       : invoice.settlement?.status === "processing"
         ? "PROCESSING"
@@ -803,6 +811,7 @@ function renderList() {
       const number = decodeURIComponent(button.dataset.invoice);
       state.selected = state.invoices.find((x) => x.invoiceNumber === number);
       state.preflight = null;
+      state.preflightLoading = true;
       renderList();
       renderDetail();
       loadPreflight(state.selected);
@@ -818,7 +827,8 @@ function renderDetail() {
   const scheduled = invoice.settlement?.status === "scheduled";
   const dueReview = reviewRequired && invoice.schedule?.status === "queued";
   const preflight = state.preflight?.invoiceNumber === invoice.invoiceNumber ? state.preflight : null;
-  const settled = invoiceSettled(invoice) || preflightSettled(preflight);
+  const checking = state.preflightLoading;
+  const settled = !checking && (invoiceSettled(invoice) || preflightSettled(preflight));
   const scheduleDecision = invoice.agentDecision === "SCHEDULE" && !settled && !processing && !reviewRequired && !scheduled;
   const decisionReady = invoice.agentDecision === "PAY_NOW" && !settled;
   const vaultReady = policyIsReady();
@@ -826,9 +836,11 @@ function renderDetail() {
   const vendor = state.vendors.find((item) => item.name === invoice.vendor);
   const vendorReady = vendor?.status === "verified" && vendor?.onchain_status === "registered";
   const ready = Boolean(preflight?.eligible);
-  const detailStatus = settled
-    ? "SETTLED"
-    : processing
+  const detailStatus = checking
+    ? "CHECKING"
+    : settled
+      ? "SETTLED"
+      : processing
       ? "PROCESSING"
       : invoice.settlement?.status === "scheduled"
         ? "SCHEDULED"
@@ -843,9 +855,11 @@ function renderDetail() {
       ? "Arc Mainnet"
       : "Arc";
   const vendorInitial = (invoice.vendor || "V").slice(0, 1);
-  const reasons = settled
-    ? ["Payment executed and reconciled on " + settlementNetwork + "."]
-    : (invoice.decisionReasons?.length ? invoice.decisionReasons : ["No decision reason recorded."]);
+  const reasons = checking
+    ? ["Checking the current settlement state before showing payment actions."]
+    : settled
+      ? ["Payment executed and reconciled on " + settlementNetwork + "."]
+      : (invoice.decisionReasons?.length ? invoice.decisionReasons : ["No decision reason recorded."]);
   const reasonsHtml = '<ul>' + reasons.map((reason) => '<li>' + escapeHtml(reason) + '</li>').join("") + '</ul>';
   const gateReasons = preflight?.reasons || ["Checking the live policy vault and payment state…"];
   const gateHtml = '<div class="preflight"><div class="decision-head">● Payment readiness</div><ul>' + gateReasons.map((reason) => '<li>' + escapeHtml(reason) + '</li>').join("") + '</ul></div>';
@@ -882,7 +896,7 @@ function renderDetail() {
     (processing ? checkRow("Payment recovery", "In progress") : reviewRequired ? checkRow("Payment recovery", "Manual review") : "") +
     '</div>' + (settled ? '<div class="settlement"><span>Arc confirmation</span><b>Reconciliation PASS</b></div>' : "") +
     '<button id="pay-button" class="pay"' + (ready ? "" : " disabled") +
-    '>' + (ready ? (invoice.settlement?.status === "failed" ? "Review & retry on Arc ↗" : "Review & settle on Arc ↗") : settled ? "Settled on Arc ✓" : processing ? "Payment submitted · recovering…" : scheduled ? "Queued for review" : reviewRequired ? "Payment under review" : scheduleDecision ? "Schedule this invoice above" : preflight ? "Payment blocked" : "Checking payment gates…") + '</button></div>';
+    '>' + (ready ? (invoice.settlement?.status === "failed" ? "Review & retry on Arc ↗" : "Review & settle on Arc ↗") : checking ? "Checking settlement state…" : settled ? "Settled on Arc ✓" : processing ? "Payment submitted · recovering…" : scheduled ? "Queued for review" : reviewRequired ? "Payment under review" : scheduleDecision ? "Schedule this invoice above" : preflight ? "Payment blocked" : "Checking payment gates…") + '</button></div>';
 
   if (ready) $("pay-button").addEventListener("click", settle);
   if (scheduleDecision) $("schedule-button").addEventListener("click", scheduleInvoice);
@@ -1131,6 +1145,7 @@ async function load() {
     state.invoices = [];
     state.selected = null;
     state.preflight = null;
+    state.preflightLoading = false;
     renderStats();
     renderList();
     $("detail").innerHTML = '<div class="empty"><div class="empty-icon">✉</div><h3>Connect the business inbox</h3><p>InboxPay only evaluates invoices from a real connected Gmail account.</p><button id="empty-connect" class="pay">Connect Gmail</button></div>';
@@ -1155,6 +1170,7 @@ async function load() {
       ? state.invoices.find((x) => x.invoiceNumber === state.selected.invoiceNumber) || null
       : state.invoices[0] || null;
     state.preflight = null;
+    state.preflightLoading = Boolean(state.selected);
     renderStats();
     renderList();
     renderDetail();
@@ -1163,6 +1179,7 @@ async function load() {
     state.invoices = [];
     state.selected = null;
     state.preflight = null;
+    state.preflightLoading = false;
     $("feed-meta").textContent = "Source: live Gmail unavailable · Evaluation failed";
     renderStats();
     renderList();
