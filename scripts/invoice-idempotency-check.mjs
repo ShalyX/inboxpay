@@ -44,6 +44,21 @@ assert.equal(result.payment_id, "payment-1");
 assert.equal(calls.filter(({ options }) => options.method === "POST").length, 0);
 assert.ok(calls.some(({ url }) => url.includes("external_message_id=eq.new-reminder-message")), "exact unique-key lookup was not attempted");
 
+calls.length = 0;
+await persistInvoice("session", "user-1", "business-1", "integration-1", {
+  vendor: "Manny",
+  invoiceNumber: "unique-test-001",
+  amount: 1,
+  currency: "USDC",
+  dueDate: "a future date",
+  agentDecision: "ESCALATE",
+  decisionReasons: ["Required invoice fields are incomplete."],
+  extraction: { confidence: "low" },
+  sources: []
+});
+assert.ok(calls.some(({ url }) => url.includes("due_date=is.null")), "null due dates must use the PostgREST is.null filter");
+assert.ok(!calls.some(({ url }) => url.includes("due_date=eq.%22%22") || url.includes("due_date=eq.")), "null due dates must not use an empty date equality filter");
+
 const deduped = dedupeInvoiceRows([
   { id: "fresh-reminder", vendor: "Acme Test Hosting", invoice_number: "TA-GMAIL-0001", due_date: "2026-10-02", settlement_status: null, updated_at: "2026-10-12T00:00:00Z" },
   settled
