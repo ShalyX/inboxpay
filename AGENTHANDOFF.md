@@ -135,9 +135,9 @@ The production alias is:
 `tameion-ap-agent-live.vercel.app`
 
 Verified production deployment carrying the per-business Arc environment selector, network-isolated wallets/policy vaults/vendors/invoices/audit data, settlement UI, payment preflight, activity surfaces, business profile control, and durable invoice scheduling queue:
-- Deployment: `dpl_7pWhci28dCAB92LEa6FASnT4BoPQ`
-- Commit: `e0e1d74b459017e3a5221d885a29b281f2f555a1`
-- Message: `Document isolated environment deployment` (documentation-only follow-up to feature commit `9806e6d`)
+- Deployment: `dpl_CkLqgwV449vqF6PP55NhthiijFda`
+- Commit: `9da75403ebe7bd9ddd2a1bce47eef3f92b788727`
+- Message: `docs: record production deployment [skip ci]` (documentation-only follow-up to feature commit `9806e6d`)
 - State: `READY`
 
 That deployment includes the auth/onboarding fixes, Circle SDK import repairs, dedicated-wallet retry protection, correct Supabase wallet persistence, financial-route/PDF runtime decoupling, Gmail PDF parsing hardening, real Arc Testnet wallet funding, and failed policy-deployment recovery described below.
