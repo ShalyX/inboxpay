@@ -134,10 +134,10 @@ Project:
 The production alias is:
 `tameion-ap-agent-live.vercel.app`
 
-Verified production deployment carrying the per-business Arc environment selector, network-isolated wallets/policy vaults/vendors/invoices/audit data, settlement UI, payment preflight, activity surfaces, business profile control, and durable invoice scheduling queue:
-- Deployment: `dpl_CkLqgwV449vqF6PP55NhthiijFda`
-- Commit: `9da75403ebe7bd9ddd2a1bce47eef3f92b788727`
-- Message: `docs: record production deployment [skip ci]` (documentation-only follow-up to feature commit `9806e6d`)
+Verified production deployment carrying the per-business Arc environment selector, network-isolated wallets/policy vaults/vendors/invoices/audit data, settlement UI, payment preflight, activity surfaces, business profile control, durable invoice scheduling queue, and production frontend rebuild:
+- Deployment: `dpl_H9Aa9W4EE5wNUqyTTsY1ELFv7eQf` / `https://tameion-ap-agent-live-3qmoold77-shalyxs-projects.vercel.app`
+- Commit: `5a075f6ddb310c8476b01ca5f008fa92238e63bd`
+- Message: `feat: rebuild InboxPay payment operations UI`
 - State: `READY`
 
 That deployment includes the auth/onboarding fixes, Circle SDK import repairs, dedicated-wallet retry protection, correct Supabase wallet persistence, financial-route/PDF runtime decoupling, Gmail PDF parsing hardening, real Arc Testnet wallet funding, and failed policy-deployment recovery described below.
@@ -864,13 +864,15 @@ Commit `9806e6d` and the verified production alias deployment `dpl_CkLqgwV449vqF
 
 Authenticated production QA also passes: Caraxes Labs was switched Testnet → Mainnet → Testnet. The Mainnet view correctly exposed a separate unprovisioned account, no Mainnet settlement, and blocked payment readiness without leaking the Testnet wallet, vault, vendor verification, or settlement state. Returning to Testnet restored wallet `0xca32c823b85c2b5de03c7626b42293b4fe18d5e2`, vault `0x59ceead805ef96fc2839388cafe937150412383a`, the four-invoice queue, and the existing reconciled settlement unchanged. No wallet provisioning, policy write, allowance, vendor mutation, or payment was performed during the test.
 
-### P1 — Production frontend rebuild (implemented locally; deployment QA pending)
+### P1 — Production frontend rebuild (complete and production-verified)
 
 The frontend has been rebuilt as a payment-operations ledger while preserving every existing API contract, DOM action ID, network confirmation, Gmail flow, policy control, vendor gate, payment preflight, and reconciliation path. The new system replaces the test-dashboard presentation with a high-trust operational shell: dark persistent navigation, explicit business/network/wallet context, grouped controls, unified operational metrics, a dense invoice queue, sticky evidence pane, redesigned policy/activity/vendor modals, a complete authentication experience, responsive layouts, keyboard focus states, reduced-motion support, and a matching favicon.
 
 Design research used Seesaw's Fintech collection as general reference material, with Acctual informing payment clarity, Ramp informing decisive hierarchy, and Midday/Ambrook informing financial density and reconciliation language. InboxPay's structure and identity remain original rather than copied from those references.
 
-Local verification passes: `git diff --check`, JavaScript syntax validation, all nine JavaScript regression suites, `npm run evaluate`, and `forge test`. Desktop and 390px responsive authentication layouts were rendered and inspected; browser logs were clean. Authenticated dashboard visual QA still requires the normal Vercel release path because localhost does not share the production Supabase browser session. Do not call this slice production-complete until the deployed, authenticated queue, detail pane, modals, and network selector have been inspected.
+Feature commit `5a075f6ddb310c8476b01ca5f008fa92238e63bd` is deployed `READY` as `dpl_H9Aa9W4EE5wNUqyTTsY1ELFv7eQf` at `https://tameion-ap-agent-live-3qmoold77-shalyxs-projects.vercel.app`, with the production alias serving the same build. Local verification passes: `git diff --check`, JavaScript syntax validation, all nine JavaScript regression suites, `npm run evaluate`, and `forge test`.
+
+Authenticated production QA is complete. The Caraxes Labs Arc Mainnet view restored its real session, dedicated Circle wallet, live Gmail source, and two-invoice queue. The invoice evidence/readiness pane, policy editor, empty payment history, and populated audit trail all rendered correctly without performing a write. The exact 390px mobile viewport and the desktop layout were visually inspected, including the responsive policy modal. Browser logs contained no warnings or errors. No network switch, wallet provisioning, policy deployment, allowance, vendor mutation, or payment was performed during this frontend verification.
 
 ### P1 — Final submission hygiene
 Before hackathon submission:
