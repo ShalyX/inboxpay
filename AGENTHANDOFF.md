@@ -134,10 +134,10 @@ Project:
 The production alias is:
 `tameion-ap-agent-live.vercel.app`
 
-Verified production deployment carrying the current settlement UI, payment preflight, activity surfaces, business profile control, and durable invoice scheduling queue:
-- Deployment: `dpl_B78wCnZX5Q71HtChehtWaj84Qk3T`
-- Commit: `11cb676`
-- Message: `Include reschedules in schedule state queries`
+Verified production deployment carrying the per-business Arc environment selector, network-isolated wallets/policy vaults/vendors/invoices/audit data, settlement UI, payment preflight, activity surfaces, business profile control, and durable invoice scheduling queue:
+- Deployment: `dpl_9Do2pUGCkxKJiDBu5sBC8ar9uNUr`
+- Commit: `9806e6d3eb1a9179de2e87e696b3048e85c8b970`
+- Message: `Add isolated Arc environment accounts`
 - State: `READY`
 
 That deployment includes the auth/onboarding fixes, Circle SDK import repairs, dedicated-wallet retry protection, correct Supabase wallet persistence, financial-route/PDF runtime decoupling, Gmail PDF parsing hardening, real Arc Testnet wallet funding, and failed policy-deployment recovery described below.
@@ -148,7 +148,7 @@ That deployment includes the auth/onboarding fixes, Circle SDK import repairs, d
 - `businesses.active_network` is the selected environment. Policies, vendors, invoices, and audit events now carry an explicit network key; their uniqueness and query indexes include that network.
 - The transactional migration in `supabase/migrations/20261012_business_network_accounts.sql` was applied successfully before the application deployment. It includes insert triggers so the previously deployed application remains compatible during the rollout.
 - Both existing financial accounts were backfilled exactly. Verification returned two businesses, two network-account rows, RLS enabled, zero missing network values, `exact_financial_backfill=true`, and the unchanged legacy digest `514746929ab1b961e034c5161b849f57` before and after migration.
-- The application implementation and environment selector are complete locally and awaiting the Git/Vercel deployment described later in this handoff. No wallet, vault, allowance, vendor mapping, or payment transaction was created or changed by the migration.
+- Commit `9806e6d` is deployed `READY` as `dpl_9Do2pUGCkxKJiDBu5sBC8ar9uNUr`, and the production alias points to it. The public bundle contains the accessible Arc Testnet/Mainnet selector and loaded with no browser warnings/errors. Authenticated environment switching remains a live account check; no wallet, vault, allowance, vendor mapping, or payment transaction was created or changed during deployment verification.
 
 ---
 
@@ -714,6 +714,7 @@ At last inspection:
 - the confirmed Business B Mainnet policy deployment reached the real Circle provider after the runtime flag was loaded; with `0.05 USDC` funded, Circle created contract record `01a11292-867f-71f5-b129-80bba31e335d` and later returned `FAILED` / `TX_NOT_INITIATED`, with no onchain contract address or transaction ID
 - deterministic retry behavior was verified against the real Circle test account
 - the persisted wallet and live balance reload successfully in production (`39.96 USDC` after the testnet faucet and policy deployment fee)
+- production Supabase and commit `9806e6d` now model Testnet/Mainnet as isolated account contexts for every business; the two legacy financial accounts were backfilled exactly, RLS is enabled, all scoped records have network keys, and the selector is present in the live bundle
 - financial routes no longer crash through the PDF runtime
 - Gmail OAuth callback configuration is saved and the real Gmail integration is connected in production.
 - The connected Gmail integration is encrypted and refreshable; the live inbox currently yields 9 invoice records.
@@ -855,6 +856,10 @@ The follow-up query-path fix is commit `11cb676`, deployed `READY` as `dpl_B78wC
 ### P1 — Local runtime and due-review plumbing (complete)
 
 Commit `a85074b` repairs the local server and adds the authenticated `review_due` trigger plus due-review UI. The trigger is compare-and-set and audit-backed, and stops at human review; it does not call Circle or authorize payment. Feature deployment `dpl_7t9ecBPQ8mov559ZXLCtzFzam9Sr` reached `READY`; handoff-only documentation deployment `dpl_DVVrBQZ5yVz9GcaAMJziGDbrWtE3` also reached `READY`. `npm run test:local` and the full regression suite pass. Business B production verification remains read-only with zero invoice rows and no vendor or payment mutation. A real background worker, service authentication, and automatic execution remain intentionally deferred.
+
+### P1 — Per-business Arc environment accounts (deployed; authenticated switch QA remains)
+
+Commit `9806e6d` and production deployment `dpl_9Do2pUGCkxKJiDBu5sBC8ar9uNUr` introduce a safe Testnet/Mainnet selector backed by `business_network_accounts`. Every financial read and mutation is scoped to the active network, and mutation requests carry the UI's expected network so a stale tab fails closed with HTTP `409`. Mainnet selection and wallet creation remain explicitly confirmed; switching alone does not move funds. The full JavaScript regression suite, `forge test`, GitHub policy artifact build, production database preservation checks, Vercel build, public bundle selector check, and browser error check pass. The remaining QA item is to sign in and switch Testnet → Mainnet → Testnet, confirming the existing addresses/vaults reappear unchanged; do not provision or transact during that read-only check.
 
 ### P1 — Final submission hygiene
 Before hackathon submission:
