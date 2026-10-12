@@ -14,6 +14,8 @@ const state = {
   policyConfig: null,
   onchainPolicy: null,
   policyAllowance: false,
+  policyStatusError: null,
+  policyConfigError: null,
   vendors: [],
   vendorRevocationSupported: null,
   preflight: null,
@@ -229,9 +231,11 @@ async function loadPolicyStatus() {
     state.policy = data.contract || null;
     state.onchainPolicy = data.onchainPolicy || null;
     state.policyAllowance = data.allowance ? BigInt(data.allowance) > 0n : false;
+    state.policyStatusError = null;
   } catch (error) {
     state.policy = null;
     state.onchainPolicy = null;
+    state.policyStatusError = error.message || "Live policy status unavailable";
   }
 }
 
@@ -241,8 +245,10 @@ async function loadPolicyConfig() {
     const data = await readJsonResponse(response);
     if (!response.ok) throw new Error(data.error || "Policy configuration unavailable");
     state.policyConfig = data.policy || null;
+    state.policyConfigError = null;
   } catch (error) {
     state.policyConfig = null;
+    state.policyConfigError = error.message || "Policy configuration unavailable";
   }
 }
 
@@ -503,15 +509,19 @@ function renderPolicyModal() {
   $("policy-max").value = policyAmount(policy?.max_transaction_usdc);
   $("policy-daily").value = policyAmount(policy?.daily_limit_usdc);
   $("policy-floor").value = policyAmount(policy?.cash_floor_usdc);
+  const policyUnavailable = Boolean(state.policyStatusError);
   $("policy-submit").textContent = ready ? "Update onchain policy" : "Save and deploy this policy";
+  $("policy-submit").disabled = policyUnavailable;
 
   const chainState = $("policy-chain-state");
-  chainState.innerHTML = ready
-    ? '<div><strong>Live on ' + network + '</strong><span>' + state.business.policy_contract_address + '</span><button class="text-action copy-address" type="button" data-address="' + state.business.policy_contract_address + '" data-label="Policy vault address">Copy address</button></div><b class="' + (paused ? "paused" : "ready") + '">' + (paused ? "Payments paused" : "Enforced onchain") + '</b>'
-    : '<div><strong>Not deployed yet</strong><span>Review these values before creating this business\'s policy vault.</span></div><b>Draft</b>';
+  chainState.innerHTML = policyUnavailable
+    ? '<div><strong>Live policy status unavailable</strong><span>' + escapeHtml(state.policyStatusError) + '</span></div><b class="paused">Unavailable</b>'
+    : ready
+      ? '<div><strong>Live on ' + network + '</strong><span>' + state.business.policy_contract_address + '</span><button class="text-action copy-address" type="button" data-address="' + state.business.policy_contract_address + '" data-label="Policy vault address">Copy address</button></div><b class="' + (paused ? "paused" : "ready") + '">' + (paused ? "Payments paused" : "Enforced onchain") + '</b>'
+      : '<div><strong>Not deployed yet</strong><span>Review these values before creating this business\'s policy vault.</span></div><b>Draft</b>';
 
   const pauseButton = $("policy-pause");
-  pauseButton.hidden = !ready;
+  pauseButton.hidden = !ready || policyUnavailable;
   pauseButton.dataset.paused = String(paused);
   pauseButton.textContent = paused ? "Resume payments" : "Pause all payments";
   $("policy-pause-note").textContent = ready
@@ -526,7 +536,7 @@ function renderPolicyModal() {
     : "";
 
   const allowanceControl = $("policy-allowance-control");
-  allowanceControl.hidden = !ready;
+  allowanceControl.hidden = !ready || policyUnavailable;
   $("policy-allowance-title").textContent = state.policyAllowance ? "USDC access authorized" : "USDC access not authorized";
   $("policy-allowance-note").textContent = state.policyAllowance
     ? "The vault can move this wallet's USDC only through the enforced policy checks."
