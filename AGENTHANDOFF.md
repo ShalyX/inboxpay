@@ -864,6 +864,14 @@ Commit `9806e6d` and the verified production alias deployment `dpl_CkLqgwV449vqF
 
 Authenticated production QA also passes: Caraxes Labs was switched Testnet → Mainnet → Testnet. The Mainnet view correctly exposed a separate unprovisioned account, no Mainnet settlement, and blocked payment readiness without leaking the Testnet wallet, vault, vendor verification, or settlement state. Returning to Testnet restored wallet `0xca32c823b85c2b5de03c7626b42293b4fe18d5e2`, vault `0x59ceead805ef96fc2839388cafe937150412383a`, the four-invoice queue, and the existing reconciled settlement unchanged. No wallet provisioning, policy write, allowance, vendor mutation, or payment was performed during the test.
 
+### P1 — Production frontend rebuild (implemented locally; deployment QA pending)
+
+The frontend has been rebuilt as a payment-operations ledger while preserving every existing API contract, DOM action ID, network confirmation, Gmail flow, policy control, vendor gate, payment preflight, and reconciliation path. The new system replaces the test-dashboard presentation with a high-trust operational shell: dark persistent navigation, explicit business/network/wallet context, grouped controls, unified operational metrics, a dense invoice queue, sticky evidence pane, redesigned policy/activity/vendor modals, a complete authentication experience, responsive layouts, keyboard focus states, reduced-motion support, and a matching favicon.
+
+Design research used Seesaw's Fintech collection as general reference material, with Acctual informing payment clarity, Ramp informing decisive hierarchy, and Midday/Ambrook informing financial density and reconciliation language. InboxPay's structure and identity remain original rather than copied from those references.
+
+Local verification passes: `git diff --check`, JavaScript syntax validation, all nine JavaScript regression suites, `npm run evaluate`, and `forge test`. Desktop and 390px responsive authentication layouts were rendered and inspected; browser logs were clean. Authenticated dashboard visual QA still requires the normal Vercel release path because localhost does not share the production Supabase browser session. Do not call this slice production-complete until the deployed, authenticated queue, detail pane, modals, and network selector have been inspected.
+
 ### P1 — Final submission hygiene
 Before hackathon submission:
 - verify public repo

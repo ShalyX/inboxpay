@@ -5,60 +5,102 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>InboxPay — Autonomous AP</title>
   <meta name="description" content="Autonomous accounts payable with bounded USDC settlement on Arc.">
+  <meta name="theme-color" content="#151915">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
   <section id="auth-gate" class="auth-gate">
-    <div class="auth-card">
-      <div class="brand auth-brand"><div class="mark">I</div><div><strong>InboxPay</strong><span>autonomous AP</span></div></div>
-      <div class="auth-kicker">BUSINESS MONEY, OPERATED</div>
-      <h1>Your AP inbox. Run by an agent.</h1>
-      <p>Connect your business account, then give InboxPay access to the Gmail inbox that actually carries your invoices.</p>
-      <form id="auth-form">
-        <input id="auth-email" type="email" autocomplete="email" placeholder="you@company.com" required>
-        <input id="auth-password" type="password" autocomplete="current-password" placeholder="Password" minlength="8" required>
-        <button id="auth-submit" class="pay" type="submit">Sign in</button>
-      </form>
-      <div class="auth-divider"><span>or</span></div>
-      <button id="auth-google" class="google-auth" type="button">Continue with Google</button>
-      <p class="auth-helper">New to InboxPay? Google will create your business account automatically.</p>
-      <div class="auth-actions">
-        <button id="auth-signup" class="ghost" type="button">Create business account</button>
+    <div class="auth-layout">
+      <div class="auth-story">
+        <div class="brand auth-brand">
+          <div class="mark" aria-hidden="true"><i></i><i></i><i></i></div>
+          <div><strong>InboxPay</strong><span>Autonomous accounts payable</span></div>
+        </div>
+        <div class="auth-story-copy">
+          <div class="auth-kicker"><span></span> BOUNDED PAYMENT OPERATIONS</div>
+          <h1>Invoices in.<br>Guardrails checked.<br><em>Payments out.</em></h1>
+          <p>InboxPay reads the business inbox, explains every decision, and settles only what the onchain policy permits.</p>
+        </div>
+        <div class="auth-flow" aria-label="InboxPay payment flow">
+          <div><b>01</b><strong>Gmail evidence</strong><span>Real invoice source</span></div>
+          <div><b>02</b><strong>Policy decision</strong><span>Deterministic gates</span></div>
+          <div><b>03</b><strong>Arc settlement</strong><span>Reconciled receipt</span></div>
+        </div>
       </div>
-      <p id="auth-message" class="auth-message"></p>
+      <div class="auth-card">
+        <div class="auth-card-head">
+          <span>BUSINESS ACCESS</span>
+          <b>Secure session</b>
+        </div>
+        <h2>Open your payment desk</h2>
+        <p>Sign in to the account that owns this business's inbox, wallet, vendors, and payment policy.</p>
+        <form id="auth-form">
+          <label for="auth-email">Work email</label>
+          <input id="auth-email" type="email" autocomplete="email" placeholder="you@company.com" required>
+          <label for="auth-password">Password</label>
+          <input id="auth-password" type="password" autocomplete="current-password" placeholder="At least 8 characters" minlength="8" required>
+          <button id="auth-submit" class="pay" type="submit">Sign in to InboxPay</button>
+        </form>
+        <div class="auth-divider"><span>or use your business identity</span></div>
+        <button id="auth-google" class="google-auth" type="button"><span class="google-dot" aria-hidden="true"></span>Continue with Google</button>
+        <p class="auth-helper">New here? Google creates the business account and keeps ownership isolated.</p>
+        <div class="auth-actions">
+          <button id="auth-signup" class="text-action" type="button">Create an account with email →</button>
+        </div>
+        <p id="auth-message" class="auth-message" aria-live="polite"></p>
+      </div>
     </div>
   </section>
 
   <main id="app-shell" class="shell" hidden>
     <aside class="sidebar">
-      <div class="brand"><div class="mark">I</div><div><strong>InboxPay</strong><span>autonomous AP</span></div></div>
-      <nav>
-        <button class="nav active" data-nav="inbox"><span>▣</span> Inbox <b id="invoice-count">0</b></button>
-        <button id="open-payments" class="nav" data-nav="payments"><span>↗</span> Payments <b id="payment-count">0</b></button>
-        <button id="open-policy" class="nav"><span>◇</span> Policies</button>
-        <button id="open-audit" class="nav" data-nav="audit"><span>≡</span> Audit trail</button>
+      <div class="brand">
+        <div class="mark" aria-hidden="true"><i></i><i></i><i></i></div>
+        <div><strong>InboxPay</strong><span>Payment operations</span></div>
+      </div>
+      <div class="nav-label">Workspace</div>
+      <nav aria-label="Primary navigation">
+        <button class="nav active" data-nav="inbox"><span class="nav-icon">I</span><span>Invoice queue</span><b id="invoice-count">0</b></button>
+        <button id="open-payments" class="nav" data-nav="payments"><span class="nav-icon">P</span><span>Payments</span><b id="payment-count">0</b></button>
+        <button id="open-policy" class="nav"><span class="nav-icon">G</span><span>Guardrails</span></button>
+        <button id="open-audit" class="nav" data-nav="audit"><span class="nav-icon">A</span><span>Audit trail</span></button>
       </nav>
-      <div class="sidebar-foot"><div><i class="dot"></i><strong id="network-label">Arc Mainnet</strong></div><small>USDC settlement rail</small></div>
+      <div class="sidebar-foot">
+        <div class="rail-state"><i class="dot"></i><div><span>Settlement rail</span><strong id="network-label">Arc Mainnet</strong></div></div>
+        <small>USDC · Dedicated business wallet</small>
+      </div>
     </aside>
 
     <section class="content">
       <header class="topbar">
-        <div>
-          <div class="eyebrow"><span id="feed-dot">●</span> <span id="feed-label">delegated finance operator</span></div>
-          <h1>Accounts payable, without the handoff.</h1>
-          <p>InboxPay reads the invoice, checks business rules, then settles only what policy permits.</p>
-          <div id="feed-meta" class="feed-meta" aria-live="polite">Invoice source: waiting for live Gmail evaluation</div>
+        <div class="topbar-row">
+          <div class="page-heading">
+            <div class="eyebrow">PAYMENT OPERATIONS / <span>INVOICE CONTROL</span></div>
+            <h1>Invoice queue</h1>
+            <p>Review what the agent found, inspect every gate, and act only when the evidence is complete.</p>
+          </div>
+          <div class="feed-card">
+            <div class="feed-state"><span id="feed-dot">●</span><strong id="feed-label">delegated finance operator</strong></div>
+            <div id="feed-meta" class="feed-meta" aria-live="polite">Invoice source: waiting for live Gmail evaluation</div>
+          </div>
         </div>
         <div class="account-actions">
-          <label class="environment-control" for="network-switch"><span>Environment</span><select id="network-switch" aria-label="Active settlement environment"><option value="ARC-TESTNET">Arc Testnet</option><option value="ARC">Arc Mainnet</option></select></label>
-          <div class="account-copy"><strong id="business-name">Business</strong><button id="edit-business" class="text-action" type="button">Edit business name</button><span id="wallet-address">Wallet provisioning…</span><button id="copy-wallet" class="text-action" type="button" hidden>Copy wallet address</button></div>
-          <button id="open-payments-top" class="ghost" type="button">Payments</button>
-          <button id="open-audit-top" class="ghost" type="button">Audit trail</button>
-          <button id="open-policy-top" class="ghost">Manage policy</button>
-          <button id="add-vendor" class="ghost">Add vendor</button>
-          <button id="connect-gmail" class="ghost">Connect Gmail</button>
-          <button id="sign-out" class="ghost">Sign out</button>
-          <button id="refresh" class="ghost">↻ Refresh inbox</button>
+          <div class="business-context">
+            <label class="environment-control" for="network-switch"><span>Environment</span><select id="network-switch" aria-label="Active settlement environment"><option value="ARC-TESTNET">Arc Testnet</option><option value="ARC">Arc Mainnet</option></select></label>
+            <div class="account-copy"><div><strong id="business-name">Business</strong><button id="edit-business" class="text-action" type="button">Edit</button></div><span id="wallet-address">Wallet provisioning…</span><button id="copy-wallet" class="text-action" type="button" hidden>Copy full address</button></div>
+          </div>
+          <div class="action-cluster" aria-label="Business controls">
+            <button id="open-payments-top" class="ghost" type="button">Payments</button>
+            <button id="open-audit-top" class="ghost" type="button">Audit</button>
+            <button id="open-policy-top" class="ghost">Policy</button>
+            <button id="add-vendor" class="ghost">Vendors</button>
+          </div>
+          <div class="action-cluster utility-actions">
+            <button id="connect-gmail" class="ghost">Connect Gmail</button>
+            <button id="refresh" class="ghost refresh-action">Refresh</button>
+            <button id="sign-out" class="text-action sign-out">Sign out</button>
+          </div>
         </div>
       </header>
 
@@ -67,7 +109,7 @@
 
       <div class="workspace">
         <section class="panel queue">
-          <div class="panel-head"><div><label>PAYMENT QUEUE</label><h2>What the agent found</h2></div><span id="queue-count" class="meta">0 invoices</span></div>
+          <div class="panel-head"><div><label>LIVE QUEUE</label><h2>Invoices from Gmail</h2></div><span id="queue-count" class="meta">0 invoices</span></div>
           <div id="invoice-list"></div>
         </section>
         <section id="detail" class="panel detail">
@@ -76,9 +118,10 @@
       </div>
 
       <section class="proof">
-        <article><span class="proof-icon">✓</span><div><strong>Agent decision</strong><p>Explainable checks wrap every model output.</p></div></article>
-        <article><span class="proof-icon">⌁</span><div><strong>Policy vault</strong><p>Duplicate, vendor, daily-limit and cash-floor rules are enforced onchain.</p></div></article>
-        <article><span class="proof-icon">↗</span><div><strong>Arc receipt</strong><p>Settlement ends with a transaction hash and reconciliation record.</p></div></article>
+        <div class="proof-heading"><span>CONTROL SYSTEM</span><strong>Three independent layers before money moves</strong></div>
+        <article><span class="proof-index">01</span><div><strong>Explainable decision</strong><p>Every model output is wrapped in deterministic checks.</p></div></article>
+        <article><span class="proof-index">02</span><div><strong>Onchain guardrails</strong><p>Vendor, duplicate, daily-limit, and cash-floor rules are enforced by the vault.</p></div></article>
+        <article><span class="proof-index">03</span><div><strong>Reconciled receipt</strong><p>A payment is complete only after the Arc transaction and audit evidence agree.</p></div></article>
       </section>
     </section>
     <div id="vendor-modal" class="vendor-modal" hidden>
