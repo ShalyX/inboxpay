@@ -767,7 +767,7 @@ function renderStats() {
   $("payment-count").textContent = settled.length;
   $("queue-count").textContent = state.invoices.length + (state.invoices.length === 1 ? " invoice" : " invoices");
   $("stats").innerHTML = [
-    ["◎", "Ready to review", total.toFixed(2) + " USDC", payable.length + " policy-eligible invoices"],
+    ["◎", "Ready to pay", total.toFixed(2) + " USDC", payable.length + " policy-eligible invoices"],
     ["◷", "Needs attention", String(held.length), "held or escalated"],
     ["✓", "Settled", String(settled.length), "reconciled on Arc"],
     ["⌁", "Execution", state.business?.wallet_status === "ready" ? "Dedicated" : "Provisioning", "business wallet"]
