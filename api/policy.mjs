@@ -1,6 +1,6 @@
 import { formatUnits, parseAbi } from "viem";
 import { requireUser, supabaseRest } from "../lib/supabase-server.mjs";
-import { getBusiness } from "../lib/businesses.mjs";
+import { getBusiness, updateBusinessNetworkAccount } from "../lib/businesses.mjs";
 import { deployBusinessPolicyVault, getBusinessPolicyVault, getWalletTransaction } from "../lib/policy-contract.mjs";
 import { migrationDeploymentAttempt, migrationEligibility } from "../lib/policy-migration.mjs";
 import { policyClient, readPolicyState, writePolicy } from "../lib/policy-sync.mjs";
@@ -22,9 +22,10 @@ function parseUsdcValue(value, key) {
   return number;
 }
 
-async function getPolicy(token, businessId) {
+async function getPolicy(token, businessId, network) {
   const rows = await supabaseRest(
-    "policies?select=*&business_id=eq." + encodeURIComponent(businessId) + "&limit=1",
+    "policies?select=*&business_id=eq." + encodeURIComponent(businessId) +
+      "&network=eq." + encodeURIComponent(network) + "&limit=1",
     { token }
   );
   return rows?.[0] || null;
@@ -72,23 +73,15 @@ async function statusHandler(token, user, business) {
   if (!business.policy_contract_id) {
     let currentBusiness = business;
     if (business.policy_contract_status === "deploying") {
-      const requestStartedAt = Date.parse(business.updated_at || "");
+      const requestStartedAt = Date.parse(business.network_account_updated_at || business.updated_at || "");
       const requestIsStale = !Number.isFinite(requestStartedAt) || Date.now() - requestStartedAt >= deploymentRequestTimeoutMs;
       if (requestIsStale) {
         const message = "The policy deployment request did not produce a Circle contract. Retry deployment.";
-        const updated = await supabaseRest(
-          "businesses?id=eq." + encodeURIComponent(business.id),
-          {
-            token,
-            method: "PATCH",
-            body: {
-              policy_contract_status: "error",
-              policy_contract_error: message,
-              updated_at: new Date().toISOString()
-            }
-          }
-        );
-        currentBusiness = updated?.[0] || { ...business, policy_contract_status: "error", policy_contract_error: message };
+        await updateBusinessNetworkAccount(token, business.id, business.wallet_blockchain, {
+          policy_contract_status: "error",
+          policy_contract_error: message
+        });
+        currentBusiness = { ...business, policy_contract_status: "error", policy_contract_error: message };
       }
     }
 
@@ -162,11 +155,8 @@ async function statusHandler(token, user, business) {
   let updatedBusiness = business;
   if (Object.keys(patch).length) {
     patch.updated_at = new Date().toISOString();
-    const updated = await supabaseRest(
-      "businesses?id=eq." + encodeURIComponent(business.id),
-      { token, method: "PATCH", body: patch }
-    );
-    updatedBusiness = updated?.[0] || { ...business, ...patch };
+    await updateBusinessNetworkAccount(token, business.id, business.wallet_blockchain, patch);
+    updatedBusiness = { ...business, ...patch };
   }
 
   return {
@@ -189,12 +179,19 @@ export default async function handler(req, res) {
       if (req.query?.view === "status") {
         return res.status(200).json(await statusHandler(token, user, business));
       }
-      const policy = await getPolicy(token, business.id);
+      const policy = await getPolicy(token, business.id, business.wallet_blockchain);
       return res.status(200).json({ policy });
     }
 
+    if (["PATCH", "POST"].includes(req.method) && String(req.body?.network || "") !== business.wallet_blockchain) {
+      return res.status(409).json({
+        error: "The active policy environment changed. Refresh and try again.",
+        activeNetwork: business.wallet_blockchain
+      });
+    }
+
     if (req.method === "PATCH") {
-      const policy = await getPolicy(token, business.id);
+      const policy = await getPolicy(token, business.id, business.wallet_blockchain);
       if (!policy) return res.status(404).json({ error: "Business policy not found" });
 
       const updates = {};
@@ -249,6 +246,7 @@ export default async function handler(req, res) {
           await audit(token, {
             user_id: user.id,
             business_id: business.id,
+            network: business.wallet_blockchain,
             event_type: "policy_updated_onchain",
             actor: "user",
             data: { tx_hash: tx.txHash, max_transaction_usdc: maxTx, daily_limit_usdc: daily, cash_floor_usdc: floor }
@@ -266,6 +264,7 @@ export default async function handler(req, res) {
           await audit(token, {
             user_id: user.id,
             business_id: business.id,
+            network: business.wallet_blockchain,
             event_type: "policy_pause_updated",
             actor: "user",
             data: { tx_hash: tx.txHash, paused: Boolean(updates.paused) }
@@ -275,7 +274,9 @@ export default async function handler(req, res) {
 
       updates.updated_at = new Date().toISOString();
       const rows = await supabaseRest(
-        "policies?id=eq." + encodeURIComponent(policy.id),
+        "policies?id=eq." + encodeURIComponent(policy.id) +
+          "&business_id=eq." + encodeURIComponent(business.id) +
+          "&network=eq." + encodeURIComponent(business.wallet_blockchain),
         { token, method: "PATCH", body: updates }
       );
       return res.status(200).json({ policy: rows?.[0] || { ...policy, ...updates } });
@@ -287,7 +288,7 @@ export default async function handler(req, res) {
       if (action === "migrate") {
         const eligibility = migrationEligibility(business);
         if (!eligibility.ok) return res.status(409).json({ error: eligibility.reason });
-        const policy = await getPolicy(token, business.id);
+        const policy = await getPolicy(token, business.id, business.wallet_blockchain);
         if (!policy) throw new Error("Business payment policy is not configured");
         if (business.wallet_blockchain === "ARC" && req.body?.confirmMainnet !== true) {
           return res.status(409).json({
@@ -312,19 +313,16 @@ export default async function handler(req, res) {
           activeAddress: previousVault,
           activeContractId: business.policy_contract_id
         });
-        const claim = await supabaseRest(
-          "businesses?id=eq." + encodeURIComponent(business.id) +
-            "&policy_contract_status=eq." + encodeURIComponent(previousStatus),
+        const claim = await updateBusinessNetworkAccount(
+          token,
+          business.id,
+          business.wallet_blockchain,
           {
-            token,
-            method: "PATCH",
-            body: {
-              policy_contract_status: "deploying",
-              policy_contract_error: null,
-              policy_contract_blockchain: business.wallet_blockchain,
-              updated_at: new Date().toISOString()
-            }
-          }
+            policy_contract_status: "deploying",
+            policy_contract_error: null,
+            policy_contract_blockchain: business.wallet_blockchain
+          },
+          { policy_contract_status: previousStatus }
         );
         if (!claim?.length) {
           const current = await getBusiness(token, user.id);
@@ -351,34 +349,25 @@ export default async function handler(req, res) {
           });
         } catch (error) {
           const message = providerError(error);
-          await supabaseRest("businesses?id=eq." + encodeURIComponent(business.id), {
-            token,
-            method: "PATCH",
-            body: {
-              policy_contract_status: previousStatus,
-              policy_contract_error: message,
-              updated_at: new Date().toISOString()
-            }
+          await updateBusinessNetworkAccount(token, business.id, business.wallet_blockchain, {
+            policy_contract_status: previousStatus,
+            policy_contract_error: message
           });
           console.error("Circle policy migration rejected", { ...providerErrorContext(error), message });
           throw new Error(message);
         }
 
-        const updated = await supabaseRest("businesses?id=eq." + encodeURIComponent(business.id), {
-          token,
-          method: "PATCH",
-          body: {
-            policy_contract_id: deployment.contractId,
-            policy_contract_tx_id: deployment.transactionId,
-            policy_contract_blockchain: deployment.blockchain,
-            policy_contract_status: "deploying",
-            policy_contract_error: null,
-            updated_at: new Date().toISOString()
-          }
+        await updateBusinessNetworkAccount(token, business.id, business.wallet_blockchain, {
+          policy_contract_id: deployment.contractId,
+          policy_contract_tx_id: deployment.transactionId,
+          policy_contract_blockchain: deployment.blockchain,
+          policy_contract_status: "deploying",
+          policy_contract_error: null
         });
         await audit(token, {
           user_id: user.id,
           business_id: business.id,
+          network: business.wallet_blockchain,
           event_type: "policy_vault_migration_started",
           actor: "user",
           data: {
@@ -391,7 +380,7 @@ export default async function handler(req, res) {
           }
         });
         return res.status(202).json({
-          business: updated?.[0] || { ...business, ...deployment, policy_contract_status: "deploying" },
+          business: { ...business, ...deployment, policy_contract_status: "deploying" },
           deployment,
           previousPolicyVault: previousVault
         });
@@ -404,7 +393,7 @@ export default async function handler(req, res) {
           return res.status(202).json({ business, deployment: { contractId: business.policy_contract_id, transactionId: business.policy_contract_tx_id } });
         }
 
-        const policy = await getPolicy(token, business.id);
+        const policy = await getPolicy(token, business.id, business.wallet_blockchain);
         if (!policy) throw new Error("Business payment policy is not configured");
 
         if (business.wallet_blockchain === "ARC" && req.body?.confirmMainnet !== true) {
@@ -414,9 +403,10 @@ export default async function handler(req, res) {
           });
         }
 
-        await supabaseRest("businesses?id=eq." + encodeURIComponent(business.id), {
-          token, method: "PATCH",
-          body: { policy_contract_status: "deploying", policy_contract_error: null, policy_contract_blockchain: business.wallet_blockchain, updated_at: new Date().toISOString() }
+        await updateBusinessNetworkAccount(token, business.id, business.wallet_blockchain, {
+          policy_contract_status: "deploying",
+          policy_contract_error: null,
+          policy_contract_blockchain: business.wallet_blockchain
         });
 
         let deployment;
@@ -433,30 +423,22 @@ export default async function handler(req, res) {
           });
         } catch (error) {
           const message = providerError(error);
-          await supabaseRest("businesses?id=eq." + encodeURIComponent(business.id), {
-            token,
-            method: "PATCH",
-            body: {
-              policy_contract_status: "error",
-              policy_contract_error: message,
-              updated_at: new Date().toISOString()
-            }
+          await updateBusinessNetworkAccount(token, business.id, business.wallet_blockchain, {
+            policy_contract_status: "error",
+            policy_contract_error: message
           });
           console.error("Circle policy deployment rejected", { ...providerErrorContext(error), message });
           throw new Error(message);
         }
 
-        const updated = await supabaseRest("businesses?id=eq." + encodeURIComponent(business.id), {
-          token, method: "PATCH",
-          body: {
-            policy_contract_id: deployment.contractId,
-            policy_contract_tx_id: deployment.transactionId,
-            policy_contract_blockchain: deployment.blockchain,
-            policy_contract_status: "deploying",
-            updated_at: new Date().toISOString()
-          }
+        await updateBusinessNetworkAccount(token, business.id, business.wallet_blockchain, {
+          policy_contract_id: deployment.contractId,
+          policy_contract_tx_id: deployment.transactionId,
+          policy_contract_blockchain: deployment.blockchain,
+          policy_contract_status: "deploying",
+          policy_contract_error: null
         });
-        return res.status(202).json({ business: updated?.[0] || { ...business, ...deployment, policy_contract_status: "deploying" }, deployment });
+        return res.status(202).json({ business: { ...business, ...deployment, policy_contract_status: "deploying" }, deployment });
       }
 
       if (action === "approve" || action === "revoke") {
@@ -499,6 +481,7 @@ export default async function handler(req, res) {
           await audit(token, {
             user_id: user.id,
             business_id: business.id,
+            network: business.wallet_blockchain,
             event_type: action === "approve" ? "policy_allowance_approved" : "policy_allowance_revoked",
             actor: "user",
             data: { approval_tx_hash: tx.txHash, owner_wallet: business.wallet_address, policy_vault: business.policy_contract_address }

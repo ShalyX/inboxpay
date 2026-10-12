@@ -13,7 +13,8 @@ export default async function handler(req, res) {
 
     if (req.method === "GET") {
       const vendors = await supabaseRest(
-        "vendors?select=id,name,recipient_address,currency,status&business_id=eq." + encodeURIComponent(business.id) + "&order=name",
+        "vendors?select=id,name,recipient_address,currency,status,network&business_id=eq." + encodeURIComponent(business.id) +
+          "&network=eq." + encodeURIComponent(business.wallet_blockchain) + "&order=name",
         { token }
       );
       const withChainState = await Promise.all((vendors || []).map(async (vendor) => {
@@ -40,13 +41,17 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "PATCH") {
+      if (String(req.body?.network || "") !== business.wallet_blockchain) {
+        return res.status(409).json({ error: "The active vendor environment changed. Refresh and try again." });
+      }
       const id = String(req.body?.id || "").trim();
       const status = String(req.body?.status || "").trim();
       if (!id || !["verified", "review", "blocked"].includes(status)) {
         return res.status(400).json({ error: "Vendor id and valid status are required" });
       }
       const existingRows = await supabaseRest(
-        "vendors?select=*&id=eq." + encodeURIComponent(id) + "&business_id=eq." + encodeURIComponent(business.id) + "&limit=1",
+        "vendors?select=*&id=eq." + encodeURIComponent(id) + "&business_id=eq." + encodeURIComponent(business.id) +
+          "&network=eq." + encodeURIComponent(business.wallet_blockchain) + "&limit=1",
         { token }
       );
       const vendor = existingRows?.[0];
@@ -90,6 +95,7 @@ export default async function handler(req, res) {
             body: {
               user_id: user.id,
               business_id: business.id,
+              network: business.wallet_blockchain,
               event_type: "vendor_policy_updated",
               actor: "user",
               data: { vendor: vendor.name, status, tx_hash: tx.txHash }
@@ -99,7 +105,8 @@ export default async function handler(req, res) {
       }
 
       const rows = await supabaseRest(
-        "vendors?id=eq." + encodeURIComponent(id) + "&business_id=eq." + encodeURIComponent(business.id),
+        "vendors?id=eq." + encodeURIComponent(id) + "&business_id=eq." + encodeURIComponent(business.id) +
+          "&network=eq." + encodeURIComponent(business.wallet_blockchain),
         { token, method: "PATCH", body: { status, updated_at: new Date().toISOString() } }
       );
       return res.status(200).json({
@@ -110,6 +117,9 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "POST") {
+      if (String(req.body?.network || "") !== business.wallet_blockchain) {
+        return res.status(409).json({ error: "The active vendor environment changed. Refresh and try again." });
+      }
       const name = String(req.body?.name || "").trim();
       const recipientAddress = String(req.body?.recipientAddress || "").trim();
       const currency = String(req.body?.currency || "USDC").toUpperCase();
@@ -126,6 +136,7 @@ export default async function handler(req, res) {
         method: "POST",
         body: {
           business_id: business.id,
+          network: business.wallet_blockchain,
           name,
           recipient_address: recipientAddress,
           currency,

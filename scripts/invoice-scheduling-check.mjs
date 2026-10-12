@@ -29,8 +29,9 @@ const queriedEvents = await scheduleEvents("token", "business-1", "user-1", "inv
     { id: "schedule-1", event_type: "invoice_scheduled", created_at: "2026-10-07T12:01:00Z", data: { scheduled_for: "2026-10-08T09:00:00.000Z", reason: "review" } },
     { id: "reschedule-1", event_type: "invoice_schedule_rescheduled", created_at: "2026-10-07T12:04:00Z", data: { scheduled_for: "2026-10-10T09:00:00.000Z", reason: "owner moved review" } }
   ];
-});
+}, "ARC");
 assert.match(requestedPath, /event_type=in\.\(invoice_scheduled,invoice_schedule_rescheduled,invoice_schedule_cancelled\)/);
+assert.match(requestedPath, /network=eq\.ARC/);
 assert.equal(resolveScheduleEvents(queriedEvents)?.scheduledFor, "2026-10-10T09:00:00.000Z");
 
 console.log("invoice scheduling checks passed");

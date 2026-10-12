@@ -51,7 +51,8 @@ The product is expected to demonstrate genuine business usage and real USDC acti
 1. **Per-business isolation**
    - Never select a single global treasury wallet at runtime.
    - Business `owner_user_id` is unique.
-   - Business wallet fields live on `businesses`.
+   - Wallet and policy-vault state lives in `business_network_accounts`, uniquely keyed by `(business_id, network)`.
+   - `businesses.active_network` selects which isolated Arc environment is projected into the runtime business context. Legacy wallet fields remain unchanged as migration evidence and rollback compatibility; runtime financial writes must not use them.
 
 2. **Real integrations**
    - Production invoice ingestion comes from a real connected Gmail account.
@@ -140,6 +141,14 @@ Verified production deployment carrying the current settlement UI, payment prefl
 - State: `READY`
 
 That deployment includes the auth/onboarding fixes, Circle SDK import repairs, dedicated-wallet retry protection, correct Supabase wallet persistence, financial-route/PDF runtime decoupling, Gmail PDF parsing hardening, real Arc Testnet wallet funding, and failed policy-deployment recovery described below.
+
+### Per-business, per-network account migration (2026-10-12)
+
+- Production Supabase now has `business_network_accounts`, one isolated account per `(business_id, network)` for `ARC-TESTNET` and `ARC`. It owns each environment's Circle wallet identity, provisioning state, policy-vault identity, deployment state, and errors.
+- `businesses.active_network` is the selected environment. Policies, vendors, invoices, and audit events now carry an explicit network key; their uniqueness and query indexes include that network.
+- The transactional migration in `supabase/migrations/20261012_business_network_accounts.sql` was applied successfully before the application deployment. It includes insert triggers so the previously deployed application remains compatible during the rollout.
+- Both existing financial accounts were backfilled exactly. Verification returned two businesses, two network-account rows, RLS enabled, zero missing network values, `exact_financial_backfill=true`, and the unchanged legacy digest `514746929ab1b961e034c5161b849f57` before and after migration.
+- The application implementation and environment selector are complete locally and awaiting the Git/Vercel deployment described later in this handoff. No wallet, vault, allowance, vendor mapping, or payment transaction was created or changed by the migration.
 
 ---
 

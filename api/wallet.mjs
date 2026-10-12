@@ -20,6 +20,9 @@ export default async function handler(req, res) {
     }
 
     if (req.method === "POST") {
+      if (String(req.body?.network || "") !== business.wallet_blockchain) {
+        return res.status(409).json({ error: "The active wallet environment changed. Refresh and try again." });
+      }
       if (req.body?.action !== "fund_testnet") {
         return res.status(400).json({ error: "Unsupported wallet action" });
       }
@@ -47,6 +50,7 @@ export default async function handler(req, res) {
           body: {
             user_id: user.id,
             business_id: business.id,
+              network: business.wallet_blockchain,
             event_type: "testnet_wallet_funding_requested",
             actor: "user",
             data: {

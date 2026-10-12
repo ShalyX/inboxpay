@@ -256,16 +256,26 @@ async function loadPolicyConfig() {
 
 function renderAccount() {
   $("business-name").textContent = state.business?.name || "Business";
-  const networkLabel = state.business?.wallet_blockchain === "ARC-TESTNET"
+  const activeNetwork = state.business?.active_network || state.business?.wallet_blockchain || "ARC-TESTNET";
+  const networkLabel = activeNetwork === "ARC-TESTNET"
     ? "Arc Testnet"
-    : state.business?.wallet_blockchain === "ARC"
+    : activeNetwork === "ARC"
       ? "Arc Mainnet"
       : "Arc";
   $("network-label").textContent = networkLabel;
+  document.body.dataset.network = activeNetwork;
+  const networkSwitch = $("network-switch");
+  const accounts = state.business?.network_accounts || [];
+  for (const option of networkSwitch.options) {
+    const account = accounts.find((entry) => entry.network === option.value);
+    const label = option.value === "ARC" ? "Arc Mainnet" : "Arc Testnet";
+    option.textContent = label + " · " + (account?.wallet_status === "ready" ? "Ready" : "Set up");
+  }
+  networkSwitch.value = activeNetwork;
   $("wallet-address").textContent = state.business?.wallet_address
     ? (state.business.wallet_blockchain || "Arc") + " · Circle wallet · " + state.business.wallet_address +
       (state.wallet ? " · " + Number(state.wallet.balance || 0).toFixed(2) + " USDC" : "")
-    : "Wallet provisioning…";
+    : "No wallet in " + networkLabel;
   $("copy-wallet").hidden = !state.business?.wallet_address;
   $("connect-gmail").textContent = state.gmail?.status === "connected" ? "Gmail connected ✓" : "Connect Gmail";
   $("connect-gmail").disabled = state.gmail?.status === "connected";
@@ -296,7 +306,7 @@ function renderSetup() {
     '</p></div><div class="setup-status">' +
     '<span class="' + (walletReady ? "done" : "") + '">✓ Dedicated Circle wallet</span>' +
     (!walletReady
-      ? '<div class="network-picker"><label for="wallet-network">Network</label><select id="wallet-network"><option value="ARC-TESTNET">Arc Testnet</option><option value="ARC">Arc Mainnet</option></select></div><button id="provision-wallet" class="ghost">Create dedicated wallet</button>'
+      ? '<span>Selected environment · ' + (state.business?.wallet_blockchain === "ARC" ? "Arc Mainnet" : "Arc Testnet") + '</span><button id="provision-wallet" class="ghost">Create dedicated wallet</button>'
       : '') +
     (testnetNeedsFunding ? '<button id="fund-test-wallet" class="ghost">Fund test wallet</button>' : '') +
     '<span class="' + (gmailReady ? "done" : "") + '">✓ Business Gmail</span>' +
@@ -327,7 +337,7 @@ async function fundTestWallet() {
     const response = await apiFetch("/api/wallet", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "fund_testnet" })
+      body: JSON.stringify({ action: "fund_testnet", network: state.business?.wallet_blockchain })
     });
     const data = await readJsonResponse(response);
     if (!response.ok) throw new Error(data.error || "Testnet funding failed");
@@ -350,7 +360,7 @@ async function fundTestWallet() {
 }
 
 async function provisionWallet() {
-  const network = $("wallet-network")?.value || "ARC-TESTNET";
+  const network = state.business?.active_network || state.business?.wallet_blockchain || "ARC-TESTNET";
   if (network === "ARC") {
     const ok = window.confirm(
       "Create this business's dedicated Circle wallet on Arc Mainnet?\\n\\n" +
@@ -389,6 +399,68 @@ async function provisionWallet() {
   } catch (error) {
     toast(error.message || "Wallet creation failed");
     renderSetup();
+  }
+}
+
+function resetNetworkState() {
+  state.invoices = [];
+  state.selected = null;
+  state.wallet = null;
+  state.policy = null;
+  state.policyConfig = null;
+  state.onchainPolicy = null;
+  state.policyAllowance = false;
+  state.policyStatusError = null;
+  state.policyConfigError = null;
+  state.vendors = [];
+  state.vendorRevocationSupported = null;
+  state.preflight = null;
+  state.preflightLoading = false;
+  state.activity = { kind: null, rows: [] };
+}
+
+async function switchNetwork(event) {
+  const select = event.currentTarget;
+  const previous = state.business?.active_network || state.business?.wallet_blockchain || "ARC-TESTNET";
+  const network = select.value;
+  let changed = false;
+  if (network === previous) return;
+
+  if (network === "ARC" && !window.confirm(
+    "Enter this business's Arc Mainnet environment?\n\n" +
+    "Mainnet has a separate Circle wallet, policy vault, vendors, invoices, and audit trail. Switching environments does not move funds or submit a payment."
+  )) {
+    select.value = previous;
+    return;
+  }
+
+  select.disabled = true;
+  try {
+    const response = await apiFetch("/api/onboarding", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "select_network",
+        network,
+        ...(network === "ARC" ? { confirmMainnet: true } : {})
+      })
+    });
+    const data = await readJsonResponse(response);
+    if (!response.ok) throw new Error(data.error || "Unable to switch environments");
+    resetNetworkState();
+    state.business = data.business;
+    changed = true;
+    await bootstrap();
+    toast((network === "ARC" ? "Arc Mainnet" : "Arc Testnet") + " environment active");
+  } catch (error) {
+    if (!changed) select.value = previous;
+    else {
+      renderAccount();
+      renderSetup();
+    }
+    toast(error.message || "Unable to switch environments");
+  } finally {
+    select.disabled = false;
   }
 }
 
@@ -576,7 +648,7 @@ async function migratePolicyVault() {
     const response = await apiFetch("/api/policy", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "migrate", confirmMainnet: true })
+      body: JSON.stringify({ action: "migrate", network: state.business?.wallet_blockchain, confirmMainnet: true })
     });
     const data = await readJsonResponse(response);
     if (!response.ok) throw new Error(data.error || "Policy-vault migration failed");
@@ -656,6 +728,7 @@ async function savePolicy(event) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         ...draft,
+        network: state.business?.wallet_blockchain,
         requireVerifiedVendor: true,
         ...(mainnet && ready ? { confirmMainnet: true } : {})
       })
@@ -670,7 +743,7 @@ async function savePolicy(event) {
       const deployResponse = await apiFetch("/api/policy", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "deploy", ...(mainnet ? { confirmMainnet: true } : {}) })
+        body: JSON.stringify({ action: "deploy", network: state.business?.wallet_blockchain, ...(mainnet ? { confirmMainnet: true } : {}) })
       });
       const deployData = await readJsonResponse(deployResponse);
       if (!deployResponse.ok) throw new Error(deployData.error || "Policy deployment failed");
@@ -708,7 +781,7 @@ async function togglePolicyPause() {
     const response = await apiFetch("/api/policy", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ paused: nextPaused, ...(state.business?.wallet_blockchain === "ARC" ? { confirmMainnet: true } : {}) })
+      body: JSON.stringify({ network: state.business?.wallet_blockchain, paused: nextPaused, ...(state.business?.wallet_blockchain === "ARC" ? { confirmMainnet: true } : {}) })
     });
     const data = await readJsonResponse(response);
     if (!response.ok) throw new Error(data.error || "Policy pause update failed");
@@ -739,7 +812,7 @@ async function togglePolicyAllowance() {
     const response = await apiFetch("/api/policy", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action, ...(state.business?.wallet_blockchain === "ARC" ? { confirmMainnet: true } : {}) })
+      body: JSON.stringify({ action, network: state.business?.wallet_blockchain, ...(state.business?.wallet_blockchain === "ARC" ? { confirmMainnet: true } : {}) })
     });
     const data = await readJsonResponse(response);
     if (!response.ok) throw new Error(data.error || "USDC allowance update failed");
@@ -1051,6 +1124,7 @@ async function verifyVendor(id) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         id,
+        network: state.business?.wallet_blockchain,
         status: "verified",
         ...(state.business?.wallet_blockchain === "ARC" && onchain ? { confirmMainnet: true } : {})
       })
@@ -1081,6 +1155,7 @@ async function revokeVendor(id) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         id,
+        network: state.business?.wallet_blockchain,
         status: "blocked",
         ...(state.business?.wallet_blockchain === "ARC" ? { confirmMainnet: true } : {})
       })
@@ -1112,7 +1187,8 @@ async function addVendor(event) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         name: $("vendor-name").value.trim(),
-        recipientAddress: $("vendor-address").value.trim()
+        recipientAddress: $("vendor-address").value.trim(),
+        network: state.business?.wallet_blockchain
       })
     });
     const data = await readJsonResponse(response);
@@ -1205,7 +1281,7 @@ async function scheduleInvoice() {
     const response = await apiFetch("/api/invoices", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "schedule", invoiceNumber: invoice.invoiceNumber })
+      body: JSON.stringify({ action: "schedule", invoiceNumber: invoice.invoiceNumber, network: state.business?.wallet_blockchain })
     });
     const data = await readJsonResponse(response);
     if (!response.ok || !data.ok) throw new Error(data.error || "Unable to schedule invoice");
@@ -1230,7 +1306,7 @@ async function cancelScheduledInvoice() {
     const response = await apiFetch("/api/invoices", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "cancel_schedule", invoiceNumber: invoice.invoiceNumber })
+      body: JSON.stringify({ action: "cancel_schedule", invoiceNumber: invoice.invoiceNumber, network: state.business?.wallet_blockchain })
     });
     const data = await readJsonResponse(response);
     if (!response.ok || !data.ok) throw new Error(data.error || "Unable to cancel schedule");
@@ -1257,7 +1333,7 @@ async function rescheduleScheduledInvoice() {
     const response = await apiFetch("/api/invoices", {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ action: "reschedule", invoiceNumber: invoice.invoiceNumber, scheduledFor })
+      body: JSON.stringify({ action: "reschedule", invoiceNumber: invoice.invoiceNumber, scheduledFor, network: state.business?.wallet_blockchain })
     });
     const data = await readJsonResponse(response);
     if (!response.ok || !data.ok) throw new Error(data.error || "Unable to reschedule invoice");
@@ -1298,6 +1374,7 @@ async function settle() {
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({
         invoiceNumber: invoice.invoiceNumber,
+        network: state.business?.wallet_blockchain,
         ...(state.business?.wallet_blockchain === "ARC" ? { confirmMainnet: true } : {})
       })
     });
@@ -1330,6 +1407,7 @@ async function init() {
     $("auth-signup").addEventListener("click", signup);
     $("auth-google").addEventListener("click", signInWithGoogle);
     $("connect-gmail").addEventListener("click", connectGmail);
+    $("network-switch").addEventListener("change", switchNetwork);
     $("edit-business").addEventListener("click", openBusinessModal);
     $("close-business").addEventListener("click", closeBusinessModal);
     $("business-form").addEventListener("submit", saveBusinessName);

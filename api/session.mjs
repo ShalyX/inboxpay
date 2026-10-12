@@ -1,4 +1,5 @@
 import { requireUser, supabaseRest } from "../lib/supabase-server.mjs";
+import { getBusiness } from "../lib/businesses.mjs";
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
@@ -8,11 +9,7 @@ export default async function handler(req, res) {
 
   try {
     const { token, user } = await requireUser(req);
-    const businesses = await supabaseRest(
-      "businesses?select=*&owner_user_id=eq." + encodeURIComponent(user.id) + "&limit=1",
-      { token }
-    );
-    const business = businesses?.[0] || null;
+    const business = await getBusiness(token, user.id);
 
     const integrations = await supabaseRest(
       "integrations?select=id,provider,provider_account_id,status,scopes,token_expires_at&user_id=eq." +

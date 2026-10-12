@@ -2,7 +2,7 @@
 
 InboxPay is an autonomous accounts-payable operator built for Tameion.
 
-Each business gets its own InboxPay account, Gmail integration, AP policy, vendor registry, and Circle developer-controlled wallet. The agent reads the business's real invoice inbox, makes a bounded payment decision, and settles approved USDC invoices from that business wallet on Arc Mainnet.
+Each business gets its own InboxPay account, Gmail integration, AP policy, vendor registry, and isolated Circle developer-controlled wallet for each enabled Arc environment. The agent reads the business's real invoice inbox, makes a bounded payment decision, and settles approved USDC invoices from that business wallet on Arc Mainnet.
 
 ## The product
 
@@ -54,9 +54,9 @@ npm start
 
 Then open http://localhost:3000.
 
-## Multi-business execution
+## Multi-business, multi-network execution
 
-Every business owns a separate Circle wallet. The agent never selects a global treasury wallet at runtime.
+Every business owns separate Arc Testnet and Arc Mainnet account contexts. Each context has its own Circle wallet, policy vault, vendor registry, invoices, scheduling state, and audit trail. The product's environment selector changes which isolated account is active; switching environments does not move funds or submit a transaction. The agent never selects a global treasury wallet at runtime.
 
 The execution route refuses invoices unless the evaluator has marked them PAY_NOW, the currency is USDC, the business is not paused, the vendor is verified, the payment is inside the business's per-transaction and daily limits, and the business wallet remains above its configured cash floor.
 
@@ -121,7 +121,7 @@ For continuing development in Codex or another coding agent, read **[AGENTHANDOF
 ## Product onboarding
 
 1. A business creates or signs into an InboxPay account.
-2. The business explicitly provisions its dedicated Circle developer-controlled wallet and selects Arc Testnet or Arc Mainnet.
+2. The business selects Arc Testnet or Arc Mainnet, then explicitly provisions the dedicated Circle developer-controlled wallet for that environment. Entering Mainnet and creating its wallet both require explicit confirmation.
 3. The business connects the Gmail account used for invoices through the InboxPay OAuth flow.
 4. The business registers vendor settlement addresses and configures AP limits.
 5. The business deploys and funds the policy guard required for autonomous settlement.

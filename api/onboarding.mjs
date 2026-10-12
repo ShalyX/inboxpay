@@ -1,5 +1,12 @@
 import { requireUser, supabaseRest } from "../lib/supabase-server.mjs";
 import { normalizeBusinessName } from "../lib/business-profile.mjs";
+import { assertSupportedNetwork } from "../lib/business-networks.mjs";
+import {
+  ensureBusinessNetworkAccount,
+  getBusiness,
+  getBusinessRecord,
+  updateBusinessNetworkAccount
+} from "../lib/businesses.mjs";
 
 function slugify(value) {
   const slug = String(value || "business").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
@@ -7,11 +14,7 @@ function slugify(value) {
 }
 
 async function findBusiness(token, userId) {
-  const rows = await supabaseRest(
-    "businesses?select=*&owner_user_id=eq." + encodeURIComponent(userId) + "&limit=1",
-    { token }
-  );
-  return rows?.[0] || null;
+  return getBusinessRecord(token, userId);
 }
 
 async function ensureBusiness(token, user) {
@@ -41,9 +44,10 @@ async function ensureBusiness(token, user) {
   }
 }
 
-async function ensurePolicy(token, userId, businessId) {
+async function ensurePolicy(token, userId, businessId, network) {
   const policies = await supabaseRest(
-    "policies?select=*&user_id=eq." + encodeURIComponent(userId) + "&limit=1",
+    "policies?select=*&business_id=eq." + encodeURIComponent(businessId) +
+      "&network=eq." + encodeURIComponent(network) + "&limit=1",
     { token }
   );
   if (policies?.[0]) return policies[0];
@@ -55,6 +59,7 @@ async function ensurePolicy(token, userId, businessId) {
       body: {
         user_id: userId,
         business_id: businessId,
+        network,
         max_transaction_usdc: 1000,
         daily_limit_usdc: 5000,
         cash_floor_usdc: 20,
@@ -67,7 +72,8 @@ async function ensurePolicy(token, userId, businessId) {
     // Same idempotency rule for concurrent policy initialization.
     if (error instanceof Error && /^Supabase 409:/i.test(error.message)) {
       const rows = await supabaseRest(
-        "policies?select=*&user_id=eq." + encodeURIComponent(userId) + "&limit=1",
+        "policies?select=*&business_id=eq." + encodeURIComponent(businessId) +
+          "&network=eq." + encodeURIComponent(network) + "&limit=1",
         { token }
       );
       return rows?.[0] || null;
@@ -102,13 +108,14 @@ export default async function handler(req, res) {
           body: { name, updated_at: new Date().toISOString() }
         }
       );
-      const updatedBusiness = rows?.[0] || { ...business, name };
+      const updatedBusiness = await getBusiness(token, user.id) || rows?.[0] || { ...business, name };
       await supabaseRest("audit_events", {
         token,
         method: "POST",
         body: {
           user_id: user.id,
           business_id: business.id,
+          network: business.active_network || business.wallet_blockchain || "ARC-TESTNET",
           event_type: "business_profile_updated",
           actor: "user",
           data: { field: "name" }
@@ -117,35 +124,83 @@ export default async function handler(req, res) {
       return res.status(200).json({ business: updatedBusiness });
     }
 
+    if (req.body?.action === "select_network") {
+      const business = await findBusiness(token, user.id);
+      if (!business) return res.status(409).json({ error: "Complete business onboarding first" });
+      let network;
+      try {
+        network = assertSupportedNetwork(req.body?.network);
+      } catch (error) {
+        return res.status(400).json({ error: error.message });
+      }
+      if (network === "ARC" && req.body?.confirmMainnet !== true) {
+        return res.status(409).json({
+          error: "Entering the Arc Mainnet environment requires explicit confirmation",
+          confirmation: {
+            network: "Arc Mainnet",
+            purpose: "View and operate this business's isolated live-payment environment"
+          }
+        });
+      }
+
+      await ensureBusinessNetworkAccount(token, business, network);
+      await ensurePolicy(token, user.id, business.id, network);
+      await supabaseRest(
+        "businesses?id=eq." + encodeURIComponent(business.id) + "&owner_user_id=eq." + encodeURIComponent(user.id),
+        {
+          token,
+          method: "PATCH",
+          body: { active_network: network, updated_at: new Date().toISOString() }
+        }
+      );
+      await supabaseRest("audit_events", {
+        token,
+        method: "POST",
+        body: {
+          user_id: user.id,
+          business_id: business.id,
+          network,
+          event_type: "business_network_selected",
+          actor: "user",
+          data: { network }
+        }
+      });
+      return res.status(200).json({ business: await getBusiness(token, user.id) });
+    }
+
     if (req.body?.action === "provision_wallet") {
       const business = await findBusiness(token, user.id);
       if (!business) return res.status(409).json({ error: "Complete business onboarding first" });
-      if (business.wallet_id) return res.status(200).json({ business });
-
-      const network = String(req.body?.network || "ARC-TESTNET");
-      if (!["ARC-TESTNET", "ARC"].includes(network)) {
-        return res.status(400).json({ error: "InboxPay supports Arc Testnet and Arc Mainnet" });
+      let network;
+      try {
+        network = assertSupportedNetwork(req.body?.network || business.active_network || "ARC-TESTNET");
+      } catch (error) {
+        return res.status(400).json({ error: error.message });
       }
       if (network === "ARC" && req.body?.confirmMainnet !== true) {
         return res.status(409).json({
           error: "Dedicated Circle wallet creation on Arc Mainnet requires explicit confirmation",
           confirmation: {
             network: "Arc Mainnet",
-            wallet: business.wallet_address || null,
+            wallet: null,
             purpose: "Create the business's dedicated USDC wallet for live payments"
           }
         });
       }
 
-      await supabaseRest("businesses?id=eq." + encodeURIComponent(business.id), {
+      const account = await ensureBusinessNetworkAccount(token, business, network);
+      await supabaseRest(
+        "businesses?id=eq." + encodeURIComponent(business.id) + "&owner_user_id=eq." + encodeURIComponent(user.id), {
         token,
         method: "PATCH",
-        body: {
-          wallet_status: "provisioning",
-          wallet_blockchain: network,
-          wallet_error: null,
-          updated_at: new Date().toISOString()
-        }
+        body: { active_network: network, updated_at: new Date().toISOString() }
+      });
+      if (account?.wallet_id) return res.status(200).json({ business: await getBusiness(token, user.id) });
+
+      await updateBusinessNetworkAccount(token, business.id, network, {
+        wallet_status: "provisioning",
+        wallet_blockchain: network,
+        wallet_error: null
       });
 
       try {
@@ -157,26 +212,17 @@ export default async function handler(req, res) {
           wallet_address: wallet.walletAddress,
           wallet_blockchain: wallet.walletBlockchain
         };
-        const updated = await supabaseRest("businesses?id=eq." + encodeURIComponent(business.id), {
-          token,
-          method: "PATCH",
-          body: {
-            ...walletRecord,
-            wallet_status: "ready",
-            wallet_error: null,
-            updated_at: new Date().toISOString()
-          }
+        await updateBusinessNetworkAccount(token, business.id, network, {
+          ...walletRecord,
+          wallet_status: "ready",
+          wallet_error: null
         });
-        return res.status(200).json({ business: updated?.[0] || { ...business, ...walletRecord, wallet_status: "ready" } });
+        await ensurePolicy(token, user.id, business.id, network);
+        return res.status(200).json({ business: await getBusiness(token, user.id) });
       } catch (walletError) {
-        await supabaseRest("businesses?id=eq." + encodeURIComponent(business.id), {
-          token,
-          method: "PATCH",
-          body: {
-            wallet_status: "error",
-            wallet_error: walletError instanceof Error ? walletError.message : String(walletError),
-            updated_at: new Date().toISOString()
-          }
+        await updateBusinessNetworkAccount(token, business.id, network, {
+          wallet_status: "error",
+          wallet_error: walletError instanceof Error ? walletError.message : String(walletError)
         }).catch(() => {});
         throw walletError;
       }
@@ -185,18 +231,21 @@ export default async function handler(req, res) {
     const business = await ensureBusiness(token, user);
     if (!business) throw new Error("Unable to create or load InboxPay business");
 
-    const policy = await ensurePolicy(token, user.id, business.id);
+    const network = assertSupportedNetwork(business.active_network || business.wallet_blockchain || "ARC-TESTNET");
+    await ensureBusinessNetworkAccount(token, business, network);
+    const policy = await ensurePolicy(token, user.id, business.id, network);
     if (!policy) throw new Error("Unable to create or load InboxPay policy");
+    const projectedBusiness = await getBusiness(token, user.id);
 
     // Wallet creation is a separate explicit business action.
     // This avoids silently creating mainnet state during account sign-in.
 
     return res.status(200).json({
-      business,
+      business: projectedBusiness,
       onboarding: {
-        walletRequired: !business.wallet_id,
+        walletRequired: !projectedBusiness?.wallet_id,
         gmailRequired: true,
-        policyVaultRequired: !business.policy_contract_address
+        policyVaultRequired: !projectedBusiness?.policy_contract_address
       }
     });
   } catch (error) {

@@ -14,7 +14,9 @@ export default async function handler(req, res) {
     const view = String(req.query?.view || "").toLowerCase();
     if (view === "payments") {
       const rows = await supabaseRest(
-        "invoices?select=id,invoice_number,vendor,amount,currency,due_date,decision,settlement_status,payment_id,payment_tx_hash,updated_at&business_id=eq." + encodeURIComponent(business.id) + "&user_id=eq." + encodeURIComponent(user.id) + "&order=updated_at.desc&limit=100",
+        "invoices?select=id,invoice_number,vendor,amount,currency,due_date,decision,settlement_status,payment_id,payment_tx_hash,settlement_network,updated_at&business_id=eq." + encodeURIComponent(business.id) +
+          "&user_id=eq." + encodeURIComponent(user.id) +
+          "&settlement_network=eq." + encodeURIComponent(business.wallet_blockchain) + "&order=updated_at.desc&limit=100",
         { token }
       );
       const payments = (rows || []).filter((invoice) => invoice.settlement_status).map((invoice) => ({
@@ -26,14 +28,16 @@ export default async function handler(req, res) {
         status: invoice.settlement_status,
         paymentId: invoice.payment_id,
         paymentTxHash: invoice.payment_tx_hash,
-        network: business.wallet_blockchain,
+        network: invoice.settlement_network,
         updatedAt: invoice.updated_at
       }));
       return res.status(200).json({ business, count: payments.length, payments });
     }
     if (view === "audit") {
       const events = await supabaseRest(
-        "audit_events?select=id,event_type,actor,data,invoice_id,business_id,created_at&business_id=eq." + encodeURIComponent(business.id) + "&user_id=eq." + encodeURIComponent(user.id) + "&order=created_at.desc&limit=100",
+        "audit_events?select=id,event_type,actor,data,invoice_id,business_id,network,created_at&business_id=eq." + encodeURIComponent(business.id) +
+          "&user_id=eq." + encodeURIComponent(user.id) +
+          "&network=eq." + encodeURIComponent(business.wallet_blockchain) + "&order=created_at.desc&limit=100",
         { token }
       );
       return res.status(200).json({ business, count: events?.length || 0, events: events || [] });

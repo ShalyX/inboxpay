@@ -15,6 +15,13 @@ export default async function handler(req, res) {
 
     const business = await getBusiness(token, user.id);
     if (!business) return res.status(409).json({ error: "Complete business onboarding first" });
+    const requestedNetwork = String(req.body?.network || "").trim();
+    if (requestedNetwork !== business.wallet_blockchain) {
+      return res.status(409).json({
+        error: "The active payment environment changed. Refresh the invoice and confirm the payment again.",
+        activeNetwork: business.wallet_blockchain
+      });
+    }
     if (business.wallet_blockchain === "ARC" && req.body?.confirmMainnet !== true) {
       return res.status(409).json({
         error: "Arc Mainnet payment requires explicit confirmation",
@@ -27,7 +34,7 @@ export default async function handler(req, res) {
       });
     }
 
-    const result = await settleBusinessInvoice(token, user.id, invoiceNumber);
+    const result = await settleBusinessInvoice(token, user.id, invoiceNumber, requestedNetwork);
     const statusCode = result?.status === "processing" ? 202 : 200;
     return res.status(statusCode).json({
       ok: true,

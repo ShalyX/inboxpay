@@ -20,7 +20,8 @@ export default async function handler(req, res) {
       if (!invoiceNumber) return res.status(400).json({ error: "Invoice number is required" });
       const result = await scheduleBusinessInvoice(token, user.id, invoiceNumber, {
         action: action === "cancel_schedule" ? "cancel" : action,
-        scheduledFor: req.body?.scheduledFor
+        scheduledFor: req.body?.scheduledFor,
+        expectedNetwork: String(req.body?.network || "")
       });
       return res.status(result.idempotent ? 200 : 201).json({ ok: true, ...result });
     }
@@ -29,6 +30,9 @@ export default async function handler(req, res) {
       const action = String(req.body?.action || "").toLowerCase();
       if (action !== "review_due") return res.status(400).json({ error: "Invoice action must be review_due" });
       const current = await listBusinessInvoices(token, user.id);
+      if (String(req.body?.network || "") !== current.business.wallet_blockchain) {
+        return res.status(409).json({ error: "The active invoice environment changed. Refresh and try again." });
+      }
       const result = await advanceDueSchedules(token, user.id, current.business, current.invoices || []);
       return res.status(200).json({ ok: true, business: current.business, ...result });
     }
@@ -41,7 +45,13 @@ export default async function handler(req, res) {
       result.invoices || []
     );
 
-    const scheduleStates = await invoiceScheduleStates(token, result.business.id, user.id, recoveredInvoices);
+    const scheduleStates = await invoiceScheduleStates(
+      token,
+      result.business.id,
+      user.id,
+      recoveredInvoices,
+      result.business.wallet_blockchain
+    );
     const invoices = recoveredInvoices.map((invoice) => ({
       vendor: invoice.vendor,
       invoiceNumber: invoice.invoice_number,
