@@ -115,6 +115,23 @@
         <section id="detail" class="panel detail">
           <div class="empty"><div class="empty-icon">✉</div><h3>Select an invoice</h3><p>The detail view shows the extraction, decision, and policy gates before money can move.</p></div>
         </section>
+        <aside class="panel execution-rail" aria-label="Payment execution readiness">
+          <div class="panel-head"><div><label>PAYMENT CONTROL</label><h2>Execution readiness</h2></div><span class="meta">LIVE STATE</span></div>
+          <div class="execution-body">
+            <div class="execution-kicker">01 / FUNDING SOURCE</div>
+            <div class="execution-line"><span>Business wallet</span><strong id="rail-wallet-state">Loading wallet…</strong></div>
+            <div class="execution-line"><span>Available balance</span><strong id="rail-wallet-balance">— USDC</strong></div>
+            <div class="execution-divider"></div>
+            <div class="execution-kicker">02 / POLICY GUARD</div>
+            <div class="execution-line"><span>Onchain vault</span><strong id="rail-vault-state">Checking policy…</strong></div>
+            <div class="execution-line"><span>USDC authorization</span><strong id="rail-allowance-state">Checking…</strong></div>
+            <button id="rail-open-policy" class="ghost execution-button" type="button">Review guardrails ↗</button>
+            <div class="execution-divider"></div>
+            <div class="execution-kicker">03 / SETTLEMENT</div>
+            <p class="execution-note">A payment is not complete when submitted. InboxPay checks confirmation and reconciliation before presenting a final receipt.</p>
+            <button id="rail-open-payments" class="ghost execution-button" type="button">View payment records ↗</button>
+          </div>
+        </aside>
       </div>
 
       <section class="proof">
