@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { inboxFailurePresentation, networkLabel, paymentFlowStep } from "./ui-state.mjs";
 
 const state = {
   supabase: null,
@@ -288,18 +289,31 @@ function renderExecutionRail() {
     : state.policyAllowance
       ? "Authorized"
       : "Not authorized";
+
+  const activeNetwork = state.business?.active_network || state.business?.wallet_blockchain || "ARC-TESTNET";
+  $("network-label-rail").textContent = networkLabel(activeNetwork);
+  renderPaymentFlow();
+}
+
+function renderPaymentFlow() {
+  const currentStep = paymentFlowStep(state);
+  document.querySelectorAll("[data-flow-step]").forEach((item) => {
+    const step = Number(item.dataset.flowStep);
+    item.classList.toggle("flow-current", currentStep === step);
+    item.classList.toggle("flow-complete", currentStep > step);
+    if (currentStep === step) item.setAttribute("aria-current", "step");
+    else item.removeAttribute("aria-current");
+  });
 }
 
 function renderAccount() {
   renderExecutionRail();
   $("business-name").textContent = state.business?.name || "Business";
   const activeNetwork = state.business?.active_network || state.business?.wallet_blockchain || "ARC-TESTNET";
-  const networkLabel = activeNetwork === "ARC-TESTNET"
-    ? "Arc Testnet"
-    : activeNetwork === "ARC"
-      ? "Arc Mainnet"
-      : "Arc";
-  $("network-label").textContent = networkLabel;
+  const activeNetworkLabel = networkLabel(activeNetwork);
+  $("network-label").textContent = activeNetworkLabel;
+  $("network-label-rail").textContent = activeNetworkLabel;
+  $("footer-network").textContent = activeNetworkLabel;
   document.body.dataset.network = activeNetwork;
   const networkSwitch = $("network-switch");
   const accounts = state.business?.network_accounts || [];
@@ -312,7 +326,7 @@ function renderAccount() {
   $("wallet-address").textContent = state.business?.wallet_address
     ? (state.business.wallet_blockchain || "Arc") + " · Circle wallet · " + state.business.wallet_address +
       (state.wallet ? " · " + Number(state.wallet.balance || 0).toFixed(2) + " USDC" : "")
-    : "No wallet in " + networkLabel;
+    : "No wallet in " + activeNetworkLabel;
   $("copy-wallet").hidden = !state.business?.wallet_address;
   $("connect-gmail").textContent = state.gmail?.status === "connected" ? "Gmail connected ✓" : "Connect Gmail";
   $("connect-gmail").disabled = state.gmail?.status === "connected";
@@ -874,6 +888,7 @@ async function togglePolicyAllowance() {
 
 
 function renderStats() {
+  renderPaymentFlow();
   const settled = state.invoices.filter(invoiceSettled);
   const payable = state.invoices.filter(invoicePaymentReady);
   const held = state.invoices.filter((x) => !invoiceSettled(x) && (
@@ -939,6 +954,7 @@ function renderList() {
 
 function renderDetail() {
   const invoice = state.selected;
+  renderPaymentFlow();
   if (!invoice) return;
   const processing = invoice.settlement?.status === "processing";
   const reviewRequired = invoice.settlement?.status === "review";
@@ -1310,23 +1326,22 @@ async function load() {
     state.selected = null;
     state.preflight = null;
     state.preflightLoading = false;
-    const authRevoked = /token has been expired or revoked|invalid_grant|gmail authorization must be renewed/i.test(error.message || "");
+    const failure = inboxFailurePresentation(error.message || "");
+    const authRevoked = failure.kind === "reauthorization";
     if (authRevoked) {
       state.gmail = { ...(state.gmail || {}), status: "reauthorization_required" };
       $("connect-gmail").textContent = "Reconnect Gmail";
       $("connect-gmail").disabled = false;
-      $("feed-label").textContent = "Gmail authorization needed";
       $("feed-dot").textContent = "○";
-      $("feed-meta").textContent = "Source: Gmail authorization expired · Reconnect to resume evaluation";
-    } else {
-      $("feed-meta").textContent = "Source: live Gmail unavailable · Evaluation failed";
     }
+    $("feed-label").textContent = failure.feedLabel;
+    $("feed-meta").textContent = failure.feedMeta;
     renderStats();
     renderList();
     const action = authRevoked
-      ? '<button id="empty-reconnect" class="pay">Reconnect Gmail</button>'
-      : '<button id="empty-refresh" class="pay">Retry inbox evaluation</button>';
-    $("detail").innerHTML = '<div class="empty"><div class="empty-icon">!</div><h3>' + (authRevoked ? "Reconnect your business inbox" : "Live inbox unavailable") + '</h3><p>' + escapeHtml(authRevoked ? "Google no longer accepts the saved Gmail authorization. Reconnect the account to continue evaluating invoices. Your wallet and payment policy are unchanged." : (error.message || "Inbox evaluation failed")) + '</p>' + action + '</div>';
+      ? '<button id="empty-reconnect" class="pay">' + failure.actionLabel + '</button>'
+      : '<button id="empty-refresh" class="pay">' + failure.actionLabel + '</button>';
+    $("detail").innerHTML = '<div class="empty"><div class="empty-icon">!</div><h3>' + escapeHtml(failure.title) + '</h3><p>' + escapeHtml(failure.message) + '</p>' + action + '</div>';
     if (authRevoked) $("empty-reconnect").addEventListener("click", connectGmail);
     else $("empty-refresh").addEventListener("click", load);
   } finally {
@@ -1463,8 +1478,6 @@ async function settle() {
 
 function setDestination(destination) {
   document.querySelectorAll(".nav[data-nav]").forEach((item) => item.classList.toggle("active", item.dataset.nav === destination));
-  const footerNetwork = $("footer-network");
-  if (footerNetwork) footerNetwork.textContent = state.business?.wallet_blockchain === "ARC" ? "Arc Mainnet" : "Arc Testnet";
 }
 
 async function init() {

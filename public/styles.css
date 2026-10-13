@@ -1153,3 +1153,19 @@ nav { gap:4px; }
  .vendor-modal.page-mode .activity-row{align-items:flex-start;flex-direction:column;gap:10px}
  .vendor-modal.page-mode .activity-value{min-width:0;text-align:left}
 }
+
+/* Live state and narrow-screen correctness */
+.payment-flow li.flow-complete > span{border-color:#cfe7bd;background:#eaf7df;color:#2e7c2e}
+.payment-flow li.flow-complete strong{color:#37672e}
+@media(max-width:800px){
+ .account-actions,.business-context,.account-copy{min-width:0;max-width:100%}
+ .business-context{width:100%;display:grid;grid-template-columns:minmax(0,1fr);align-items:stretch;overflow:hidden}
+ .environment-control{width:100%;min-width:0;border-right:0;border-bottom:1px solid var(--line);padding:12px 14px}
+ .account-copy{width:100%;padding:12px 14px;overflow:hidden}
+ .account-copy>div{min-width:0;flex-wrap:wrap}
+ .account-copy>span{display:block;max-width:100%;overflow-wrap:anywhere;word-break:break-all;white-space:normal;line-height:1.45}
+ .action-cluster{width:100%;display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+ .action-cluster .ghost{min-width:0;padding-inline:6px}
+ .utility-actions{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr) minmax(0,.8fr);padding-right:0}
+ .utility-actions .sign-out{justify-content:center;margin-left:0;padding:0 6px}
+}

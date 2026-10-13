@@ -15,6 +15,7 @@
     "test:idempotency": "node scripts/invoice-idempotency-check.mjs",
     "test:networks": "node scripts/business-network-check.mjs",
     "test:migration": "node scripts/policy-migration-check.mjs",
+    "test:frontend": "node scripts/frontend-state-check.mjs",
     "compile:policy": "node scripts/compile-policy.mjs"
   },
   "dependencies": {
