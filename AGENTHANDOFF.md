@@ -874,6 +874,18 @@ Feature commit `5a075f6ddb310c8476b01ca5f008fa92238e63bd` is deployed `READY` as
 
 Authenticated production QA is complete. The Caraxes Labs Arc Mainnet view restored its real session, dedicated Circle wallet, live Gmail source, and two-invoice queue. The invoice evidence/readiness pane, policy editor, empty payment history, and populated audit trail all rendered correctly without performing a write. The exact 390px mobile viewport and the desktop layout were visually inspected, including the responsive policy modal. Browser logs contained no warnings or errors. No network switch, wallet provisioning, policy deployment, allowance, vendor mutation, or payment was performed during this frontend verification.
 
+### P0 — Frontend state consistency and production deployment target (code fixed; production promotion pending)
+
+Commit `fe8c03e` fixes four reliability defects found during a live frontend review:
+- every network label now derives from the selected account's `active_network` (falling back to `wallet_blockchain`) instead of mixing selected Mainnet state with stale Testnet copy;
+- the execution-readiness rail now reflects the actual selected invoice/preflight/settlement state and exposes the current step accessibly;
+- Gmail failures no longer expose raw server configuration text in the browser, while revoked OAuth credentials still receive the explicit reconnect path;
+- the 390px business/wallet context is stacked and long wallet addresses wrap instead of clipping horizontally.
+
+The behavior is covered by `npm run test:frontend` in addition to the full JavaScript regression suite, JavaScript syntax validation, `git diff --check`, and `forge test`. Preview deployment `dpl_78ssFMudaenJcg4ysAtMMh7rQmzp` is `READY` at `https://tameion-ap-agent-live-q0g8x8n6e-shalyxs-projects.vercel.app`. Desktop and exact 390px preview QA pass and browser logs contain no warnings or errors.
+
+The canonical production alias currently resolves to `dpl_Hq1dJG8zFdYUgyzD5mthTJADMY2d`, whose Vercel target is incorrectly `preview`. Preview has only `SUPABASE_PUBLISHABLE_KEY`; Gmail OAuth and `INBOXPAY_TOKEN_ENCRYPTION_KEY` are intentionally Production-only. Consequently the live Gmail route reports the server-side 32-byte encryption-key configuration failure even though `lib/secure-tokens.mjs` is correctly enforcing the key format. Do not weaken encryption validation or copy the live token key into Preview. The operational fix is a fresh Production-target deployment of the reviewed source so Vercel attaches the existing Production secrets. That deployment is pending explicit user approval; no payment, allowance, vendor, policy, wallet, or network mutation was performed while diagnosing or fixing the UI.
+
 ### P1 — Final submission hygiene
 Before hackathon submission:
 - verify public repo
