@@ -532,3 +532,28 @@ body { background:var(--canvas); }
 .settlement code { max-width: 100%; overflow-wrap: anywhere; color: var(--ink); font: 10px/1.5 var(--mono); }
 .settlement button { margin-top: 3px; border-color: #b8d2c2; color: var(--ok); background: transparent; }
 .settlement button:hover { background: var(--ok-soft); }
+
+
+/* Option 2 correction: prioritize the invoice desk over dashboard chrome */
+@media (min-width: 901px) {
+  .content { padding: 22px 26px 28px; }
+  .topbar { padding-bottom: 14px; }
+  .topbar-row { align-items: center; gap: 18px; }
+  .page-heading h1 { margin: 8px 0 4px; font-size: clamp(28px, 2.5vw, 38px); }
+  .page-heading p { font-size: 11px; }
+  .feed-card { width: 260px; padding: 10px 12px; }
+  .account-actions { margin-top: 12px; gap: 8px; }
+  .stats { display: none; }
+  .workspace { margin-top: 12px; gap: 12px; grid-template-columns: minmax(230px, .78fr) minmax(360px, 1.35fr) minmax(240px, .82fr); }
+  .panel-head { min-height: 60px; }
+  .execution-rail { top: 12px; }
+}
+@media (min-width: 901px) and (max-height: 850px) {
+  .content { padding-top: 16px; }
+  .page-heading h1 { font-size: 30px; }
+  .page-heading p { display: none; }
+  .feed-card { padding: 8px 10px; }
+  .account-actions { margin-top: 9px; }
+  .workspace { margin-top: 9px; }
+  .panel-head { min-height: 54px; padding-top: 11px; padding-bottom: 10px; }
+}
