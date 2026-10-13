@@ -63,8 +63,13 @@
       <nav aria-label="Primary navigation">
         <button class="nav active" data-nav="inbox"><span class="nav-icon">I</span><span>Invoice queue</span><b id="invoice-count">0</b></button>
         <button id="open-payments" class="nav" data-nav="payments"><span class="nav-icon">P</span><span>Payments</span><b id="payment-count">0</b></button>
-        <button id="open-policy" class="nav"><span class="nav-icon">G</span><span>Guardrails</span></button>
+        <button id="open-policy" class="nav" data-nav="policy"><span class="nav-icon">G</span><span>Payment policy</span></button>
         <button id="open-audit" class="nav" data-nav="audit"><span class="nav-icon">A</span><span>Audit trail</span></button>
+      </nav>
+      <div class="nav-label nav-label-business">Business</div>
+      <nav aria-label="Business settings">
+        <button id="nav-business" class="nav" data-nav="business"><span class="nav-icon">B</span><span>Business profile</span></button>
+        <button id="nav-vendors" class="nav" data-nav="vendors"><span class="nav-icon">V</span><span>Vendor registry</span></button>
       </nav>
       <div class="sidebar-foot">
         <div class="rail-state"><i class="dot"></i><div><span>Settlement rail</span><strong id="network-label">Arc Mainnet</strong></div></div>
