@@ -493,3 +493,35 @@ body { background:var(--canvas); }
 .execution-note { margin:12px 0 0; color:var(--muted); font-size:10px; line-height:1.65; }
 @media (max-width:1280px) { .execution-rail { grid-column:2; position:static; } }
 @media (max-width:900px) { .execution-rail { grid-column:auto; } }
+
+
+/* Invoice review — clearer hierarchy for the decision and payment gates */
+.detail-inner { padding-bottom: 18px; }
+.merchant { gap: 12px; }
+.merchant > div:last-child { min-width: 0; }
+.merchant strong { font-size: 13px; letter-spacing: -.02em; }
+.merchant span { overflow-wrap: anywhere; }
+.big-amount { margin: 22px 0 20px; font-size: clamp(30px, 3vw, 42px); font-weight: 650; letter-spacing: -.065em; font-variant-numeric: tabular-nums; }
+.big-amount span { font-size: .42em; font-weight: 600; letter-spacing: -.01em; color: var(--muted); }
+.decision, .preflight { border: 1px solid var(--line); border-radius: 8px; background: var(--soft-2); }
+.decision { padding: 15px; }
+.decision-head { font-size: 10px; letter-spacing: .02em; }
+.decision ul, .preflight ul { padding-left: 17px; }
+.decision li, .preflight li { margin: 7px 0; font-size: 11px; line-height: 1.55; }
+.confidence { gap: 12px; padding-top: 10px; }
+.confidence span { font-size: 10px; }
+.confidence b { font-size: 10px; font-variant-numeric: tabular-nums; }
+.preflight { margin-top: 12px; padding: 14px 15px; background: #fff; }
+.checks { margin-top: 13px; border-top: 1px solid var(--line); }
+.check-row { min-height: 38px; gap: 10px; }
+.check-row span, .check-row b { font-size: 10px; }
+.settlement { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 13px 0; padding: 13px 14px; border: 1px solid #c7e5d2; border-radius: 7px; background: #f0f8f2; }
+.settlement span { color: #3f6e50; font-size: 10px; }
+.settlement b { color: #1d7950; font-size: 10px; letter-spacing: .04em; }
+#pay-button { min-height: 45px; margin-top: 16px; font-size: 11px; font-weight: 700; }
+#pay-button:disabled { cursor: not-allowed; opacity: .62; }
+@media (max-width: 560px) {
+  .big-amount { font-size: 34px; }
+  .decision, .preflight { padding: 12px; }
+  .settlement { align-items: flex-start; flex-direction: column; gap: 6px; }
+}
