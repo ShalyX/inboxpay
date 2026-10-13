@@ -889,10 +889,10 @@ function renderStats() {
 
 function renderList() {
   if (!state.invoices.length) {
-    $("invoice-list").innerHTML = '<div class="empty queue-empty"><div class="empty-icon">✉</div><h3>No invoices found</h3><p>The live Gmail evaluation returned no invoice records for this business.</p></div>';
+    $("invoice-list").innerHTML = '<div class="queue-list"><div class="empty queue-empty"><div class="empty-icon">✉</div><h3>No invoices found</h3><p>The live Gmail evaluation returned no invoice records for this business.</p></div></div>';
     return;
   }
-  $("invoice-list").innerHTML = state.invoices.map((invoice) => {
+  $("invoice-list").innerHTML = '<div class="queue-list">' + state.invoices.map((invoice) => {
     const selected = state.selected?.invoiceNumber === invoice.invoiceNumber ? " selected" : "";
     const displayDecision = state.preflightLoading && selected
       ? "CHECKING"
@@ -914,7 +914,7 @@ function renderList() {
       escapeHtml(invoice.invoiceNumber || "Missing invoice number") + ' · due ' + escapeHtml(invoice.dueDate || "not found") +
       '</span></div><div class="amount">' + Number(invoice.amount || 0).toFixed(2) + ' ' +
       escapeHtml(invoice.currency || "") + '</div><span class="chev">›</span></button>';
-  }).join("");
+  }).join("") + '</div>';
 
   document.querySelectorAll(".invoice-row").forEach((button) => {
     button.addEventListener("click", () => {
