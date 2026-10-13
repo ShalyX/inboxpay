@@ -1449,6 +1449,8 @@ async function init() {
     $("edit-business").addEventListener("click", openBusinessModal);
     $("close-business").addEventListener("click", closeBusinessModal);
     $("business-form").addEventListener("submit", saveBusinessName);
+    $("nav-business").addEventListener("click", openBusinessModal);
+    $("nav-vendors").addEventListener("click", openVendorModal);
     $("add-vendor").addEventListener("click", openVendorModal);
     $("close-vendor").addEventListener("click", closeVendorModal);
     $("vendor-form").addEventListener("submit", addVendor);
