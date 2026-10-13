@@ -1004,10 +1004,11 @@ function renderDetail() {
     Number(invoice.sourceCount || invoice.sources?.length || 0) + " source" + (Number(invoice.sourceCount || invoice.sources?.length || 0) === 1 ? "" : "s") + '</b></div></div>' +
     gateHtml + scheduleHtml + '<div class="checks">' + checksHtml +
     (processing ? checkRow("Payment recovery", "In progress") : reviewRequired ? checkRow("Payment recovery", "Manual review") : "") +
-    '</div>' + (settled ? '<div class="settlement"><span>Arc confirmation</span><b>Reconciliation PASS</b></div>' : "") +
+    '</div>' + (settled ? '<div class="settlement" id="settlement-receipt"><span>Settlement receipt</span><b>Confirmed</b><small>Open Payments to view the transaction hash and reconciliation record.</small><button id="receipt-open-payments" class="ghost" type="button">View payment record ↗</button></div>' : "") +
     '<button id="pay-button" class="pay"' + (ready ? "" : " disabled") +
     '>' + (ready ? (invoice.settlement?.status === "failed" ? "Review & retry on Arc ↗" : "Review & settle on Arc ↗") : checking ? "Checking settlement state…" : settled ? "Settled on Arc ✓" : processing ? "Payment submitted · recovering…" : scheduled ? "Queued for review" : reviewRequired ? "Payment under review" : scheduleDecision ? "Schedule this invoice above" : preflight ? "Payment blocked" : "Checking payment gates…") + '</button></div>';
 
+  if (settled) { const receiptButton = $("receipt-open-payments"); if (receiptButton) receiptButton.addEventListener("click", () => openActivity("payments")); }
   if (ready) $("pay-button").addEventListener("click", settle);
   if (scheduleDecision) $("schedule-button").addEventListener("click", scheduleInvoice);
   if (scheduled) $("reschedule-button").addEventListener("click", rescheduleScheduledInvoice);
