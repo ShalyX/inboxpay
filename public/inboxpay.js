@@ -1310,11 +1310,25 @@ async function load() {
     state.selected = null;
     state.preflight = null;
     state.preflightLoading = false;
-    $("feed-meta").textContent = "Source: live Gmail unavailable · Evaluation failed";
+    const authRevoked = /token has been expired or revoked|invalid_grant|gmail authorization must be renewed/i.test(error.message || "");
+    if (authRevoked) {
+      state.gmail = { ...(state.gmail || {}), status: "reauthorization_required" };
+      $("connect-gmail").textContent = "Reconnect Gmail";
+      $("connect-gmail").disabled = false;
+      $("feed-label").textContent = "Gmail authorization needed";
+      $("feed-dot").textContent = "○";
+      $("feed-meta").textContent = "Source: Gmail authorization expired · Reconnect to resume evaluation";
+    } else {
+      $("feed-meta").textContent = "Source: live Gmail unavailable · Evaluation failed";
+    }
     renderStats();
     renderList();
-    $("detail").innerHTML = '<div class="empty"><div class="empty-icon">!</div><h3>Live inbox unavailable</h3><p>' + escapeHtml(error.message || "Inbox evaluation failed") + '</p><button id="empty-refresh" class="pay">Retry inbox evaluation</button></div>';
-    $("empty-refresh").addEventListener("click", load);
+    const action = authRevoked
+      ? '<button id="empty-reconnect" class="pay">Reconnect Gmail</button>'
+      : '<button id="empty-refresh" class="pay">Retry inbox evaluation</button>';
+    $("detail").innerHTML = '<div class="empty"><div class="empty-icon">!</div><h3>' + (authRevoked ? "Reconnect your business inbox" : "Live inbox unavailable") + '</h3><p>' + escapeHtml(authRevoked ? "Google no longer accepts the saved Gmail authorization. Reconnect the account to continue evaluating invoices. Your wallet and payment policy are unchanged." : (error.message || "Inbox evaluation failed")) + '</p>' + action + '</div>';
+    if (authRevoked) $("empty-reconnect").addEventListener("click", connectGmail);
+    else $("empty-refresh").addEventListener("click", load);
   } finally {
     $("refresh").disabled = false;
   }
