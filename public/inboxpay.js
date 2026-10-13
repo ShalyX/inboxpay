@@ -257,10 +257,37 @@ async function loadPolicyConfig() {
 function renderExecutionRail() {
   const walletState = $("rail-wallet-state");
   if (!walletState) return;
-  walletState.textContent = state.business?.wallet_status === "ready" ? "Ready" : "Not provisioned";
-  $("rail-wallet-balance").textContent = state.wallet?.balance != null ? Number(state.wallet.balance).toFixed(2) + " USDC" : "Unavailable";
-  $("rail-vault-state").textContent = state.business?.policy_contract_status === "ready" && state.business?.policy_contract_address ? "Deployed" : "Not ready";
-  $("rail-allowance-state").textContent = state.policyAllowance ? "Authorized" : "Not authorized";
+
+  const walletStatus = state.business?.wallet_status;
+  walletState.textContent = walletStatus === "ready"
+    ? "Ready"
+    : walletStatus === "provisioning" || walletStatus === "creating"
+      ? "Provisioning"
+      : walletStatus === "error" || walletStatus === "failed"
+        ? "Needs attention"
+        : "Not provisioned";
+
+  const balance = state.wallet?.balance;
+  $("rail-wallet-balance").textContent = balance != null && Number.isFinite(Number(balance))
+    ? Number(balance).toFixed(2) + " USDC"
+    : "Unavailable";
+
+  const vaultState = $("rail-vault-state");
+  if (state.policyStatusError) {
+    vaultState.textContent = "Status unavailable";
+  } else if (state.business?.policy_contract_status === "ready" && state.business?.policy_contract_address) {
+    vaultState.textContent = state.onchainPolicy?.paused ? "Deployed · paused" : "Deployed";
+  } else if (state.business?.policy_contract_status === "deploying") {
+    vaultState.textContent = "Deploying";
+  } else {
+    vaultState.textContent = "Not deployed";
+  }
+
+  $("rail-allowance-state").textContent = state.policyStatusError
+    ? "Status unavailable"
+    : state.policyAllowance
+      ? "Authorized"
+      : "Not authorized";
 }
 
 function renderAccount() {
