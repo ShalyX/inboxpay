@@ -118,18 +118,29 @@
         <aside class="panel execution-rail" aria-label="Payment execution readiness">
           <div class="panel-head"><div><label>PAYMENT CONTROL</label><h2>Execution readiness</h2></div><span class="meta">LIVE STATE</span></div>
           <div class="execution-body">
-            <div class="execution-kicker">01 / FUNDING SOURCE</div>
-            <div class="execution-line"><span>Business wallet</span><strong id="rail-wallet-state">Loading wallet…</strong></div>
-            <div class="execution-line"><span>Available balance</span><strong id="rail-wallet-balance">— USDC</strong></div>
-            <div class="execution-divider"></div>
-            <div class="execution-kicker">02 / POLICY GUARD</div>
-            <div class="execution-line"><span>Onchain vault</span><strong id="rail-vault-state">Checking policy…</strong></div>
-            <div class="execution-line"><span>USDC authorization</span><strong id="rail-allowance-state">Checking…</strong></div>
-            <button id="rail-open-policy" class="ghost execution-button" type="button">Review guardrails ↗</button>
-            <div class="execution-divider"></div>
-            <div class="execution-kicker">03 / SETTLEMENT</div>
-            <p class="execution-note">A payment is not complete when submitted. InboxPay checks confirmation and reconciliation before presenting a final receipt.</p>
-            <button id="rail-open-payments" class="ghost execution-button" type="button">View payment records ↗</button>
+            <section class="rail-card payment-flow-card">
+              <h3>Payment flow</h3>
+              <ol class="payment-flow">
+                <li class="flow-current"><span>1</span><div><strong>Review invoice</strong><small>Inspect extracted details and evidence</small></div></li>
+                <li><span>2</span><div><strong>Run policy checks</strong><small>Verify recipient, limits and balance</small></div></li>
+                <li><span>3</span><div><strong>Confirm payment</strong><small>Execute only when eligible</small></div></li>
+                <li><span>4</span><div><strong>Track settlement</strong><small>Reconcile transaction and receipt</small></div></li>
+              </ol>
+            </section>
+            <section class="rail-card">
+              <h3>Wallet &amp; network</h3>
+              <div class="execution-line"><span>Business wallet</span><strong id="rail-wallet-state">Loading wallet…</strong></div>
+              <div class="execution-line"><span>Network</span><strong id="network-label-rail">Arc Testnet</strong></div>
+              <div class="execution-line"><span>USDC balance</span><strong id="rail-wallet-balance">— USDC</strong></div>
+              <div class="execution-line"><span>Vault</span><strong id="rail-vault-state">Checking policy…</strong></div>
+              <div class="execution-line"><span>USDC authorization</span><strong id="rail-allowance-state">Checking…</strong></div>
+            </section>
+            <section class="rail-card">
+              <h3>Payment policy</h3>
+              <p class="execution-note">Vendor verification, duplicate protection, spending limits and the cash floor are checked before funds can move.</p>
+              <button id="rail-open-policy" class="text-action execution-link" type="button">Review full policy →</button>
+            </section>
+            <section class="rail-assurance"><span class="assurance-mark">✓</span><div><strong>Guardrails stay in control</strong><p>Every settlement is bounded by policy and recorded for audit.</p><button id="rail-open-payments" class="text-action execution-link" type="button">View payment records →</button></div></section>
           </div>
         </aside>
       </div>
