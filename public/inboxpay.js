@@ -254,7 +254,17 @@ async function loadPolicyConfig() {
   }
 }
 
+function renderExecutionRail() {
+  const walletState = $("rail-wallet-state");
+  if (!walletState) return;
+  walletState.textContent = state.business?.wallet_status === "ready" ? "Ready" : "Not provisioned";
+  $("rail-wallet-balance").textContent = state.wallet?.balance != null ? Number(state.wallet.balance).toFixed(2) + " USDC" : "Unavailable";
+  $("rail-vault-state").textContent = state.business?.policy_contract_status === "ready" && state.business?.policy_contract_address ? "Deployed" : "Not ready";
+  $("rail-allowance-state").textContent = state.policyAllowance ? "Authorized" : "Not authorized";
+}
+
 function renderAccount() {
+  renderExecutionRail();
   $("business-name").textContent = state.business?.name || "Business";
   const activeNetwork = state.business?.active_network || state.business?.wallet_blockchain || "ARC-TESTNET";
   const networkLabel = activeNetwork === "ARC-TESTNET"
@@ -1414,6 +1424,8 @@ async function init() {
     $("add-vendor").addEventListener("click", openVendorModal);
     $("close-vendor").addEventListener("click", closeVendorModal);
     $("vendor-form").addEventListener("submit", addVendor);
+    $("rail-open-policy").addEventListener("click", openPolicyModal);
+    $("rail-open-payments").addEventListener("click", () => openActivity("payments"));
     $("open-policy").addEventListener("click", openPolicyModal);
     $("open-policy-top").addEventListener("click", openPolicyModal);
     $("open-payments").addEventListener("click", () => openActivity("payments"));
