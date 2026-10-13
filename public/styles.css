@@ -1077,3 +1077,7 @@ nav { gap:4px; }
  .execution-body { padding:9px; }
 }
 @media (prefers-reduced-motion:reduce) { .invoice-row { transition:none; } }
+
+
+/* Business workspace navigation and shared footer */
+.nav-label-business{margin-top:22px}.nav[data-nav].active{background:#edf5e5;color:#244b18;box-shadow:inset 3px 0 0 #82b94b}.app-footer{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:28px;padding:20px 2px 8px;border-top:1px solid var(--line);color:var(--muted);font-size:11px}.app-footer b{color:var(--ink);font-weight:650}.app-footer i{font-style:normal;color:var(--muted-2);padding:0 5px}@media(max-width:760px){.app-footer{align-items:flex-start;flex-direction:column;gap:8px}}
