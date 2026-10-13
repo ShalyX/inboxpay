@@ -2,6 +2,7 @@ import { requireUser } from "../lib/supabase-server.mjs";
 import { listBusinessInvoices, syncBusinessInvoices } from "../lib/business-data.mjs";
 import { recoverPendingBusinessInvoices } from "../lib/business-payment.mjs";
 import { advanceDueSchedules, invoiceScheduleStates, scheduleBusinessInvoice } from "../lib/invoice-scheduling.mjs";
+import { classifyInvoiceRouteError } from "../lib/invoice-route-errors.mjs";
 
 export default async function handler(req, res) {
   if (!["GET", "PATCH", "POST"].includes(req.method)) {
@@ -88,9 +89,12 @@ export default async function handler(req, res) {
       invoices
     });
   } catch (error) {
-    console.error("InboxPay /api/invoices failed:", error);
-    const message = error instanceof Error ? error.message : "Invoice data unavailable";
-    const status = /Authentication required|Invalid or expired/i.test(message) ? 401 : 500;
-    return res.status(status).json({ error: message });
+    const failure = classifyInvoiceRouteError(error);
+    if (failure.log === "warning") {
+      console.warn("InboxPay /api/invoices requires Gmail reauthorization");
+    } else if (failure.log === "error") {
+      console.error("InboxPay /api/invoices failed:", error);
+    }
+    return res.status(failure.status).json(failure.body);
   }
 }
