@@ -967,3 +967,43 @@ nav { gap:4px; }
  .execution-divider { display:block; }
  .queue-list { max-height:440px; }
 }
+
+/* Option 2 reference fidelity: structured payment execution rail */
+.topbar-row { display:grid; grid-template-columns:minmax(0,1fr) minmax(230px,300px); align-items:center; }
+.page-heading h1 { font-size:25px; }
+.feed-card { width:100%; }
+.account-actions { margin-top:10px; }
+.business-context { background:#fff; border:1px solid var(--line); }
+.execution-rail { align-self:start; }
+.execution-rail > .panel-head { padding:13px 14px 11px; }
+.execution-rail > .panel-head h2 { font-size:13px; }
+.execution-body { display:flex; flex-direction:column; gap:12px; padding:10px; }
+.rail-card { min-width:0; padding:12px; border:1px solid var(--line); border-radius:8px; background:#fff; }
+.rail-card h3 { margin:0 0 10px; padding-bottom:9px; border-bottom:1px solid #edf1f6; color:#172033; font-size:12px; letter-spacing:-.02em; }
+.payment-flow { position:relative; display:flex; flex-direction:column; gap:0; margin:0; padding:0; list-style:none; }
+.payment-flow:before { position:absolute; top:15px; bottom:18px; left:13px; width:1px; background:#e4eaf2; content:""; }
+.payment-flow li { position:relative; display:grid; grid-template-columns:27px minmax(0,1fr); gap:10px; align-items:start; padding:2px 0 13px; }
+.payment-flow li:last-child { padding-bottom:0; }
+.payment-flow li > span { z-index:1; display:grid; place-items:center; width:27px; height:27px; border:1px solid #e7ecf3; border-radius:50%; background:#f2f5f9; color:#34445d; font-size:10px; font-weight:700; }
+.payment-flow li.flow-current > span { background:#eef8e6; border-color:#d7edc4; color:#2e7c2e; }
+.payment-flow li strong { display:block; padding-top:2px; font-size:10px; font-weight:650; }
+.payment-flow li small { display:block; margin-top:4px; color:var(--muted); font-size:9px; line-height:1.45; }
+.rail-card .execution-line { display:flex; justify-content:space-between; align-items:baseline; gap:10px; padding:8px 0; }
+.rail-card .execution-line:last-child { border-bottom:0; padding-bottom:0; }
+.rail-card .execution-line span { font-size:9px; }
+.rail-card .execution-line strong { text-align:right; overflow-wrap:anywhere; font-size:9px; }
+.execution-note { margin:0; font-size:9px; line-height:1.6; }
+.execution-link { margin-top:10px; padding:0; font-size:10px; color:#2563a6; }
+.rail-assurance { display:flex; gap:9px; padding:12px; border:1px solid #e1f0d8; border-radius:8px; background:#f8fcf4; }
+.assurance-mark { display:grid; place-items:center; flex:0 0 24px; width:24px; height:24px; border-radius:50%; background:#e3f6d7; color:#2c8b37; font-weight:800; }
+.rail-assurance strong { font-size:10px; }
+.rail-assurance p { margin:5px 0 0; color:var(--muted); font-size:9px; line-height:1.55; }
+@media (max-width:1280px) {
+ .topbar-row { grid-template-columns:minmax(0,1fr) minmax(220px,280px); }
+ .execution-body { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .payment-flow-card { grid-row:span 2; }
+}
+@media (max-width:800px) {
+ .topbar-row { display:flex; }
+ .execution-body { display:flex; }
+}
