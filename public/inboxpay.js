@@ -521,6 +521,8 @@ function invoicePaymentReady(invoice) {
 }
 
 function openBusinessModal() {
+  setDestination("business");
+  $("business-modal").classList.add("page-mode");
   $("business-name-input").value = state.business?.name || "";
   $("business-message").textContent = "";
   $("business-message").className = "auth-message";
@@ -530,6 +532,8 @@ function openBusinessModal() {
 
 function closeBusinessModal() {
   $("business-modal").hidden = true;
+  $("business-modal").classList.remove("page-mode");
+  setDestination("inbox");
   $("business-message").textContent = "";
 }
 
@@ -703,6 +707,8 @@ async function migratePolicyVault() {
 }
 
 async function openPolicyModal() {
+  setDestination("policy");
+  $("policy-modal").classList.add("page-mode");
   $("policy-modal").hidden = false;
   setPolicyMessage("Loading this business's policy…");
   await Promise.all([loadPolicyConfig(), loadPolicyStatus()]);
@@ -712,6 +718,8 @@ async function openPolicyModal() {
 
 function closePolicyModal() {
   $("policy-modal").hidden = true;
+  $("policy-modal").classList.remove("page-mode");
+  setDestination("inbox");
   setPolicyMessage("");
 }
 
@@ -1030,6 +1038,8 @@ function checkRowState(check) {
 
 function closeActivityModal() {
   $("activity-modal").hidden = true;
+  $("activity-modal").classList.remove("page-mode");
+  setDestination("inbox");
   $("activity-message").textContent = "";
 }
 
@@ -1060,6 +1070,8 @@ function renderActivity(kind, rows) {
 }
 
 async function openActivity(kind) {
+  setDestination(kind);
+  $("activity-modal").classList.add("page-mode");
   $("activity-modal").hidden = false;
   $("activity-kicker").textContent = kind === "payments" ? "SETTLEMENTS" : "AUDIT TRAIL";
   $("activity-title").textContent = kind === "payments" ? "Payments" : "Audit trail";
@@ -1090,6 +1102,8 @@ function toast(message) {
 }
 
 async function openVendorModal() {
+  setDestination("vendors");
+  $("vendor-modal").classList.add("page-mode");
   $("vendor-modal").hidden = false;
   $("vendor-name").focus();
   await loadVendors();
@@ -1212,6 +1226,8 @@ async function revokeVendor(id) {
 
 function closeVendorModal() {
   $("vendor-modal").hidden = true;
+  $("vendor-modal").classList.remove("page-mode");
+  setDestination("inbox");
 }
 
 async function addVendor(event) {
@@ -1431,6 +1447,12 @@ async function settle() {
   }
 }
 
+function setDestination(destination) {
+  document.querySelectorAll(".nav[data-nav]").forEach((item) => item.classList.toggle("active", item.dataset.nav === destination));
+  const footerNetwork = $("footer-network");
+  if (footerNetwork) footerNetwork.textContent = state.business?.wallet_blockchain === "ARC" ? "Arc Mainnet" : "Arc Testnet";
+}
+
 async function init() {
   try {
     const configResponse = await fetch("/api/config");
@@ -1470,7 +1492,8 @@ async function init() {
     $("policy-allowance").addEventListener("click", togglePolicyAllowance);
     $("copy-wallet").addEventListener("click", () => copyText(state.business.wallet_address, "Wallet address"));
     $("sign-out").addEventListener("click", async () => {
-      await state.supabase.auth.signOut();
+      const button = $("sign-out"); button.disabled = true; button.textContent = "Signing out…";
+      try { await state.supabase.auth.signOut(); } finally { button.disabled = false; button.textContent = "Sign out"; }
     });
     $("refresh").addEventListener("click", () => {
       toast("Syncing the business inbox…");
