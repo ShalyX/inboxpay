@@ -1007,3 +1007,73 @@ nav { gap:4px; }
  .topbar-row { display:flex; }
  .execution-body { display:flex; }
 }
+
+/* Final interface polish: hierarchy, scanning density, responsive behavior */
+.page-heading p { max-width:660px; }
+.stats .stat { position:relative; overflow:hidden; }
+.stats .stat:after { position:absolute; top:0; left:0; right:0; height:2px; background:#d7e7bd; content:""; }
+.stats .stat:nth-child(2):after { background:#f0d8a6; }
+.stats .stat:nth-child(3):after { background:#bde5cb; }
+.stats .stat:nth-child(4):after { background:#d6e1f2; }
+.queue .panel-head { background:linear-gradient(#fff,#fcfdff); }
+.queue-list { scrollbar-width:thin; scrollbar-color:#d5deea transparent; }
+.invoice-row { transition:background .15s ease,box-shadow .15s ease; }
+.invoice-row .row-title strong { color:#1b2a40; letter-spacing:-.015em; }
+.invoice-row .sub { color:#7c8ba1; }
+.invoice-row .amount { color:#24354c; font-weight:650; letter-spacing:-.025em; }
+.detail { overflow:hidden; }
+.detail-inner { padding:0 16px 16px; }
+.detail-top { margin:0 -16px; padding:15px 16px 13px; background:#fbfcfe; border-bottom:1px solid var(--line); }
+.detail-top h2 { font-size:16px; letter-spacing:-.035em; }
+.merchant { margin-top:16px; }
+.merchant strong { font-size:12px; letter-spacing:-.015em; }
+.merchant span { font-size:10px; color:#74839a; }
+.avatar.big { width:39px; height:39px; border-radius:10px; font-size:14px; }
+.big-amount { margin:16px 0 14px; font-size:29px; line-height:1; letter-spacing:-.06em; font-weight:750; font-variant-numeric:tabular-nums; }
+.big-amount span { font-size:12px; font-weight:600; letter-spacing:0; color:#7b8aa0; }
+.decision, .preflight { margin-top:12px; padding:12px; border:1px solid var(--line); border-radius:8px; background:#fff; }
+.decision { background:#fbfcfe; }
+.decision-head { margin-bottom:9px; font-size:10px; font-weight:750; color:#25364e; }
+.decision ul, .preflight ul { padding-left:16px; margin:0; }
+.decision li, .preflight li { margin:5px 0; color:#5f7088; font-size:10px; line-height:1.55; }
+.confidence { display:flex; justify-content:space-between; gap:10px; padding-top:8px; margin-top:8px; border-top:1px solid #e9eef5; font-size:9px; }
+.confidence span { color:#7b8aa0; }
+.confidence b { color:#33445c; font-weight:650; text-align:right; }
+.preflight { border-color:#e3ebd9; background:#f9fcf6; }
+.preflight .decision-head { color:#3d742d; }
+.checks { margin-top:12px; padding:3px 12px; border:1px solid var(--line); border-radius:8px; background:#fff; }
+.check-row { gap:8px; padding:9px 0; border-bottom:1px solid #eff2f7; }
+.check-row:last-child { border-bottom:0; }
+.check-row span { color:#74839a; font-size:9px; }
+.check-row b { max-width:56%; overflow-wrap:anywhere; text-align:right; font-size:9px; font-weight:650; }
+.check-row .check-ok { color:#228147; }
+.detail .pay { width:100%; min-height:42px; margin-top:13px; border-radius:8px; font-size:11px; box-shadow:0 3px 8px rgba(46,108,33,.12); }
+.detail .pay:disabled { box-shadow:none; }
+.settlement { margin-top:12px; padding:12px; border:1px solid #cfe9d5; border-radius:8px; background:#f5fbf6; }
+.settlement span { font-size:9px; color:#558065; }
+.settlement b { font-size:11px; color:#247c42; }
+.settlement small { display:block; margin:5px 0; font-size:9px; line-height:1.5; color:#5d7765; }
+.panel-head .meta { white-space:nowrap; }
+@media (min-width:1281px) {
+ .workspace { grid-template-columns:minmax(255px,1.03fr) minmax(330px,1.14fr) minmax(245px,.82fr); gap:12px; }
+ .queue-list { max-height:calc(100vh - 340px); }
+ .detail { align-self:start; }
+ .execution-rail { position:sticky; top:12px; }
+}
+@media (max-width:1120px) and (min-width:801px) {
+ .workspace { grid-template-columns:minmax(215px,.85fr) minmax(290px,1.15fr); }
+ .execution-rail { grid-column:1 / -1; position:static; }
+ .execution-body { grid-template-columns:repeat(2,minmax(0,1fr)); }
+ .payment-flow-card { grid-row:span 2; }
+ .queue-list { max-height:560px; }
+}
+@media (max-width:800px) {
+ .stats { gap:8px; }
+ .stats .stat { min-height:70px; padding:11px; }
+ .stats .stat strong { font-size:17px; }
+ .detail-inner { padding:0 12px 12px; }
+ .detail-top { margin:0 -12px; padding:13px 12px; }
+ .big-amount { font-size:26px; }
+ .execution-body { padding:9px; }
+}
+@media (prefers-reduced-motion:reduce) { .invoice-row { transition:none; } }
