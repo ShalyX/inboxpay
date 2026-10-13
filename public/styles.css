@@ -525,3 +525,10 @@ body { background:var(--canvas); }
   .decision, .preflight { padding: 12px; }
   .settlement { align-items: flex-start; flex-direction: column; gap: 6px; }
 }
+
+/* Settlement receipt actions */
+.settlement { flex-wrap: wrap; }
+.settlement small { width: 100%; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.settlement code { max-width: 100%; overflow-wrap: anywhere; color: var(--ink); font: 10px/1.5 var(--mono); }
+.settlement button { margin-top: 3px; border-color: #b8d2c2; color: var(--ok); background: transparent; }
+.settlement button:hover { background: var(--ok-soft); }
