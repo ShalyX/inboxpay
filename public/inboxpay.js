@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { inboxFailurePresentation, networkLabel, paymentFlowStep } from "./ui-state.mjs";
+import { inboxFailurePresentation, networkLabel, paymentFlowStep, singleFlight } from "./ui-state.mjs";
 
 const state = {
   supabase: null,
@@ -1275,16 +1275,29 @@ async function addVendor(event) {
   }
 }
 
-async function connectGmail() {
+async function startGmailConnection() {
+  const buttons = [$('connect-gmail'), $('empty-connect'), $('empty-reconnect')].filter(Boolean);
+  const labels = buttons.map((button) => button.textContent);
+  buttons.forEach((button) => {
+    button.disabled = true;
+    button.textContent = "Opening Google…";
+  });
+
   try {
     const response = await apiFetch("/api/gmail/start");
     const data = await readJsonResponse(response);
     if (!response.ok) throw new Error(data.error || "Unable to start Gmail connection");
     window.location.href = data.url;
   } catch (error) {
+    buttons.forEach((button, index) => {
+      button.disabled = false;
+      button.textContent = labels[index];
+    });
     toast(error.message);
   }
 }
+
+const connectGmail = singleFlight(startGmailConnection);
 
 async function load() {
   if (!state.gmail?.status || state.gmail.status !== "connected") {

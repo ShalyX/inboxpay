@@ -20,6 +20,18 @@ export function paymentFlowStep({ selected, preflight, preflightLoading = false 
   return 1;
 }
 
+export function singleFlight(action) {
+  let pending = null;
+  return (...args) => {
+    if (pending) return pending;
+    pending = Promise.resolve(action(...args))
+      .finally(() => {
+        pending = null;
+      });
+    return pending;
+  };
+}
+
 export function inboxFailurePresentation(message = "") {
   const authRevoked = /token has been expired or revoked|invalid_grant|gmail authorization must be renewed/i.test(message);
   if (authRevoked) {
