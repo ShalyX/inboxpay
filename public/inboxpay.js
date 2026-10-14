@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { inboxFailurePresentation, networkLabel, paymentFlowStep, singleFlight } from "./ui-state.mjs";
+import { activateDestination, inboxFailurePresentation, networkLabel, paymentFlowStep, singleFlight } from "./ui-state.mjs";
 
 const state = {
   supabase: null,
@@ -25,6 +25,8 @@ const state = {
 };
 
 let bootstrapPromise = null;
+let activeDestination = "inbox";
+let activityRequestId = 0;
 
 async function readJsonResponse(response) {
   const text = await response.text();
@@ -81,6 +83,7 @@ function status(decision) {
 }
 
 function showAuth() {
+  setDestination("inbox");
   $("auth-gate").hidden = false;
   $("app-shell").hidden = true;
 }
@@ -536,17 +539,13 @@ function invoicePaymentReady(invoice) {
 
 function openBusinessModal() {
   setDestination("business");
-  $("business-modal").classList.add("page-mode");
   $("business-name-input").value = state.business?.name || "";
   $("business-message").textContent = "";
   $("business-message").className = "auth-message";
-  $("business-modal").hidden = false;
   $("business-name-input").focus();
 }
 
 function closeBusinessModal() {
-  $("business-modal").hidden = true;
-  $("business-modal").classList.remove("page-mode");
   setDestination("inbox");
   $("business-message").textContent = "";
 }
@@ -722,8 +721,6 @@ async function migratePolicyVault() {
 
 async function openPolicyModal() {
   setDestination("policy");
-  $("policy-modal").classList.add("page-mode");
-  $("policy-modal").hidden = false;
   setPolicyMessage("Loading this business's policy…");
   await Promise.all([loadPolicyConfig(), loadPolicyStatus()]);
   renderPolicyModal();
@@ -731,8 +728,6 @@ async function openPolicyModal() {
 }
 
 function closePolicyModal() {
-  $("policy-modal").hidden = true;
-  $("policy-modal").classList.remove("page-mode");
   setDestination("inbox");
   setPolicyMessage("");
 }
@@ -1053,8 +1048,6 @@ function checkRowState(check) {
 }
 
 function closeActivityModal() {
-  $("activity-modal").hidden = true;
-  $("activity-modal").classList.remove("page-mode");
   setDestination("inbox");
   $("activity-message").textContent = "";
 }
@@ -1087,8 +1080,7 @@ function renderActivity(kind, rows) {
 
 async function openActivity(kind) {
   setDestination(kind);
-  $("activity-modal").classList.add("page-mode");
-  $("activity-modal").hidden = false;
+  const requestId = ++activityRequestId;
   $("activity-kicker").textContent = kind === "payments" ? "SETTLEMENTS" : "AUDIT TRAIL";
   $("activity-title").textContent = kind === "payments" ? "Payments" : "Audit trail";
   $("activity-context").textContent = kind === "payments"
@@ -1100,11 +1092,13 @@ async function openActivity(kind) {
   try {
     const response = await apiFetch("/api/activity?view=" + encodeURIComponent(kind));
     const data = await readJsonResponse(response);
+    if (requestId !== activityRequestId || activeDestination !== kind) return;
     if (!response.ok) throw new Error(data.error || "Activity unavailable");
     state.activity = { kind, rows: kind === "payments" ? (data.payments || []) : (data.events || []) };
     $("activity-message").textContent = "";
     renderActivity(kind, state.activity.rows);
   } catch (error) {
+    if (requestId !== activityRequestId || activeDestination !== kind) return;
     $("activity-message").textContent = error.message || "Activity unavailable";
     $("activity-message").className = "auth-message error";
   }
@@ -1119,8 +1113,6 @@ function toast(message) {
 
 async function openVendorModal() {
   setDestination("vendors");
-  $("vendor-modal").classList.add("page-mode");
-  $("vendor-modal").hidden = false;
   $("vendor-name").focus();
   await loadVendors();
 }
@@ -1241,8 +1233,6 @@ async function revokeVendor(id) {
 }
 
 function closeVendorModal() {
-  $("vendor-modal").hidden = true;
-  $("vendor-modal").classList.remove("page-mode");
   setDestination("inbox");
 }
 
@@ -1490,11 +1480,21 @@ async function settle() {
 }
 
 function setDestination(destination) {
-  document.querySelectorAll(".nav[data-nav]").forEach((item) => item.classList.toggle("active", item.dataset.nav === destination));
+  const activity = $("activity-modal");
+  activateDestination(destination, {
+    inbox: null,
+    payments: activity,
+    policy: $("policy-modal"),
+    audit: activity,
+    business: $("business-modal"),
+    vendors: $("vendor-modal")
+  }, document.querySelectorAll(".nav[data-nav]"), document.querySelector(".content"));
+  activeDestination = destination;
 }
 
 async function init() {
   try {
+    setDestination("inbox");
     const configResponse = await fetch("/api/config");
     const config = await readJsonResponse(configResponse);
     if (!configResponse.ok) throw new Error(config.error || "InboxPay configuration unavailable");
@@ -1512,6 +1512,7 @@ async function init() {
     $("close-business").addEventListener("click", closeBusinessModal);
     $("business-form").addEventListener("submit", saveBusinessName);
     $("nav-business").addEventListener("click", openBusinessModal);
+    document.querySelector('[data-nav="inbox"]').addEventListener("click", () => setDestination("inbox"));
     $("nav-vendors").addEventListener("click", openVendorModal);
     $("add-vendor").addEventListener("click", openVendorModal);
     $("close-vendor").addEventListener("click", closeVendorModal);

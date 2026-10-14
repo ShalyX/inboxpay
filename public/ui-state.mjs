@@ -32,6 +32,23 @@ export function singleFlight(action) {
   };
 }
 
+export function activateDestination(destination, sections, navItems, inboxContent) {
+  if (!(destination in sections)) throw new Error("Unknown workspace destination: " + destination);
+  const activeSection = sections[destination];
+  for (const section of new Set(Object.values(sections))) {
+    if (!section) continue;
+    section.hidden = section !== activeSection;
+    section.classList.toggle("page-mode", section === activeSection);
+  }
+  for (const item of navItems) {
+    const active = item.dataset.nav === destination;
+    item.classList.toggle("active", active);
+    if (active) item.setAttribute("aria-current", "page");
+    else item.removeAttribute("aria-current");
+  }
+  if (inboxContent) inboxContent.inert = destination !== "inbox";
+}
+
 export function inboxFailurePresentation(message = "") {
   const authRevoked = /token has been expired or revoked|invalid_grant|gmail authorization must be renewed/i.test(message);
   if (authRevoked) {

@@ -1087,7 +1087,7 @@ nav { gap:4px; }
 .app-footer i{font-style:normal;color:var(--muted-2);padding:0 5px}
 
 /* Destinations keep the product navigation in view; these are pages, not dialogs. */
-.vendor-modal.page-mode{position:fixed;inset:0 0 0 246px;z-index:50;display:block;overflow:auto;padding:34px clamp(22px,4vw,64px) 56px;background:var(--canvas);backdrop-filter:none}
+.vendor-modal.page-mode{position:fixed;inset:0 0 0 212px;z-index:50;display:block;overflow:auto;padding:34px clamp(22px,4vw,64px) 56px;background:var(--canvas);backdrop-filter:none}
 .vendor-modal.page-mode>.vendor-card{width:min(1120px,100%);max-width:none;max-height:none;overflow:visible;margin:0 auto;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none}
 .vendor-modal.page-mode .detail-top{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin:0 0 18px;padding:0 0 24px;border:0;border-bottom:1px solid var(--line);background:transparent}
 .vendor-modal.page-mode .detail-top label,.vendor-modal.page-mode .detail-top>div>label{display:inline-block;color:#718067;font:700 10px/1.2 var(--mono);letter-spacing:.14em}
@@ -1251,7 +1251,7 @@ nav { gap:4px; }
 .payment-flow li small,.execution-line span,.execution-note,.rail-assurance p{font-size:11px;line-height:1.5}
 .execution-link,.rail-assurance strong{font-size:12px}
 .rail-assurance{grid-column:1/-1;align-self:stretch;padding:16px}
-.vendor-modal.page-mode{left:220px}
+.vendor-modal.page-mode{left:212px}
 .vendor-modal.page-mode .policy-grid label>span,.vendor-modal.page-mode .policy-locks strong{font-size:13px}
 .vendor-modal.page-mode .policy-grid small,.vendor-modal.page-mode .policy-locks span{font-size:12px}
 .vendor-modal.page-mode .activity-row span,.vendor-modal.page-mode .vendor-row span{font-size:12px}

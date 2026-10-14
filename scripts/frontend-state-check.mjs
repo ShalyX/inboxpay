@@ -1,10 +1,52 @@
 import assert from "node:assert/strict";
 import {
+  activateDestination,
   inboxFailurePresentation,
   networkLabel,
   paymentFlowStep,
   singleFlight
 } from "../public/ui-state.mjs";
+
+function fakeElement(nav) {
+  const classes = new Set();
+  const attributes = new Map();
+  return {
+    dataset: nav ? { nav } : {},
+    hidden: true,
+    inert: false,
+    classList: {
+      contains: (name) => classes.has(name),
+      toggle: (name, active) => active ? classes.add(name) : classes.delete(name)
+    },
+    setAttribute: (name, value) => attributes.set(name, value),
+    removeAttribute: (name) => attributes.delete(name),
+    getAttribute: (name) => attributes.get(name)
+  };
+}
+
+const activitySection = fakeElement();
+const sections = {
+  inbox: null,
+  payments: activitySection,
+  policy: fakeElement(),
+  audit: activitySection,
+  business: fakeElement(),
+  vendors: fakeElement()
+};
+const navItems = Object.keys(sections).map(fakeElement);
+const inboxContent = fakeElement();
+for (const destination of Object.keys(sections)) {
+  activateDestination(destination, sections, navItems, inboxContent);
+  assert.deepEqual(
+    [...new Set(Object.values(sections))].filter((section) => section && !section.hidden),
+    sections[destination] ? [sections[destination]] : [],
+    `${destination} must be the only visible destination`
+  );
+  assert.equal(inboxContent.inert, destination !== "inbox");
+  assert.deepEqual(navItems.filter((item) => item.classList.contains("active")).map((item) => item.dataset.nav), [destination]);
+  assert.deepEqual(navItems.filter((item) => item.getAttribute("aria-current") === "page").map((item) => item.dataset.nav), [destination]);
+}
+assert.throws(() => activateDestination("missing", sections, navItems), /Unknown workspace destination/);
 
 assert.equal(networkLabel("ARC"), "Arc Mainnet");
 assert.equal(networkLabel("ARC-TESTNET"), "Arc Testnet");
