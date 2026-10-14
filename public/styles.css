@@ -1611,6 +1611,7 @@ body[data-network="ARC"] .environment-control>span{color:var(--danger)}
 .account-status[data-state="ready"]{border-color:#c8e2d1;color:var(--ok);background:var(--ok-soft)}
 .account-status[data-state="error"]{border-color:#e8c6c0;color:var(--danger);background:var(--danger-soft)}
 .wallet-summary{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:10px 12px;min-width:0;padding-top:12px;border-top:1px solid var(--line)}
+.account-copy>.wallet-summary{display:grid}
 .wallet-address-group{display:grid;gap:6px;min-width:0}
 .wallet-address-group{grid-column:1/-1}
 .wallet-address-group code{display:block;min-width:0;color:#25364e;font:600 10px/1.45 var(--mono);overflow-wrap:anywhere;word-break:break-all}
