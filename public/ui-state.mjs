@@ -20,6 +20,17 @@ export function paymentFlowStep({ selected, preflight, preflightLoading = false 
   return 1;
 }
 
+export function invoiceQueueCategory(invoice = {}, paymentReady = false) {
+  const settlement = invoice.settlement || {};
+  if (
+    settlement.status === "confirmed" ||
+    settlement.reconciled === true ||
+    settlement.onchainDuplicate === true
+  ) return "settled";
+  if (paymentReady) return "ready";
+  return "review";
+}
+
 export function singleFlight(action) {
   let pending = null;
   return (...args) => {

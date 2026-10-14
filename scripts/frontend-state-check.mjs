@@ -5,6 +5,7 @@ import {
   auditEventLabel,
   destinationFromHash,
   inboxFailurePresentation,
+  invoiceQueueCategory,
   networkLabel,
   paymentFlowStep,
   singleFlight
@@ -72,6 +73,11 @@ assert.equal(paymentFlowStep({ selected: { invoiceNumber: "INV-1" }, preflightLo
 assert.equal(paymentFlowStep({ selected: { invoiceNumber: "INV-1" }, preflight: { eligible: true } }), 3);
 assert.equal(paymentFlowStep({ selected: { invoiceNumber: "INV-1", settlement: { status: "processing" } } }), 4);
 assert.equal(paymentFlowStep({ selected: { invoiceNumber: "INV-1", settlement: { status: "confirmed" } } }), 4);
+
+assert.equal(invoiceQueueCategory({ settlement: { status: "confirmed" } }, false), "settled");
+assert.equal(invoiceQueueCategory({ settlement: { reconciled: true } }, false), "settled");
+assert.equal(invoiceQueueCategory({ invoiceNumber: "INV-1" }, true), "ready");
+assert.equal(invoiceQueueCategory({ invoiceNumber: "INV-1" }, false), "review");
 
 const configFailure = inboxFailurePresentation("INBOXPAY_TOKEN_ENCRYPTION_KEY must be a 32-byte hex key");
 assert.equal(configFailure.kind, "service");

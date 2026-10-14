@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { activateDestination, auditEventCategory, auditEventLabel, destinationFromHash, inboxFailurePresentation, networkLabel, paymentFlowStep, singleFlight } from "./ui-state.mjs";
+import { activateDestination, auditEventCategory, auditEventLabel, destinationFromHash, inboxFailurePresentation, invoiceQueueCategory, networkLabel, paymentFlowStep, singleFlight } from "./ui-state.mjs";
 
 const state = {
   supabase: null,
@@ -21,6 +21,7 @@ const state = {
   vendorRevocationSupported: null,
   preflight: null,
   preflightLoading: false,
+  queue: { filter: "all", query: "" },
   activity: { kind: null, rows: [], filter: "all", query: "" }
 };
 
@@ -377,30 +378,44 @@ function renderSetup() {
   const walletFunded = Number(state.wallet?.balance || 0) > 0;
   const testnetNeedsFunding = walletReady && state.business?.wallet_blockchain === "ARC-TESTNET" && !walletFunded;
   const policyReady = state.business?.policy_contract_status === "ready" && Boolean(state.business?.policy_contract_address);
+  const policyUnavailable = Boolean(state.policyStatusError);
+  const step = (label, stepState) => {
+    const icon = stepState === "done" ? "✓" : stepState === "error" ? "!" : "○";
+    return '<span class="setup-step ' + stepState + '"><i aria-hidden="true">' + icon + '</i>' + escapeHtml(label) + '</span>';
+  };
 
-  if (gmailReady && walletReady && policyReady) {
+  if (gmailReady && walletReady && policyReady && !policyUnavailable) {
     node.hidden = true;
     return;
   }
 
+  const setupTitle = policyUnavailable && walletReady
+    ? "Policy status needs attention"
+    : "Finish connecting your business";
+  const setupCopy = !walletReady
+    ? "Create the dedicated Circle wallet that will hold this business's USDC."
+    : !gmailReady
+      ? "Connect the Gmail inbox your business actually uses for invoices."
+      : testnetNeedsFunding
+        ? "Fund the Arc Testnet wallet so it can pay deployment gas."
+        : policyUnavailable
+          ? "InboxPay could not confirm the live policy vault. Review the policy status before taking any payment action."
+          : "Review and deploy the onchain policy guard before autonomous payments can run.";
+
   node.hidden = false;
   node.innerHTML =
-    '<div><label>SETUP</label><h3>Finish connecting your business</h3><p>' +
-    (!walletReady ? "Create the dedicated Circle wallet that will hold this business's USDC. " : "") +
-    (!gmailReady ? "Connect the Gmail inbox your business actually uses for invoices. " : "") +
-    (testnetNeedsFunding ? "Fund the Arc Testnet wallet so it can pay deployment gas. " : "") +
-    (!policyReady && walletReady && !testnetNeedsFunding ? "Deploy the onchain policy guard before autonomous payments can run. " : "") +
+    '<div class="setup-copy"><label>ACTIVATION CHECKLIST</label><h3>' + escapeHtml(setupTitle) + '</h3><p>' + escapeHtml(setupCopy) +
     '</p></div><div class="setup-status">' +
-    '<span class="' + (walletReady ? "done" : "") + '">✓ Dedicated Circle wallet</span>' +
+    step("Dedicated Circle wallet", walletReady ? "done" : "pending") +
     (!walletReady
       ? '<span>Selected environment · ' + (state.business?.wallet_blockchain === "ARC" ? "Arc Mainnet" : "Arc Testnet") + '</span><button id="provision-wallet" class="ghost">Create dedicated wallet</button>'
       : '') +
     (testnetNeedsFunding ? '<button id="fund-test-wallet" class="ghost">Fund test wallet</button>' : '') +
-    '<span class="' + (gmailReady ? "done" : "") + '">✓ Business Gmail</span>' +
-    '<span class="' + (policyReady ? "done" : "") + '">✓ Onchain payment policy</span>' +
-    (walletReady && !policyReady
+    step("Business Gmail", gmailReady ? "done" : "pending") +
+    step(policyUnavailable ? "Policy status unavailable" : "Onchain payment policy", policyUnavailable ? "error" : policyReady ? "done" : "pending") +
+    (walletReady && (policyUnavailable || !policyReady)
       ? '<button id="setup-policy" class="ghost"' + (testnetNeedsFunding || state.business?.policy_contract_status === "deploying" ? ' disabled' : '') + '>' +
-        (testnetNeedsFunding ? "Fund wallet first" : state.business?.policy_contract_status === "deploying" ? "Policy deployment running…" : "Review policy & deploy") + '</button>'
+        (testnetNeedsFunding ? "Fund wallet first" : state.business?.policy_contract_status === "deploying" ? "Policy deployment running…" : policyUnavailable ? "Review policy status" : "Review policy & deploy") + '</button>'
       : policyReady
         ? '<span class="setup-contract">Vault · ' + shortAddress(state.business.policy_contract_address) +
           (state.wallet?.policyVaultBalance != null ? " · Business wallet balance: " + Number(state.wallet.policyVaultBalance).toFixed(2) + " USDC" : "") +
@@ -410,7 +425,7 @@ function renderSetup() {
 
   if (!walletReady) $("provision-wallet").addEventListener("click", provisionWallet);
   if (testnetNeedsFunding) $("fund-test-wallet").addEventListener("click", fundTestWallet);
-  if (walletReady && !policyReady && !testnetNeedsFunding && state.business?.policy_contract_status !== "deploying") {
+  if (walletReady && (policyUnavailable || !policyReady) && !testnetNeedsFunding && state.business?.policy_contract_status !== "deploying") {
     $("setup-policy").addEventListener("click", openPolicyModal);
   }
 }
@@ -503,6 +518,7 @@ function resetNetworkState() {
   state.vendorRevocationSupported = null;
   state.preflight = null;
   state.preflightLoading = false;
+  state.queue = { filter: "all", query: "" };
   state.activity = { kind: null, rows: [], filter: "all", query: "" };
 }
 
@@ -755,10 +771,18 @@ async function migratePolicyVault() {
 
 async function openPolicyModal(options = {}) {
   setDestination("policy", options.updateUrl !== false);
+  const card = $("policy-modal").querySelector(".policy-card");
+  card.classList.add("is-loading");
+  card.setAttribute("aria-busy", "true");
   setPolicyMessage("Loading this business's policy…");
-  await Promise.all([loadPolicyConfig(), loadPolicyStatus()]);
-  renderPolicyModal();
-  setPolicyMessage(state.policyConfig ? "" : "Policy configuration is unavailable. Try again before deploying.", !state.policyConfig);
+  try {
+    await Promise.all([loadPolicyConfig(), loadPolicyStatus()]);
+    renderPolicyModal();
+    setPolicyMessage(state.policyConfig ? "" : "Policy configuration is unavailable. Try again before deploying.", !state.policyConfig);
+  } finally {
+    card.classList.remove("is-loading");
+    card.setAttribute("aria-busy", "false");
+  }
 }
 
 function closePolicyModal() {
@@ -925,6 +949,11 @@ function renderStats() {
     ["processing", "failed", "review"].includes(x.settlement?.status)
   ));
   const total = payable.reduce((sum, x) => sum + Number(x.amount || 0), 0);
+  const policyMetric = state.policyStatusError
+    ? ["Needs review", "Live status unavailable"]
+    : policyIsReady()
+      ? [state.onchainPolicy?.paused ? "Paused" : "Enforced", "onchain payment guard"]
+      : ["Setup required", "policy vault not active"];
   $("invoice-count").textContent = state.invoices.length;
   $("payment-count").textContent = settled.length;
   $("queue-count").textContent = state.invoices.length + (state.invoices.length === 1 ? " invoice" : " invoices");
@@ -932,19 +961,64 @@ function renderStats() {
     ["◎", "Ready to pay", total.toFixed(2) + " USDC", payable.length + " policy-eligible invoices"],
     ["◷", "Needs attention", String(held.length), "held or escalated"],
     ["✓", "Settled", String(settled.length), "reconciled on Arc"],
-    ["⌁", "Execution", state.business?.wallet_status === "ready" ? "Dedicated" : "Provisioning", "business wallet"]
+    ["⌁", "Policy guard", policyMetric[0], policyMetric[1]]
   ].map(([icon, label, value, meta]) =>
     '<div class="stat"><div class="stat-icon">' + icon + '</div><div><span>' + label +
     '</span><strong>' + value + '</strong><small>' + meta + '</small></div></div>'
   ).join("");
+  renderQueueControls();
+}
+
+function queueCategory(invoice) {
+  return invoiceQueueCategory(invoice, invoicePaymentReady(invoice));
+}
+
+function visibleQueueInvoices() {
+  const filter = state.queue.filter || "all";
+  const query = (state.queue.query || "").trim().toLowerCase();
+  return state.invoices.filter((invoice) => {
+    const filterMatch = filter === "all" || queueCategory(invoice) === filter;
+    if (!filterMatch || !query) return filterMatch;
+    return [invoice.vendor, invoice.invoiceNumber, invoice.dueDate, invoice.currency, invoice.agentDecision]
+      .some((value) => String(value || "").toLowerCase().includes(query));
+  });
+}
+
+function renderQueueControls() {
+  const node = $("queue-filters");
+  if (!node) return;
+  const counts = state.invoices.reduce((summary, invoice) => {
+    summary[queueCategory(invoice)] += 1;
+    return summary;
+  }, { ready: 0, review: 0, settled: 0 });
+  const filters = [
+    ["all", "All", state.invoices.length],
+    ["ready", "Ready", counts.ready],
+    ["review", "Review", counts.review],
+    ["settled", "Settled", counts.settled]
+  ];
+  node.innerHTML = filters.map(([value, label, count]) =>
+    '<button type="button" class="filter-button' + (state.queue.filter === value ? " active" : "") + '" data-queue-filter="' + value + '" aria-pressed="' + (state.queue.filter === value) + '"><span>' + label + '</span><b>' + count + '</b></button>'
+  ).join("");
+  $("queue-search").value = state.queue.query || "";
 }
 
 function renderList() {
+  renderQueueControls();
   if (!state.invoices.length) {
     $("invoice-list").innerHTML = '<div class="queue-list"><div class="empty queue-empty"><div class="empty-icon">✉</div><h3>No invoices found</h3><p>The live Gmail evaluation returned no invoice records for this business.</p></div></div>';
     return;
   }
-  $("invoice-list").innerHTML = '<div class="queue-list">' + state.invoices.map((invoice) => {
+  const visibleInvoices = visibleQueueInvoices();
+  if (!visibleInvoices.length) {
+    $("invoice-list").innerHTML = '<div class="queue-list"><div class="empty queue-empty compact"><div class="empty-icon">⌕</div><h3>No matching invoices</h3><p>Change the queue filter or search term to see more records.</p><button id="clear-queue-view" class="ghost" type="button">Clear filters</button></div></div>';
+    $("clear-queue-view").addEventListener("click", () => {
+      state.queue = { filter: "all", query: "" };
+      renderList();
+    });
+    return;
+  }
+  $("invoice-list").innerHTML = '<div class="queue-list">' + visibleInvoices.map((invoice) => {
     const selected = state.selected?.invoiceNumber === invoice.invoiceNumber ? " selected" : "";
     const displayDecision = state.preflightLoading && selected
       ? "CHECKING"
@@ -959,7 +1033,7 @@ function renderList() {
           : invoice.settlement?.status === "review"
             ? "REVIEW"
             : invoice.agentDecision;
-    return '<button class="invoice-row' + selected + '" data-invoice="' +
+    return '<button class="invoice-row' + selected + '" type="button" aria-current="' + (selected ? "true" : "false") + '" data-category="' + queueCategory(invoice) + '" data-invoice="' +
       encodeURIComponent(invoice.invoiceNumber) + '"><div class="avatar">' +
       escapeHtml((invoice.vendor || "V").slice(0, 1)) + '</div><div class="main"><div class="row-title"><strong>' +
       escapeHtml(invoice.vendor || "Unknown vendor") + '</strong>' + status(displayDecision) + '</div><span class="sub">' +
@@ -1167,6 +1241,16 @@ function renderActivity(kind, rows) {
   }).join("");
 }
 
+function renderActivityLoading(kind) {
+  $("activity-summary").innerHTML = Array.from({ length: 3 }, () =>
+    '<article class="page-metric skeleton-metric" aria-hidden="true"><span class="skeleton-line short"></span><span class="skeleton-line value"></span><span class="skeleton-line"></span></article>'
+  ).join("");
+  renderActivityControls(kind);
+  $("activity-list").innerHTML = Array.from({ length: 3 }, () =>
+    '<div class="skeleton-record" aria-hidden="true"><span class="skeleton-status"></span><div><span class="skeleton-line medium"></span><span class="skeleton-line"></span></div><span class="skeleton-line short"></span></div>'
+  ).join("");
+}
+
 async function openActivity(kind, options = {}) {
   setDestination(kind, options.updateUrl !== false);
   const requestId = ++activityRequestId;
@@ -1176,11 +1260,10 @@ async function openActivity(kind, options = {}) {
     ? "Every submitted, failed, processing, or reconciled payment for this business."
     : "Business-scoped evidence for policy, vendor, wallet, and settlement decisions.";
   $("activity-message").textContent = "Loading live activity…";
-  $("activity-message").className = "auth-message";
+  $("activity-message").className = "auth-message loading-message";
   state.activity = { kind, rows: [], filter: "all", query: "" };
-  renderActivitySummary(kind, []);
-  renderActivityControls(kind);
-  $("activity-list").innerHTML = "";
+  $("activity-list").setAttribute("aria-busy", "true");
+  renderActivityLoading(kind);
   try {
     const response = await apiFetch("/api/activity?view=" + encodeURIComponent(kind));
     const data = await readJsonResponse(response);
@@ -1188,9 +1271,13 @@ async function openActivity(kind, options = {}) {
     if (!response.ok) throw new Error(data.error || "Activity unavailable");
     state.activity = { kind, rows: kind === "payments" ? (data.payments || []) : (data.events || []), filter: "all", query: "" };
     $("activity-message").textContent = "";
+    $("activity-message").className = "auth-message";
+    $("activity-list").setAttribute("aria-busy", "false");
     renderActivity(kind, state.activity.rows);
   } catch (error) {
     if (requestId !== activityRequestId || activeDestination !== kind) return;
+    $("activity-list").setAttribute("aria-busy", "false");
+    $("activity-list").innerHTML = '<div class="activity-empty"><strong>Activity could not load</strong><span>Return to invoices or try this destination again.</span></div>';
     $("activity-message").textContent = error.message || "Activity unavailable";
     $("activity-message").className = "auth-message error";
   }
@@ -1389,8 +1476,29 @@ async function startGmailConnection() {
 
 const connectGmail = singleFlight(startGmailConnection);
 
+function renderInboxLoading() {
+  $("queue-count").textContent = "Syncing…";
+  $("stats").innerHTML = Array.from({ length: 4 }, () =>
+    '<div class="stat skeleton-stat" aria-hidden="true"><span class="skeleton-line short"></span><span class="skeleton-line value"></span><span class="skeleton-line"></span></div>'
+  ).join("");
+  $("invoice-list").innerHTML = '<div class="queue-list skeleton-list" aria-hidden="true">' + Array.from({ length: 4 }, () =>
+    '<div class="skeleton-invoice"><span class="skeleton-avatar"></span><div><span class="skeleton-line medium"></span><span class="skeleton-line"></span></div><span class="skeleton-line amount"></span></div>'
+  ).join("") + '</div>';
+  $("detail").innerHTML = '<div class="detail-inner detail-skeleton" aria-hidden="true"><span class="skeleton-line short"></span><span class="skeleton-line title"></span><div class="skeleton-merchant"></div><span class="skeleton-line amount"></span><div class="skeleton-block"></div><div class="skeleton-block tall"></div></div>';
+}
+
+function setInboxBusy(busy) {
+  const refresh = $("refresh");
+  refresh.disabled = busy;
+  refresh.textContent = busy ? "Syncing…" : "Refresh";
+  $("stats").setAttribute("aria-busy", String(busy));
+  $("invoice-list").setAttribute("aria-busy", String(busy));
+  document.body.classList.toggle("inbox-syncing", busy);
+}
+
 async function load() {
   if (!state.gmail?.status || state.gmail.status !== "connected") {
+    setInboxBusy(false);
     state.invoices = [];
     state.selected = null;
     state.preflight = null;
@@ -1402,7 +1510,8 @@ async function load() {
     return;
   }
 
-  $("refresh").disabled = true;
+  setInboxBusy(true);
+  if (!state.invoices.length) renderInboxLoading();
   try {
     const response = await apiFetch("/api/invoices");
     const data = await readJsonResponse(response);
@@ -1448,7 +1557,7 @@ async function load() {
     if (authRevoked) $("empty-reconnect").addEventListener("click", connectGmail);
     else $("empty-refresh").addEventListener("click", load);
   } finally {
-    $("refresh").disabled = false;
+    setInboxBusy(false);
   }
 }
 
@@ -1590,6 +1699,23 @@ function setDestination(destination, updateUrl = true) {
     vendors: $("vendor-modal")
   }, document.querySelectorAll(".nav[data-nav]"), document.querySelector(".content"));
   activeDestination = destination;
+  const titles = {
+    inbox: "Invoice queue",
+    payments: "Payments",
+    policy: "Payment policy",
+    audit: "Audit trail",
+    business: "Business profile",
+    vendors: "Vendor registry"
+  };
+  document.title = (titles[destination] || "InboxPay") + " — InboxPay";
+  if (window.matchMedia("(max-width: 800px)").matches) {
+    const activeNav = document.querySelector('.nav[data-nav="' + destination + '"]');
+    window.requestAnimationFrame(() => activeNav?.scrollIntoView({
+      behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+      block: "nearest",
+      inline: "center"
+    }));
+  }
   if (updateUrl && destinationFromHash(window.location.hash) !== destination) {
     const base = window.location.pathname + window.location.search;
     window.history.pushState({ destination }, "", destination === "inbox" ? base : base + "#" + destination);
@@ -1639,6 +1765,16 @@ async function init() {
     $("open-audit-top").addEventListener("click", () => openActivity("audit"));
     $("close-activity").addEventListener("click", closeActivityModal);
     $("close-policy").addEventListener("click", closePolicyModal);
+    $("queue-filters").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-queue-filter]");
+      if (!button) return;
+      state.queue.filter = button.dataset.queueFilter;
+      renderList();
+    });
+    $("queue-search").addEventListener("input", (event) => {
+      state.queue.query = event.currentTarget.value;
+      renderList();
+    });
     $("activity-filters").addEventListener("click", (event) => {
       const button = event.target.closest("[data-filter]");
       if (!button || !state.activity.kind) return;
@@ -1667,6 +1803,9 @@ async function init() {
       if (!state.session || !state.business) return;
       openDestination(destinationFromHash(window.location.hash), { updateUrl: false }).catch((error) => toast(error.message));
     });
+    window.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && activeDestination !== "inbox") setDestination("inbox");
+    });
 
     state.supabase.auth.onAuthStateChange((event, session) => {
       state.session = session;
@@ -1679,6 +1818,7 @@ async function init() {
         state.policyConfig = null;
         state.onchainPolicy = null;
         state.policyAllowance = false;
+        state.queue = { filter: "all", query: "" };
         showAuth();
         return;
       }

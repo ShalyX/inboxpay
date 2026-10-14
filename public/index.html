@@ -63,17 +63,17 @@
         <div class="nav-group">
           <div class="nav-label">Workspace</div>
           <nav aria-label="Primary navigation">
-            <button class="nav active" data-nav="inbox"><span class="nav-icon">I</span><span>Invoice queue</span><b id="invoice-count">0</b></button>
-            <button id="open-payments" class="nav" data-nav="payments"><span class="nav-icon">P</span><span>Payments</span><b id="payment-count">0</b></button>
-            <button id="open-policy" class="nav" data-nav="policy"><span class="nav-icon">G</span><span>Payment policy</span></button>
-            <button id="open-audit" class="nav" data-nav="audit"><span class="nav-icon">A</span><span>Audit trail</span></button>
+            <button class="nav active" data-nav="inbox" type="button"><span class="nav-icon">I</span><span>Invoice queue</span><b id="invoice-count">0</b></button>
+            <button id="open-payments" class="nav" data-nav="payments" type="button"><span class="nav-icon">P</span><span>Payments</span><b id="payment-count">0</b></button>
+            <button id="open-policy" class="nav" data-nav="policy" type="button"><span class="nav-icon">G</span><span>Payment policy</span></button>
+            <button id="open-audit" class="nav" data-nav="audit" type="button"><span class="nav-icon">A</span><span>Audit trail</span></button>
           </nav>
         </div>
         <div class="nav-group nav-group-business">
           <div class="nav-label">Business</div>
           <nav aria-label="Business settings">
-            <button id="nav-business" class="nav" data-nav="business"><span class="nav-icon">B</span><span>Business profile</span></button>
-            <button id="nav-vendors" class="nav" data-nav="vendors"><span class="nav-icon">V</span><span>Vendor registry</span></button>
+            <button id="nav-business" class="nav" data-nav="business" type="button"><span class="nav-icon">B</span><span>Business profile</span></button>
+            <button id="nav-vendors" class="nav" data-nav="vendors" type="button"><span class="nav-icon">V</span><span>Vendor registry</span></button>
           </nav>
         </div>
       </div>
@@ -115,13 +115,17 @@
         </div>
       </header>
 
-      <section id="stats" class="stats"></section>
-      <section id="setup-card" class="setup-card" hidden></section>
+      <section id="stats" class="stats" aria-live="polite"></section>
+      <section id="setup-card" class="setup-card" aria-live="polite" hidden></section>
 
       <div class="workspace">
         <section class="panel queue">
           <div class="panel-head"><div><label>LIVE QUEUE</label><h2>Invoices from Gmail</h2></div><span id="queue-count" class="meta">0 invoices</span></div>
-          <div id="invoice-list"></div>
+          <div class="queue-toolbar">
+            <div id="queue-filters" class="filter-group" role="group" aria-label="Filter invoice queue"></div>
+            <label class="queue-search" for="queue-search"><span>Search invoices</span><input id="queue-search" type="search" placeholder="Vendor or invoice"></label>
+          </div>
+          <div id="invoice-list" aria-live="polite"></div>
         </section>
         <section id="detail" class="panel detail">
           <div class="empty"><div class="empty-icon">✉</div><h3>Select an invoice</h3><p>The detail view shows the extraction, decision, and policy gates before money can move.</p></div>
@@ -233,7 +237,7 @@
         <div id="policy-message" class="auth-message" aria-live="polite"></div>
       </div>
     </div>
-    <div id="toast" class="toast" hidden></div>
+    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
     <div id="activity-modal" class="vendor-modal" hidden>
       <div class="vendor-card activity-card" role="region" aria-labelledby="activity-title">
         <div class="detail-top page-titlebar"><div><label id="activity-kicker">ACTIVITY</label><h2 id="activity-title">Payments</h2><p id="activity-context">A business-scoped view of real settlement state and receipts.</p></div><button id="close-activity" class="ghost" type="button">Back to invoices</button></div>
