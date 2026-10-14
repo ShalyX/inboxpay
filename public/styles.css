@@ -1077,3 +1077,95 @@ nav { gap:4px; }
  .execution-body { padding:9px; }
 }
 @media (prefers-reduced-motion:reduce) { .invoice-row { transition:none; } }
+
+
+/* InboxPay workspace destinations — cohesive page system */
+.nav-label-business{margin-top:24px}
+.nav[data-nav].active{background:#eaf2df;color:#2c4b1b;box-shadow:inset 3px 0 0 #a8d85a}
+.app-footer{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-top:28px;padding:20px 2px 8px;border-top:1px solid var(--line);color:var(--muted);font-size:11px}
+.app-footer b{color:var(--ink);font-weight:650}
+.app-footer i{font-style:normal;color:var(--muted-2);padding:0 5px}
+
+/* Destinations keep the product navigation in view; these are pages, not dialogs. */
+.vendor-modal.page-mode{position:fixed;inset:0 0 0 246px;z-index:50;display:block;overflow:auto;padding:34px clamp(22px,4vw,64px) 56px;background:var(--canvas);backdrop-filter:none}
+.vendor-modal.page-mode>.vendor-card{width:min(1120px,100%);max-width:none;max-height:none;overflow:visible;margin:0 auto;padding:0;border:0;border-radius:0;background:transparent;box-shadow:none}
+.vendor-modal.page-mode .detail-top{display:flex;align-items:flex-start;justify-content:space-between;gap:24px;margin:0 0 18px;padding:0 0 24px;border:0;border-bottom:1px solid var(--line);background:transparent}
+.vendor-modal.page-mode .detail-top label,.vendor-modal.page-mode .detail-top>div>label{display:inline-block;color:#718067;font:700 10px/1.2 var(--mono);letter-spacing:.14em}
+.vendor-modal.page-mode .detail-top h2{max-width:780px;margin:10px 0 0;font-size:clamp(30px,3.5vw,44px);line-height:1.04;letter-spacing:-.055em;font-weight:650}
+.vendor-modal.page-mode .detail-top .ghost{flex:0 0 auto;margin-top:4px;padding:10px 14px;border:1px solid var(--line-strong);border-radius:8px;background:var(--paper);font-size:11px}
+.vendor-modal.page-mode>.vendor-card>p{max-width:720px;margin:0 0 24px;color:var(--muted);font-size:13px;line-height:1.7}
+.vendor-modal.page-mode .vendor-card form{margin-top:0}
+.vendor-modal.page-mode .business-card form{max-width:700px;display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:10px;padding:24px;border:1px solid var(--line);border-radius:14px;background:var(--paper);box-shadow:0 8px 28px rgba(26,35,21,.035)}
+.vendor-modal.page-mode .business-card form>label{grid-column:1/-1;color:var(--muted);font-size:11px;font-weight:650}
+.vendor-modal.page-mode .business-card form input{min-height:46px}
+.vendor-modal.page-mode .business-card form .pay{min-height:46px;justify-self:stretch;margin:0;padding:0 18px;white-space:nowrap}
+.vendor-modal.page-mode #business-message{max-width:700px;margin-top:12px}
+.vendor-modal.page-mode .policy-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.vendor-modal.page-mode .policy-grid>label{min-height:172px;padding:20px;border:1px solid var(--line);border-radius:12px;background:var(--paper)}
+.vendor-modal.page-mode .policy-grid label>span{margin-bottom:18px;font-size:12px}
+.vendor-modal.page-mode .policy-grid small{margin-top:12px;font-size:10px;line-height:1.6}
+.vendor-modal.page-mode .money-input{padding:0 0 10px;border-bottom:1px solid var(--line-strong)}
+.vendor-modal.page-mode .money-input input{font-size:24px;font-weight:650;letter-spacing:-.04em}
+.vendor-modal.page-mode .money-input b{font-size:10px}
+.vendor-modal.page-mode .policy-locks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0 22px}
+.vendor-modal.page-mode .policy-locks>div{padding:16px;border:1px solid var(--line);border-radius:10px;background:#f8faf6}
+.vendor-modal.page-mode .policy-locks strong{font-size:12px}
+.vendor-modal.page-mode .policy-locks span{display:block;margin-top:6px;color:var(--muted);font-size:10px;line-height:1.6}
+.vendor-modal.page-mode #policy-submit{min-width:180px;min-height:44px;padding:0 18px}
+.vendor-modal.page-mode .policy-secondary,.vendor-modal.page-mode .policy-allowance{margin-top:14px;padding:16px;border:1px solid var(--line);border-radius:10px;background:var(--paper)}
+.vendor-modal.page-mode .activity-list{margin-top:20px;padding:0 22px;border:1px solid var(--line);border-radius:12px;background:var(--paper)}
+.vendor-modal.page-mode .activity-row{align-items:center;gap:24px;padding:18px 0;border-top-color:#edf0e9}
+.vendor-modal.page-mode .activity-row strong{font-size:13px;font-weight:650;letter-spacing:-.01em}
+.vendor-modal.page-mode .activity-row span{font-size:11px;line-height:1.5}
+.vendor-modal.page-mode .activity-value{min-width:190px}
+.vendor-modal.page-mode .activity-value b{font-size:12px}
+.vendor-modal.page-mode .activity-value a{font-size:10px}
+.vendor-modal.page-mode .activity-empty{padding:44px 12px;color:var(--muted);font-size:13px;text-align:center}
+.vendor-modal.page-mode .vendor-list{margin-top:26px;padding:0 22px;border:1px solid var(--line);border-radius:12px;background:var(--paper)}
+.vendor-modal.page-mode .vendor-row{padding:18px 0;border-top:1px solid #edf0e9}
+.vendor-modal.page-mode .vendor-row strong{font-size:13px}
+.vendor-modal.page-mode .vendor-row span{font-size:11px}
+.vendor-modal.page-mode #vendor-form{grid-template-columns:minmax(180px,.7fr) minmax(260px,1.3fr) auto;align-items:end;gap:10px;padding:22px;border:1px solid var(--line);border-radius:14px;background:var(--paper)}
+.vendor-modal.page-mode #vendor-form input{min-height:44px}
+.vendor-modal.page-mode #vendor-form .pay{min-height:44px;margin:0;padding:0 16px;white-space:nowrap}
+.vendor-modal.page-mode #vendor-message{margin-top:12px}
+.vendor-modal.page-mode .auth-message{font-size:12px}
+.vendor-modal.page-mode .policy-chain-state{margin:0 0 18px}
+@media(max-width:1000px){
+ .vendor-modal.page-mode{padding:28px 26px 44px}
+ .vendor-modal.page-mode #vendor-form{grid-template-columns:1fr 1fr}
+ .vendor-modal.page-mode #vendor-form .pay{grid-column:1/-1;justify-self:start}
+ .vendor-modal.page-mode .policy-grid{grid-template-columns:1fr}
+ .vendor-modal.page-mode .policy-grid>label{min-height:0}
+}
+@media(max-width:800px){
+ .app-footer{align-items:flex-start;flex-direction:column;gap:8px}
+ .vendor-modal.page-mode{inset:0;padding:18px 14px 28px}
+ .vendor-modal.page-mode>.vendor-card{width:100%;margin:0}
+ .vendor-modal.page-mode .detail-top{padding-bottom:18px;margin-bottom:18px}
+ .vendor-modal.page-mode .detail-top h2{font-size:30px}
+ .vendor-modal.page-mode .business-card form{grid-template-columns:1fr;padding:18px}
+ .vendor-modal.page-mode .business-card form>label{grid-column:auto}
+ .vendor-modal.page-mode .policy-locks{grid-template-columns:1fr}
+ .vendor-modal.page-mode #vendor-form{grid-template-columns:1fr;padding:16px}
+ .vendor-modal.page-mode #vendor-form .pay{grid-column:auto;justify-self:stretch}
+ .vendor-modal.page-mode .activity-list,.vendor-modal.page-mode .vendor-list{padding:0 14px}
+ .vendor-modal.page-mode .activity-row{align-items:flex-start;flex-direction:column;gap:10px}
+ .vendor-modal.page-mode .activity-value{min-width:0;text-align:left}
+}
+
+/* Live state and narrow-screen correctness */
+.payment-flow li.flow-complete > span{border-color:#cfe7bd;background:#eaf7df;color:#2e7c2e}
+.payment-flow li.flow-complete strong{color:#37672e}
+@media(max-width:800px){
+ .account-actions,.business-context,.account-copy{min-width:0;max-width:100%}
+ .business-context{width:100%;display:grid;grid-template-columns:minmax(0,1fr);align-items:stretch;overflow:hidden}
+ .environment-control{width:100%;min-width:0;border-right:0;border-bottom:1px solid var(--line);padding:12px 14px}
+ .account-copy{width:100%;padding:12px 14px;overflow:hidden}
+ .account-copy>div{min-width:0;flex-wrap:wrap}
+ .account-copy>span{display:block;max-width:100%;overflow-wrap:anywhere;word-break:break-all;white-space:normal;line-height:1.45}
+ .action-cluster{width:100%;display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+ .action-cluster .ghost{min-width:0;padding-inline:6px}
+ .utility-actions{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr) minmax(0,.8fr);padding-right:0}
+ .utility-actions .sign-out{justify-content:center;margin-left:0;padding:0 6px}
+}

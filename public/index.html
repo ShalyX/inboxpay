@@ -63,8 +63,13 @@
       <nav aria-label="Primary navigation">
         <button class="nav active" data-nav="inbox"><span class="nav-icon">I</span><span>Invoice queue</span><b id="invoice-count">0</b></button>
         <button id="open-payments" class="nav" data-nav="payments"><span class="nav-icon">P</span><span>Payments</span><b id="payment-count">0</b></button>
-        <button id="open-policy" class="nav"><span class="nav-icon">G</span><span>Guardrails</span></button>
+        <button id="open-policy" class="nav" data-nav="policy"><span class="nav-icon">G</span><span>Payment policy</span></button>
         <button id="open-audit" class="nav" data-nav="audit"><span class="nav-icon">A</span><span>Audit trail</span></button>
+      </nav>
+      <div class="nav-label nav-label-business">Business</div>
+      <nav aria-label="Business settings">
+        <button id="nav-business" class="nav" data-nav="business"><span class="nav-icon">B</span><span>Business profile</span></button>
+        <button id="nav-vendors" class="nav" data-nav="vendors"><span class="nav-icon">V</span><span>Vendor registry</span></button>
       </nav>
       <div class="sidebar-foot">
         <div class="rail-state"><i class="dot"></i><div><span>Settlement rail</span><strong id="network-label">Arc Mainnet</strong></div></div>
@@ -121,10 +126,10 @@
             <section class="rail-card payment-flow-card">
               <h3>Payment flow</h3>
               <ol class="payment-flow">
-                <li class="flow-current"><span>1</span><div><strong>Review invoice</strong><small>Inspect extracted details and evidence</small></div></li>
-                <li><span>2</span><div><strong>Run policy checks</strong><small>Verify recipient, limits and balance</small></div></li>
-                <li><span>3</span><div><strong>Confirm payment</strong><small>Execute only when eligible</small></div></li>
-                <li><span>4</span><div><strong>Track settlement</strong><small>Reconcile transaction and receipt</small></div></li>
+                <li data-flow-step="1"><span>1</span><div><strong>Review invoice</strong><small>Inspect extracted details and evidence</small></div></li>
+                <li data-flow-step="2"><span>2</span><div><strong>Run policy checks</strong><small>Verify recipient, limits and balance</small></div></li>
+                <li data-flow-step="3"><span>3</span><div><strong>Confirm payment</strong><small>Execute only when eligible</small></div></li>
+                <li data-flow-step="4"><span>4</span><div><strong>Track settlement</strong><small>Reconcile transaction and receipt</small></div></li>
               </ol>
             </section>
             <section class="rail-card">
@@ -144,6 +149,8 @@
           </div>
         </aside>
       </div>
+
+      <footer class="app-footer"><span>InboxPay <i>/</i> Bounded payment operations</span><span><b id="footer-network">Arc Testnet</b> <i>·</i> Business-scoped controls</span></footer>
 
       <section class="proof">
         <div class="proof-heading"><span>CONTROL SYSTEM</span><strong>Three independent layers before money moves</strong></div>

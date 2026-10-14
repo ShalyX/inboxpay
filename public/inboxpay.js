@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { inboxFailurePresentation, networkLabel, paymentFlowStep, singleFlight } from "./ui-state.mjs";
 
 const state = {
   supabase: null,
@@ -288,18 +289,31 @@ function renderExecutionRail() {
     : state.policyAllowance
       ? "Authorized"
       : "Not authorized";
+
+  const activeNetwork = state.business?.active_network || state.business?.wallet_blockchain || "ARC-TESTNET";
+  $("network-label-rail").textContent = networkLabel(activeNetwork);
+  renderPaymentFlow();
+}
+
+function renderPaymentFlow() {
+  const currentStep = paymentFlowStep(state);
+  document.querySelectorAll("[data-flow-step]").forEach((item) => {
+    const step = Number(item.dataset.flowStep);
+    item.classList.toggle("flow-current", currentStep === step);
+    item.classList.toggle("flow-complete", currentStep > step);
+    if (currentStep === step) item.setAttribute("aria-current", "step");
+    else item.removeAttribute("aria-current");
+  });
 }
 
 function renderAccount() {
   renderExecutionRail();
   $("business-name").textContent = state.business?.name || "Business";
   const activeNetwork = state.business?.active_network || state.business?.wallet_blockchain || "ARC-TESTNET";
-  const networkLabel = activeNetwork === "ARC-TESTNET"
-    ? "Arc Testnet"
-    : activeNetwork === "ARC"
-      ? "Arc Mainnet"
-      : "Arc";
-  $("network-label").textContent = networkLabel;
+  const activeNetworkLabel = networkLabel(activeNetwork);
+  $("network-label").textContent = activeNetworkLabel;
+  $("network-label-rail").textContent = activeNetworkLabel;
+  $("footer-network").textContent = activeNetworkLabel;
   document.body.dataset.network = activeNetwork;
   const networkSwitch = $("network-switch");
   const accounts = state.business?.network_accounts || [];
@@ -312,7 +326,7 @@ function renderAccount() {
   $("wallet-address").textContent = state.business?.wallet_address
     ? (state.business.wallet_blockchain || "Arc") + " · Circle wallet · " + state.business.wallet_address +
       (state.wallet ? " · " + Number(state.wallet.balance || 0).toFixed(2) + " USDC" : "")
-    : "No wallet in " + networkLabel;
+    : "No wallet in " + activeNetworkLabel;
   $("copy-wallet").hidden = !state.business?.wallet_address;
   $("connect-gmail").textContent = state.gmail?.status === "connected" ? "Gmail connected ✓" : "Connect Gmail";
   $("connect-gmail").disabled = state.gmail?.status === "connected";
@@ -521,6 +535,8 @@ function invoicePaymentReady(invoice) {
 }
 
 function openBusinessModal() {
+  setDestination("business");
+  $("business-modal").classList.add("page-mode");
   $("business-name-input").value = state.business?.name || "";
   $("business-message").textContent = "";
   $("business-message").className = "auth-message";
@@ -530,6 +546,8 @@ function openBusinessModal() {
 
 function closeBusinessModal() {
   $("business-modal").hidden = true;
+  $("business-modal").classList.remove("page-mode");
+  setDestination("inbox");
   $("business-message").textContent = "";
 }
 
@@ -703,6 +721,8 @@ async function migratePolicyVault() {
 }
 
 async function openPolicyModal() {
+  setDestination("policy");
+  $("policy-modal").classList.add("page-mode");
   $("policy-modal").hidden = false;
   setPolicyMessage("Loading this business's policy…");
   await Promise.all([loadPolicyConfig(), loadPolicyStatus()]);
@@ -712,6 +732,8 @@ async function openPolicyModal() {
 
 function closePolicyModal() {
   $("policy-modal").hidden = true;
+  $("policy-modal").classList.remove("page-mode");
+  setDestination("inbox");
   setPolicyMessage("");
 }
 
@@ -866,6 +888,7 @@ async function togglePolicyAllowance() {
 
 
 function renderStats() {
+  renderPaymentFlow();
   const settled = state.invoices.filter(invoiceSettled);
   const payable = state.invoices.filter(invoicePaymentReady);
   const held = state.invoices.filter((x) => !invoiceSettled(x) && (
@@ -931,6 +954,7 @@ function renderList() {
 
 function renderDetail() {
   const invoice = state.selected;
+  renderPaymentFlow();
   if (!invoice) return;
   const processing = invoice.settlement?.status === "processing";
   const reviewRequired = invoice.settlement?.status === "review";
@@ -1030,6 +1054,8 @@ function checkRowState(check) {
 
 function closeActivityModal() {
   $("activity-modal").hidden = true;
+  $("activity-modal").classList.remove("page-mode");
+  setDestination("inbox");
   $("activity-message").textContent = "";
 }
 
@@ -1060,6 +1086,8 @@ function renderActivity(kind, rows) {
 }
 
 async function openActivity(kind) {
+  setDestination(kind);
+  $("activity-modal").classList.add("page-mode");
   $("activity-modal").hidden = false;
   $("activity-kicker").textContent = kind === "payments" ? "SETTLEMENTS" : "AUDIT TRAIL";
   $("activity-title").textContent = kind === "payments" ? "Payments" : "Audit trail";
@@ -1090,6 +1118,8 @@ function toast(message) {
 }
 
 async function openVendorModal() {
+  setDestination("vendors");
+  $("vendor-modal").classList.add("page-mode");
   $("vendor-modal").hidden = false;
   $("vendor-name").focus();
   await loadVendors();
@@ -1212,6 +1242,8 @@ async function revokeVendor(id) {
 
 function closeVendorModal() {
   $("vendor-modal").hidden = true;
+  $("vendor-modal").classList.remove("page-mode");
+  setDestination("inbox");
 }
 
 async function addVendor(event) {
@@ -1243,16 +1275,29 @@ async function addVendor(event) {
   }
 }
 
-async function connectGmail() {
+async function startGmailConnection() {
+  const buttons = [$('connect-gmail'), $('empty-connect'), $('empty-reconnect')].filter(Boolean);
+  const labels = buttons.map((button) => button.textContent);
+  buttons.forEach((button) => {
+    button.disabled = true;
+    button.textContent = "Opening Google…";
+  });
+
   try {
     const response = await apiFetch("/api/gmail/start");
     const data = await readJsonResponse(response);
     if (!response.ok) throw new Error(data.error || "Unable to start Gmail connection");
     window.location.href = data.url;
   } catch (error) {
+    buttons.forEach((button, index) => {
+      button.disabled = false;
+      button.textContent = labels[index];
+    });
     toast(error.message);
   }
 }
+
+const connectGmail = singleFlight(startGmailConnection);
 
 async function load() {
   if (!state.gmail?.status || state.gmail.status !== "connected") {
@@ -1294,11 +1339,24 @@ async function load() {
     state.selected = null;
     state.preflight = null;
     state.preflightLoading = false;
-    $("feed-meta").textContent = "Source: live Gmail unavailable · Evaluation failed";
+    const failure = inboxFailurePresentation(error.message || "");
+    const authRevoked = failure.kind === "reauthorization";
+    if (authRevoked) {
+      state.gmail = { ...(state.gmail || {}), status: "reauthorization_required" };
+      $("connect-gmail").textContent = "Reconnect Gmail";
+      $("connect-gmail").disabled = false;
+      $("feed-dot").textContent = "○";
+    }
+    $("feed-label").textContent = failure.feedLabel;
+    $("feed-meta").textContent = failure.feedMeta;
     renderStats();
     renderList();
-    $("detail").innerHTML = '<div class="empty"><div class="empty-icon">!</div><h3>Live inbox unavailable</h3><p>' + escapeHtml(error.message || "Inbox evaluation failed") + '</p><button id="empty-refresh" class="pay">Retry inbox evaluation</button></div>';
-    $("empty-refresh").addEventListener("click", load);
+    const action = authRevoked
+      ? '<button id="empty-reconnect" class="pay">' + failure.actionLabel + '</button>'
+      : '<button id="empty-refresh" class="pay">' + failure.actionLabel + '</button>';
+    $("detail").innerHTML = '<div class="empty"><div class="empty-icon">!</div><h3>' + escapeHtml(failure.title) + '</h3><p>' + escapeHtml(failure.message) + '</p>' + action + '</div>';
+    if (authRevoked) $("empty-reconnect").addEventListener("click", connectGmail);
+    else $("empty-refresh").addEventListener("click", load);
   } finally {
     $("refresh").disabled = false;
   }
@@ -1431,6 +1489,10 @@ async function settle() {
   }
 }
 
+function setDestination(destination) {
+  document.querySelectorAll(".nav[data-nav]").forEach((item) => item.classList.toggle("active", item.dataset.nav === destination));
+}
+
 async function init() {
   try {
     const configResponse = await fetch("/api/config");
@@ -1449,6 +1511,8 @@ async function init() {
     $("edit-business").addEventListener("click", openBusinessModal);
     $("close-business").addEventListener("click", closeBusinessModal);
     $("business-form").addEventListener("submit", saveBusinessName);
+    $("nav-business").addEventListener("click", openBusinessModal);
+    $("nav-vendors").addEventListener("click", openVendorModal);
     $("add-vendor").addEventListener("click", openVendorModal);
     $("close-vendor").addEventListener("click", closeVendorModal);
     $("vendor-form").addEventListener("submit", addVendor);
@@ -1468,7 +1532,8 @@ async function init() {
     $("policy-allowance").addEventListener("click", togglePolicyAllowance);
     $("copy-wallet").addEventListener("click", () => copyText(state.business.wallet_address, "Wallet address"));
     $("sign-out").addEventListener("click", async () => {
-      await state.supabase.auth.signOut();
+      const button = $("sign-out"); button.disabled = true; button.textContent = "Signing out…";
+      try { await state.supabase.auth.signOut(); } finally { button.disabled = false; button.textContent = "Sign out"; }
     });
     $("refresh").addEventListener("click", () => {
       toast("Syncing the business inbox…");
