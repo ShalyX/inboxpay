@@ -91,27 +91,33 @@
             <h1>Invoice queue</h1>
             <p>Review what the agent found, inspect every gate, and act only when the evidence is complete.</p>
           </div>
-          <div class="feed-card">
-            <div class="feed-state"><span id="feed-dot">●</span><strong id="feed-label">delegated finance operator</strong></div>
-            <div id="feed-meta" class="feed-meta" aria-live="polite">Invoice source: waiting for live Gmail evaluation</div>
-          </div>
         </div>
         <div class="account-actions">
-          <div class="business-context">
-            <label class="environment-control" for="network-switch"><span>Environment</span><select id="network-switch" aria-label="Active settlement environment"><option value="ARC-TESTNET">Arc Testnet</option><option value="ARC">Arc Mainnet</option></select></label>
-            <div class="account-copy"><div><strong id="business-name">Business</strong><button id="edit-business" class="text-action" type="button">Edit</button></div><span id="wallet-address">Wallet provisioning…</span><button id="copy-wallet" class="text-action" type="button" hidden>Copy full address</button></div>
-          </div>
+          <label class="environment-control" for="network-switch"><span>Settlement environment</span><select id="network-switch" aria-label="Active settlement environment" aria-describedby="network-context-note"><option value="ARC-TESTNET">Arc Testnet</option><option value="ARC">Arc Mainnet</option></select><small id="network-context-note">Separate business account</small></label>
+          <section class="business-context" aria-label="Business wallet">
+            <div class="account-copy">
+              <div class="account-heading"><div><span class="account-kicker">BUSINESS ACCOUNT</span><div class="business-name-row"><strong id="business-name">Business</strong><button id="edit-business" class="text-action" type="button">Edit</button></div></div><span id="wallet-status" class="account-status" aria-live="polite">Checking wallet</span></div>
+              <div class="wallet-summary"><div class="wallet-address-group"><span id="wallet-network" class="wallet-label">Circle wallet</span><code id="wallet-address">Wallet provisioning…</code></div><button id="copy-wallet" class="copy-wallet-button" type="button" hidden>Copy full address</button><div class="wallet-balance"><span>USDC balance</span><strong id="wallet-balance">—</strong></div></div>
+            </div>
+          </section>
           <div class="action-cluster" aria-label="Business controls">
             <button id="open-payments-top" class="ghost" type="button">Payments</button>
             <button id="open-audit-top" class="ghost" type="button">Audit</button>
             <button id="open-policy-top" class="ghost">Policy</button>
             <button id="add-vendor" class="ghost">Vendors</button>
           </div>
-          <div class="action-cluster utility-actions">
-            <button id="connect-gmail" class="ghost">Connect Gmail</button>
-            <button id="refresh" class="ghost refresh-action">Refresh</button>
-            <button id="sign-out" class="text-action sign-out">Sign out</button>
-          </div>
+          <section class="gmail-context" aria-label="Business inbox">
+            <div class="context-label">INVOICE SOURCE</div>
+            <div class="feed-card" aria-live="polite">
+              <div class="feed-state" id="feed-state" data-state="loading"><span id="feed-dot" aria-hidden="true">○</span><strong id="feed-label">Checking Gmail connection</strong></div>
+              <div id="feed-meta" class="feed-meta">Waiting for live Gmail evaluation</div>
+            </div>
+            <div class="utility-actions" aria-label="Inbox controls">
+              <button id="connect-gmail" class="ghost">Connect Gmail</button>
+              <button id="refresh" class="ghost refresh-action">Refresh inbox</button>
+              <button id="sign-out" class="text-action sign-out">Sign out</button>
+            </div>
+          </section>
         </div>
       </header>
 

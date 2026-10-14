@@ -108,8 +108,8 @@ export function inboxFailurePresentation(message = "") {
       title: "Reconnect your business inbox",
       message: "Google no longer accepts the saved Gmail authorization. Reconnect the account to continue evaluating invoices. Your wallet and payment policy are unchanged.",
       actionLabel: "Reconnect Gmail",
-      feedLabel: "Gmail authorization needed",
-      feedMeta: "Source: Gmail authorization expired · Reconnect to resume evaluation"
+      feedLabel: "Reconnect required",
+      feedMeta: "Google access expired · reconnect to resume invoice evaluation"
     };
   }
 
@@ -118,7 +118,7 @@ export function inboxFailurePresentation(message = "") {
     title: "Live inbox temporarily unavailable",
     message: "InboxPay could not securely read this Gmail connection. Retry in a moment. If the problem continues, the inbox integration needs operator attention.",
     actionLabel: "Retry inbox evaluation",
-    feedLabel: "Live Gmail operator",
-    feedMeta: "Source: live Gmail unavailable · Evaluation failed"
+    feedLabel: "Live inbox unavailable",
+    feedMeta: "Invoice evaluation failed · retry in a moment"
   };
 }

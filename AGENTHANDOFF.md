@@ -916,6 +916,19 @@ The production release reached `READY` as deployment `dpl_dxLGBuyYmJ1Bpy16ZPA5n7
 
 Local JavaScript syntax checks, `git diff --check`, `npm run test:frontend`, `npm run test:local`, `npm run test:networks`, `npm run test:profile`, `npm run test:gmail-parser`, `npm run test:scheduling`, `npm run test:preflight`, `npm run test:recovery`, `npm run test:idempotency`, `npm run test:migration`, and `npm run test:invoice-route` pass.
 
+### P1 — Operator context header structure (implementation complete; production QA pending)
+
+The production header audit found that environment selection, business identity, the full Circle wallet address and balance, Gmail evaluation state, and account actions were crowded into two misaligned rows. The next UI release reorganizes them as separate environment, business-wallet, and Gmail panels. The wallet address remains fully visible and copyable, while balance and wallet readiness each have their own label. Gmail now reports live evaluation count and time in plain language and distinguishes connected, reconnect-required, and service-error states. At narrow widths the panels stack intentionally; at tablet widths the wallet gets its own full-width row.
+
+Verification before release: `npm run test:frontend`, `npm run test:local`, `npm run test:networks`, `npm run test:profile`, `npm run test:gmail-parser`, `npm run test:scheduling`, `npm run test:preflight`, `npm run test:recovery`, `npm run test:idempotency`, `npm run test:migration`, `npm run test:invoice-route`, both frontend JavaScript syntax checks, and `git diff --check` pass. Production visual verification is still pending.
+
+Remaining UI worklist after this pass:
+- Replace native confirmation/prompt dialogs for payment, policy, vendor, and scheduling actions with accessible InboxPay dialogs that preserve every existing explicit authorization gate.
+- Make invoice work the first visible priority on mobile when setup is incomplete.
+- Replace letter-based navigation marks with a consistent, accessible icon set.
+- Improve empty activity and recovery states, then consolidate the accumulated CSS overrides.
+- Extend visual QA across keyboard-only operation, tablet widths, and high-contrast settings.
+
 ### P1 — Final submission hygiene
 Before hackathon submission:
 - verify public repo

@@ -8,7 +8,6 @@ const state = {
   business: null,
   invoices: [],
   selected: null,
-  feedSource: "gmail-live",
   gmail: null,
   wallet: null,
   policy: null,
@@ -331,15 +330,33 @@ function renderAccount() {
     option.textContent = label + " · " + (account?.wallet_status === "ready" ? "Ready" : "Set up");
   }
   networkSwitch.value = activeNetwork;
-  $("wallet-address").textContent = state.business?.wallet_address
-    ? (state.business.wallet_blockchain || "Arc") + " · Circle wallet · " + state.business.wallet_address +
-      (state.wallet ? " · " + Number(state.wallet.balance || 0).toFixed(2) + " USDC" : "")
-    : "No wallet in " + activeNetworkLabel;
-  $("copy-wallet").hidden = !state.business?.wallet_address;
-  $("connect-gmail").textContent = state.gmail?.status === "connected" ? "Gmail connected ✓" : "Connect Gmail";
-  $("connect-gmail").disabled = state.gmail?.status === "connected";
-  $("feed-label").textContent = state.gmail?.status === "connected" ? "live Gmail operator" : "connect Gmail";
-  $("feed-dot").textContent = state.gmail?.status === "connected" ? "●" : "○";
+  const walletAddress = state.business?.wallet_address;
+  const walletStatus = state.business?.wallet_status;
+  const walletReady = walletStatus === "ready" && Boolean(walletAddress);
+  const walletStatusLabel = walletReady
+    ? "Circle wallet ready"
+    : walletStatus === "provisioning" || walletStatus === "creating"
+      ? "Wallet provisioning"
+      : walletStatus === "error" || walletStatus === "failed"
+        ? "Wallet needs attention"
+        : "Wallet not provisioned";
+  $("wallet-address").textContent = walletAddress || "No wallet provisioned for this environment";
+  $("wallet-address").classList.toggle("is-unavailable", !walletAddress);
+  $("wallet-network").textContent = (state.business?.wallet_blockchain || activeNetwork) + " · Circle wallet";
+  $("wallet-status").textContent = walletStatusLabel;
+  $("wallet-status").dataset.state = walletReady ? "ready" : walletStatus === "error" || walletStatus === "failed" ? "error" : "pending";
+  $("wallet-balance").textContent = state.wallet?.balance != null && Number.isFinite(Number(state.wallet.balance))
+    ? Number(state.wallet.balance).toFixed(2) + " USDC"
+    : "Unavailable";
+  $("copy-wallet").hidden = !walletAddress;
+  const gmailConnected = state.gmail?.status === "connected";
+  const gmailNeedsReconnect = state.gmail?.status === "reauthorization_required";
+  $("connect-gmail").textContent = gmailNeedsReconnect ? "Reconnect Gmail" : "Connect Gmail";
+  $("connect-gmail").hidden = gmailConnected;
+  $("connect-gmail").disabled = false;
+  $("feed-label").textContent = gmailConnected ? "Gmail connected" : gmailNeedsReconnect ? "Reconnect required" : "Connect business Gmail";
+  $("feed-state").dataset.state = gmailConnected ? "connected" : gmailNeedsReconnect ? "reauthorization" : "disconnected";
+  $("feed-dot").textContent = gmailConnected ? "●" : "○";
   renderBusinessPage();
 }
 
@@ -1490,7 +1507,7 @@ function renderInboxLoading() {
 function setInboxBusy(busy) {
   const refresh = $("refresh");
   refresh.disabled = busy;
-  refresh.textContent = busy ? "Syncing…" : "Refresh";
+  refresh.textContent = busy ? "Refreshing…" : "Refresh inbox";
   $("stats").setAttribute("aria-busy", String(busy));
   $("invoice-list").setAttribute("aria-busy", String(busy));
   document.body.classList.toggle("inbox-syncing", busy);
@@ -1517,13 +1534,16 @@ async function load() {
     const data = await readJsonResponse(response);
     if (!response.ok) throw new Error(data.error || "Invoice data unavailable");
     state.invoices = data.invoices || [];
-    state.feedSource = data.source || "unknown";
     state.liveGmail = data.liveGmail === true;
     state.evaluatedAt = data.evaluatedAt || null;
-    const evaluatedLabel = state.evaluatedAt ? new Date(state.evaluatedAt).toLocaleString() : "not recorded";
+    const evaluatedLabel = state.evaluatedAt
+      ? new Date(state.evaluatedAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })
+      : "time unavailable";
+    $("feed-state").dataset.state = state.liveGmail ? "connected" : "warning";
+    $("feed-label").textContent = state.liveGmail ? "Live Gmail evaluated" : "Live Gmail read unavailable";
     $("feed-meta").textContent = state.liveGmail
-      ? "Source: " + state.feedSource + " · Live Gmail: yes · Evaluated: " + evaluatedLabel + " · " + state.invoices.length + " invoices"
-      : "Source: " + state.feedSource + " · Live Gmail: no";
+      ? state.invoices.length + " invoice" + (state.invoices.length === 1 ? "" : "s") + " · evaluated " + evaluatedLabel
+      : "Inbox is connected, but this evaluation did not include a live Gmail read.";
     state.selected = state.selected
       ? state.invoices.find((x) => x.invoiceNumber === state.selected.invoiceNumber) || null
       : state.invoices[0] || null;
@@ -1544,10 +1564,12 @@ async function load() {
       state.gmail = { ...(state.gmail || {}), status: "reauthorization_required" };
       $("connect-gmail").textContent = "Reconnect Gmail";
       $("connect-gmail").disabled = false;
+      $("connect-gmail").hidden = false;
       $("feed-dot").textContent = "○";
     }
     $("feed-label").textContent = failure.feedLabel;
     $("feed-meta").textContent = failure.feedMeta;
+    $("feed-state").dataset.state = authRevoked ? "reauthorization" : "error";
     renderStats();
     renderList();
     const action = authRevoked
