@@ -908,6 +908,14 @@ Feature commit `46dcaf8` was pushed to `main` and reached `READY` as Production 
 
 Local JavaScript syntax checks, `git diff --check`, `npm run test:frontend`, `npm run test:local`, `npm run test:networks`, `npm run test:profile`, `npm run test:gmail-parser`, `npm run test:scheduling`, `npm run test:preflight`, `npm run test:recovery`, `npm run test:idempotency`, `npm run test:migration`, and `npm run test:invoice-route` pass.
 
+### P1 — Invoice workspace product polish (deployed and production-verified)
+
+Commits `bc3056e`, `e8e736c`, and `17e313e` complete the next frontend polish slice without changing any wallet, policy, vendor, invoice, payment, or reconciliation API contract. The invoice queue now has payment-state filters, search, accurate counts, clear selected-row semantics, and a dedicated no-results recovery action. Initial inbox and activity reads use accessible skeleton states rather than briefly presenting false zero balances or empty records. The activation checklist now distinguishes completed, pending, and unavailable policy state instead of displaying a checkmark for every step, and a policy-status failure directs the operator to review rather than implying a fresh deployment is safe. Policy controls are inert while their live state is loading. Destination titles, Escape-to-inbox behavior, touch/keyboard states, and toast announcements are also consistent.
+
+The production release reached `READY` as deployment `dpl_dxLGBuyYmJ1Bpy16ZPA5n71JRpaT`, and `https://tameion-ap-agent-live.vercel.app` serves it. Authenticated production QA loaded Caraxes Labs on Arc Mainnet with its dedicated wallet, connected Gmail, and two real invoice rows. Queue filtering plus search returned the intended Acme record, activity loading rendered skeletons before the real empty state, and the policy page completed its live read with controls unlocked and zero internal horizontal overflow. Exact `390×844` QA confirms a scrollable one-line metrics summary, compact three-step activation checklist with its CTA visible, centered/scrollable destination navigation, readable invoice amounts, and no document- or queue-level horizontal overflow. Browser warnings/errors are empty. No wallet, policy, allowance, vendor, network, scheduling, or payment write was performed during this release verification.
+
+Local JavaScript syntax checks, `git diff --check`, `npm run test:frontend`, `npm run test:local`, `npm run test:networks`, `npm run test:profile`, `npm run test:gmail-parser`, `npm run test:scheduling`, `npm run test:preflight`, `npm run test:recovery`, `npm run test:idempotency`, `npm run test:migration`, and `npm run test:invoice-route` pass.
+
 ### P1 — Final submission hygiene
 Before hackathon submission:
 - verify public repo
