@@ -1169,3 +1169,141 @@ nav { gap:4px; }
  .utility-actions{grid-template-columns:minmax(0,1.35fr) minmax(0,1fr) minmax(0,.8fr);padding-right:0}
  .utility-actions .sign-out{justify-content:center;margin-left:0;padding:0 6px}
 }
+
+/* Production UI pass: readable operations, predictable controls, fewer duplicates. */
+.shell{grid-template-columns:220px minmax(0,1fr)}
+.sidebar{padding:24px 16px 18px}
+.sidebar .brand{padding-bottom:30px}
+.brand strong{font-size:18px}
+.brand span{font-size:11px}
+.nav-label{font-size:10px}
+.nav{min-height:44px;gap:10px;padding:10px 11px;font-size:13px;line-height:1.25}
+.nav-icon{font-size:11px}
+.nav b{font-size:10px}
+.rail-state span,.sidebar-foot small{font-size:11px}
+.rail-state strong{font-size:13px}
+.content{padding:26px clamp(18px,2.25vw,36px) 40px}
+.topbar{padding-bottom:18px}
+.page-heading h1{font-size:clamp(28px,2.45vw,38px)}
+.page-heading p{font-size:13px;line-height:1.55}
+.feed-card{padding:12px 14px}
+.feed-state strong{font-size:11px}
+.feed-meta{font:11px/1.45 var(--font)}
+.account-actions{gap:10px;margin-top:16px}
+.business-context{min-height:58px}
+.environment-control{min-width:150px;padding:10px 13px}
+.environment-control>span{font-size:10px}
+.environment-control select{font-size:13px}
+.account-copy{padding:10px 14px}
+.account-copy strong{font-size:13px}
+.account-copy>span{font-size:11px;line-height:1.4}
+.text-action{min-height:28px;font-size:11px}
+.account-actions>.action-cluster:not(.utility-actions){display:none}
+.utility-actions{flex:0 0 auto;padding-right:8px}
+.utility-actions .ghost{min-height:42px;padding:10px 13px;font-size:12px}
+.utility-actions .sign-out{padding:8px 10px}
+.ghost{min-height:42px;padding:10px 13px;font-size:12px}
+.pay{min-height:44px;font-size:13px}
+.stats{gap:12px;margin:16px 0}
+.stat{min-height:92px;padding:16px 18px}
+.stat span{font-size:11px}
+.stat strong{font-size:24px;line-height:1.15}
+.stat small{font-size:11px;line-height:1.4;white-space:normal}
+.workspace{grid-template-columns:minmax(275px,.86fr) minmax(390px,1.14fr);gap:14px}
+.panel{border-radius:12px}
+.panel-head{min-height:70px;padding:16px 18px}
+.panel-head label,.detail-top label{font-size:10px;line-height:1.2}
+.panel-head h2{font-size:17px}
+.meta{font-size:11px}
+.queue-list{max-height:680px;min-height:270px;padding:7px}
+.invoice-row{min-height:70px;grid-template-columns:38px minmax(0,1fr) auto;gap:11px;padding:12px 10px}
+.invoice-row .avatar{width:38px;height:38px;font-size:12px}
+.invoice-row .row-title{gap:7px}
+.invoice-row .row-title strong{font-size:13px;line-height:1.25}
+.invoice-row .sub{margin-top:5px;font:11px/1.4 var(--font)}
+.invoice-row .amount{display:block;font-size:12px}
+.invoice-row .chev{display:none}
+.status{min-height:21px;padding:4px 7px;font-size:9px}
+.detail-inner{padding:0 20px 20px}
+.detail-top{margin:0 -20px;padding:18px 20px}
+.detail-top h2{font-size:21px}
+.merchant{margin-top:18px}
+.merchant strong{font-size:14px}
+.merchant span{font-size:12px;line-height:1.4}
+.big-amount{margin:20px 0;font-size:34px}
+.big-amount span{font-size:13px}
+.decision,.preflight{padding:16px}
+.decision-head{font-size:11px;line-height:1.35}
+.decision p,.decision li,.preflight li{font-size:13px;line-height:1.55}
+.confidence{font-size:11px;line-height:1.45}
+.checks{padding:4px 14px}
+.check-row{min-height:42px;padding:10px 0}
+.check-row span,.check-row b{font-size:11px;line-height:1.4}
+.detail .pay{min-height:46px;font-size:13px}
+.settlement span,.settlement small{font-size:11px}
+.settlement b{font-size:12px}
+.execution-rail{grid-column:1/-1;position:static}
+.execution-rail>.panel-head h2{font-size:17px}
+.execution-body{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:start;gap:12px;padding:14px}
+.rail-card{padding:16px}
+.rail-card h3{font-size:14px}
+.payment-flow li strong,.execution-line strong{font-size:12px}
+.payment-flow li small,.execution-line span,.execution-note,.rail-assurance p{font-size:11px;line-height:1.5}
+.execution-link,.rail-assurance strong{font-size:12px}
+.rail-assurance{grid-column:1/-1;align-self:stretch;padding:16px}
+.vendor-modal.page-mode{left:220px}
+.vendor-modal.page-mode .policy-grid label>span,.vendor-modal.page-mode .policy-locks strong{font-size:13px}
+.vendor-modal.page-mode .policy-grid small,.vendor-modal.page-mode .policy-locks span{font-size:12px}
+.vendor-modal.page-mode .activity-row span,.vendor-modal.page-mode .vendor-row span{font-size:12px}
+.vendor-modal.page-mode .detail-top .ghost{font-size:12px}
+body:has(.vendor-modal.page-mode:not([hidden])){overflow:hidden}
+@media(max-width:1400px){
+ .execution-body{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .payment-flow-card{grid-row:span 2}
+}
+@media(max-width:1120px){
+ .shell{grid-template-columns:190px minmax(0,1fr)}
+ .vendor-modal.page-mode{left:190px}
+ .workspace{grid-template-columns:1fr}
+ .queue-list{max-height:440px}
+ .execution-rail{grid-column:auto}
+}
+@media(max-width:800px){
+ .shell{grid-template-columns:1fr}
+ .sidebar{position:relative;height:auto;padding:12px;border-bottom-color:var(--line)}
+ .sidebar .brand{padding:0 4px 12px}
+ nav{gap:5px}
+ .nav{min-height:44px;gap:2px;padding:8px 5px;font-size:11px;line-height:1.2}
+ .content{padding:18px 14px 28px}
+ .topbar-row{display:flex;gap:12px}
+ .page-heading h1{font-size:29px}
+ .feed-card{width:100%}
+ .account-actions{gap:9px}
+ .utility-actions{width:100%;display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr) minmax(0,.8fr);padding-right:0}
+ .utility-actions .ghost{min-width:0;padding:9px 7px;font-size:11px}
+ .utility-actions .sign-out{justify-content:center;margin:0;padding:8px 5px}
+ .stats{gap:9px}
+ .stat{min-height:88px;padding:14px}
+ .stat strong{font-size:21px}
+ .workspace{gap:12px}
+ .invoice-row{grid-template-columns:36px minmax(0,1fr) auto;gap:8px}
+ .invoice-row .amount{grid-column:auto;justify-self:end;margin:0}
+ .detail-inner{padding:0 15px 16px}
+ .detail-top{margin:0 -15px;padding:16px 15px}
+ .execution-body{display:grid;grid-template-columns:1fr}
+ .payment-flow-card{grid-row:auto}
+ .vendor-modal.page-mode{left:0}
+ .policy-chain-state{display:grid;grid-template-columns:1fr;gap:10px}
+ .policy-chain-state>div{min-width:0}
+ .policy-chain-state span{overflow-wrap:anywhere;font-size:10px;line-height:1.4}
+ .policy-chain-state>b{justify-self:start}
+}
+@media(max-width:420px){
+ .stat span{font-size:10px}
+ .stat strong{font-size:19px}
+ .invoice-row .amount{font-size:11px}
+ .invoice-row .row-title strong{font-size:12px}
+ .invoice-row .sub{font-size:10px}
+ .vendor-modal.page-mode{padding:20px 14px 30px}
+ .vendor-modal.page-mode .detail-top h2{font-size:28px}
+}
