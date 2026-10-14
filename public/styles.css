@@ -1564,7 +1564,9 @@ button{touch-action:manipulation}
  .stat strong{font-size:18px}
  .setup-card{display:grid}
  .setup-copy{padding:15px 16px}
- .setup-status{min-width:0;padding:14px 16px;border-top:1px solid #eadfc5;border-left:0}
+ .setup-status{grid-template-columns:repeat(3,minmax(0,1fr));align-items:start;min-width:0;padding:12px 14px;border-top:1px solid #eadfc5;border-left:0}
+ .setup-step{flex-direction:column;gap:5px;text-align:center;font-size:9px!important;line-height:1.3}
+ .setup-status>.ghost,.setup-status>.setup-contract,.setup-status>span:not(.setup-step){grid-column:1/-1}
  .queue-toolbar{align-items:stretch;flex-direction:column;padding:10px}
  .queue-toolbar .filter-group{overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
  .queue-toolbar .filter-group::-webkit-scrollbar{display:none}
