@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { activateDestination, inboxFailurePresentation, networkLabel, paymentFlowStep, singleFlight } from "./ui-state.mjs";
+import { activateDestination, auditEventCategory, auditEventLabel, destinationFromHash, inboxFailurePresentation, networkLabel, paymentFlowStep, singleFlight } from "./ui-state.mjs";
 
 const state = {
   supabase: null,
@@ -21,7 +21,7 @@ const state = {
   vendorRevocationSupported: null,
   preflight: null,
   preflightLoading: false,
-  activity: { kind: null, rows: [] }
+  activity: { kind: null, rows: [], filter: "all", query: "" }
 };
 
 let bootstrapPromise = null;
@@ -83,7 +83,7 @@ function status(decision) {
 }
 
 function showAuth() {
-  setDestination("inbox");
+  setDestination("inbox", false);
   $("auth-gate").hidden = false;
   $("app-shell").hidden = true;
 }
@@ -91,6 +91,10 @@ function showAuth() {
 function showApp() {
   $("auth-gate").hidden = true;
   $("app-shell").hidden = false;
+}
+
+function pageMetric(label, value, note, tone = "") {
+  return '<article class="page-metric ' + escapeHtml(tone) + '"><span>' + escapeHtml(label) + '</span><strong>' + escapeHtml(value) + '</strong><small>' + escapeHtml(note) + '</small></article>';
 }
 
 function setAuthMessage(message, error = false) {
@@ -335,6 +339,35 @@ function renderAccount() {
   $("connect-gmail").disabled = state.gmail?.status === "connected";
   $("feed-label").textContent = state.gmail?.status === "connected" ? "live Gmail operator" : "connect Gmail";
   $("feed-dot").textContent = state.gmail?.status === "connected" ? "●" : "○";
+  renderBusinessPage();
+}
+
+function renderBusinessPage() {
+  const summary = $("business-snapshot");
+  const details = $("business-rail-details");
+  if (!summary || !details || !state.business) return;
+  const network = state.business?.active_network || state.business?.wallet_blockchain || "ARC-TESTNET";
+  const walletReady = state.business?.wallet_status === "ready" && Boolean(state.business?.wallet_address);
+  const policyReady = state.business?.policy_contract_status === "ready" && Boolean(state.business?.policy_contract_address);
+  const gmailReady = state.gmail?.status === "connected";
+  summary.innerHTML = [
+    pageMetric("Environment", networkLabel(network), "Network-isolated account", network === "ARC" ? "mainnet" : "testnet"),
+    pageMetric("Business wallet", walletReady ? "Ready" : "Setup needed", walletReady ? "Dedicated Circle wallet" : "No wallet for this environment", walletReady ? "ready" : "attention"),
+    pageMetric("Policy vault", policyReady ? "Enforced" : "Setup needed", policyReady ? "Dedicated onchain guard" : "No active vault", policyReady ? "ready" : "attention"),
+    pageMetric("Invoice source", gmailReady ? "Connected" : "Disconnected", gmailReady ? "Live Gmail evaluation" : "Reconnect Gmail", gmailReady ? "ready" : "attention")
+  ].join("");
+  $("business-network-badge").textContent = networkLabel(network);
+  const walletAddress = state.business?.wallet_address || "Not provisioned";
+  const vaultAddress = state.business?.policy_contract_address || "Not deployed";
+  details.innerHTML =
+    '<div><span>Dedicated wallet</span><strong>' + escapeHtml(walletAddress) + '</strong>' +
+      (walletReady ? '<button class="text-action copy-business-address" type="button" data-address="' + escapeHtml(walletAddress) + '" data-label="Business wallet address">Copy address</button>' : '') + '</div>' +
+    '<div><span>Policy vault</span><strong>' + escapeHtml(vaultAddress) + '</strong>' +
+      (policyReady ? '<button class="text-action copy-business-address" type="button" data-address="' + escapeHtml(vaultAddress) + '" data-label="Policy vault address">Copy address</button>' : '') + '</div>' +
+    '<div><span>Wallet balance</span><strong>' + (state.wallet ? escapeHtml(Number(state.wallet.balance || 0).toFixed(2) + " USDC") : "Unavailable") + '</strong></div>';
+  document.querySelectorAll(".copy-business-address").forEach((button) => {
+    button.addEventListener("click", () => copyText(button.dataset.address, button.dataset.label));
+  });
 }
 
 function renderSetup() {
@@ -470,7 +503,7 @@ function resetNetworkState() {
   state.vendorRevocationSupported = null;
   state.preflight = null;
   state.preflightLoading = false;
-  state.activity = { kind: null, rows: [] };
+  state.activity = { kind: null, rows: [], filter: "all", query: "" };
 }
 
 async function switchNetwork(event) {
@@ -537,11 +570,12 @@ function invoicePaymentReady(invoice) {
     vendor?.onchain_status === "registered";
 }
 
-function openBusinessModal() {
-  setDestination("business");
+function openBusinessModal(options = {}) {
+  setDestination("business", options.updateUrl !== false);
   $("business-name-input").value = state.business?.name || "";
   $("business-message").textContent = "";
   $("business-message").className = "auth-message";
+  renderBusinessPage();
   $("business-name-input").focus();
 }
 
@@ -719,8 +753,8 @@ async function migratePolicyVault() {
   }
 }
 
-async function openPolicyModal() {
-  setDestination("policy");
+async function openPolicyModal(options = {}) {
+  setDestination("policy", options.updateUrl !== false);
   setPolicyMessage("Loading this business's policy…");
   await Promise.all([loadPolicyConfig(), loadPolicyStatus()]);
   renderPolicyModal();
@@ -1058,28 +1092,83 @@ function formatActivityDate(value) {
   return Number.isNaN(date.getTime()) ? "Unknown time" : date.toLocaleString();
 }
 
+function activityFilters(kind) {
+  return kind === "payments"
+    ? [["all", "All"], ["confirmed", "Settled"], ["processing", "Processing"], ["attention", "Needs attention"]]
+    : [["all", "All"], ["payments", "Payments"], ["policy", "Policy"], ["vendors", "Vendors"], ["business", "Business"]];
+}
+
+function activityMatches(kind, row) {
+  const filter = state.activity.filter || "all";
+  const query = (state.activity.query || "").trim().toLowerCase();
+  const status = String(row.status || "").toLowerCase();
+  const category = auditEventCategory(row.event_type);
+  const filterMatch = filter === "all" || (kind === "payments"
+    ? (filter === "attention" ? ["failed", "review"].includes(status) : status === filter)
+    : category === filter);
+  if (!filterMatch) return false;
+  if (!query) return true;
+  return JSON.stringify(row).toLowerCase().includes(query) ||
+    (kind === "audit" && auditEventLabel(row.event_type).toLowerCase().includes(query));
+}
+
+function renderActivitySummary(kind, rows) {
+  const node = $("activity-summary");
+  if (kind === "payments") {
+    const confirmed = rows.filter((row) => String(row.status).toLowerCase() === "confirmed");
+    const confirmedUsdc = confirmed.filter((row) => row.currency === "USDC").reduce((total, row) => total + Number(row.amount || 0), 0);
+    const attention = rows.filter((row) => ["failed", "review"].includes(String(row.status).toLowerCase())).length;
+    node.innerHTML = [
+      pageMetric("Settlement records", String(rows.length), "All attempts for this business"),
+      pageMetric("Confirmed", String(confirmed.length), confirmedUsdc.toFixed(2) + " USDC reconciled", "ready"),
+      pageMetric("Needs attention", String(attention), attention ? "Review failed or flagged attempts" : "No failed attempts", attention ? "attention" : "ready")
+    ].join("");
+    return;
+  }
+  const categories = new Set(rows.map((row) => auditEventCategory(row.event_type)));
+  node.innerHTML = [
+    pageMetric("Audit records", String(rows.length), "Immutable business-scoped events"),
+    pageMetric("Control areas", String(categories.size), "Payments, policy, vendors and profile"),
+    pageMetric("Latest activity", rows[0] ? formatActivityDate(rows[0].created_at) : "None", "Most recent recorded decision", "ready")
+  ].join("");
+}
+
+function renderActivityControls(kind) {
+  $("activity-filters").innerHTML = activityFilters(kind).map(([value, label]) =>
+    '<button type="button" class="filter-button' + (state.activity.filter === value ? " active" : "") + '" data-filter="' + value + '" aria-pressed="' + (state.activity.filter === value) + '">' + label + '</button>'
+  ).join("");
+  $("activity-search").value = state.activity.query || "";
+}
+
 function renderActivity(kind, rows) {
   const node = $("activity-list");
-  if (!rows.length) {
-    node.innerHTML = '<div class="activity-empty">No ' + (kind === "payments" ? "settlement attempts" : "audit events") + " recorded for this business yet.</div>";
+  renderActivitySummary(kind, rows);
+  renderActivityControls(kind);
+  const visibleRows = rows.filter((row) => activityMatches(kind, row));
+  if (!visibleRows.length) {
+    const hasRecords = rows.length > 0;
+    node.innerHTML = '<div class="activity-empty"><strong>' + (hasRecords ? "No matching records" : "Nothing recorded yet") + '</strong><span>' +
+      (hasRecords ? "Change the filter or search term to see more activity." : (kind === "payments" ? "Payment attempts will appear here with their Arc settlement status and receipts." : "Business policy, vendor, wallet, and settlement decisions will appear here.")) + '</span></div>';
     return;
   }
   if (kind === "payments") {
-    node.innerHTML = rows.map((payment) => '<article class="activity-row"><div><strong>' + escapeHtml(payment.vendor || "Unknown vendor") + '</strong><span>' +
-      escapeHtml(payment.invoiceNumber || "Missing invoice number") + ' · ' + escapeHtml(formatActivityDate(payment.updatedAt)) + '</span></div><div class="activity-value"><b>' +
-      Number(payment.amount || 0).toFixed(2) + ' ' + escapeHtml(payment.currency || "") + '</b><span class="activity-status ' + escapeHtml(payment.status || "") + '">' +
-      escapeHtml(payment.status || "unknown") + '</span><span>' + escapeHtml(payment.network === "ARC" ? "Arc Mainnet" : "Arc Testnet") + '</span>' +
-      (payment.paymentId ? '<span>Payment ID: ' + escapeHtml(payment.paymentId.slice(0, 12) + "…") + '</span>' : '') +
-      (payment.paymentTxHash ? '<a href="' + (payment.network === "ARC" ? "https://arcscan.app/tx/" : "https://testnet.arcscan.app/tx/") + encodeURIComponent(payment.paymentTxHash) + '" target="_blank" rel="noreferrer">Tx: ' + escapeHtml(payment.paymentTxHash.slice(0, 10) + "…") + '</a>' : '') + '</div></article>').join("");
+    node.innerHTML = visibleRows.map((payment) => {
+      const statusValue = String(payment.status || "unknown").toLowerCase();
+      const explorer = payment.network === "ARC" ? "https://arcscan.app/tx/" : "https://testnet.arcscan.app/tx/";
+      return '<article class="payment-record"><div class="record-status-mark ' + escapeHtml(statusValue) + '"></div><div class="record-primary"><span>' + escapeHtml(payment.vendor || "Unknown vendor") + '</span><strong>' + escapeHtml(payment.invoiceNumber || "Missing invoice number") + '</strong><small>' + escapeHtml(formatActivityDate(payment.updatedAt)) + '</small></div><div class="record-network"><span>' + escapeHtml(payment.network === "ARC" ? "Arc Mainnet" : "Arc Testnet") + '</span><b class="activity-status ' + escapeHtml(statusValue) + '">' + escapeHtml(statusValue) + '</b></div><div class="record-amount"><strong>' + Number(payment.amount || 0).toFixed(2) + '</strong><span>' + escapeHtml(payment.currency || "") + '</span></div><div class="record-receipt">' +
+        (payment.paymentId ? '<span title="' + escapeHtml(payment.paymentId) + '">ID ' + escapeHtml(payment.paymentId.slice(0, 10) + "…") + '</span>' : '<span>No payment ID</span>') +
+        (payment.paymentTxHash ? '<a href="' + explorer + encodeURIComponent(payment.paymentTxHash) + '" target="_blank" rel="noreferrer">View Arc receipt ↗</a>' : '<span>Receipt pending</span>') + '</div></article>';
+    }).join("");
     return;
   }
-  node.innerHTML = rows.map((event) => '<article class="activity-row"><div><strong>' + escapeHtml(event.event_type || "event") + '</strong><span>' +
-    escapeHtml(event.actor || "system") + ' · ' + escapeHtml(formatActivityDate(event.created_at)) + '</span></div><div class="activity-value"><span>Business scope: ' + escapeHtml(event.business_id || "current business") + '</span><span>' +
-    escapeHtml(event.invoice_id ? "Invoice event" : "Business event") + '</span><details><summary>Details</summary><pre>' + escapeHtml(JSON.stringify(event.data || {}, null, 2)) + '</pre></details></div></article>').join("");
+  node.innerHTML = visibleRows.map((event) => {
+    const category = auditEventCategory(event.event_type);
+    return '<article class="audit-record"><div class="audit-marker ' + category + '"></div><div class="audit-record-body"><div class="audit-record-meta"><span class="audit-category">' + escapeHtml(category) + '</span><time>' + escapeHtml(formatActivityDate(event.created_at)) + '</time></div><h3>' + escapeHtml(auditEventLabel(event.event_type)) + '</h3><p>' + escapeHtml(event.actor || "system") + ' recorded a ' + (event.invoice_id ? "invoice-level" : "business-level") + ' control event.</p><details><summary>Technical details</summary><pre>' + escapeHtml(JSON.stringify(event.data || {}, null, 2)) + '</pre></details></div></article>';
+  }).join("");
 }
 
-async function openActivity(kind) {
-  setDestination(kind);
+async function openActivity(kind, options = {}) {
+  setDestination(kind, options.updateUrl !== false);
   const requestId = ++activityRequestId;
   $("activity-kicker").textContent = kind === "payments" ? "SETTLEMENTS" : "AUDIT TRAIL";
   $("activity-title").textContent = kind === "payments" ? "Payments" : "Audit trail";
@@ -1088,13 +1177,16 @@ async function openActivity(kind) {
     : "Business-scoped evidence for policy, vendor, wallet, and settlement decisions.";
   $("activity-message").textContent = "Loading live activity…";
   $("activity-message").className = "auth-message";
+  state.activity = { kind, rows: [], filter: "all", query: "" };
+  renderActivitySummary(kind, []);
+  renderActivityControls(kind);
   $("activity-list").innerHTML = "";
   try {
     const response = await apiFetch("/api/activity?view=" + encodeURIComponent(kind));
     const data = await readJsonResponse(response);
     if (requestId !== activityRequestId || activeDestination !== kind) return;
     if (!response.ok) throw new Error(data.error || "Activity unavailable");
-    state.activity = { kind, rows: kind === "payments" ? (data.payments || []) : (data.events || []) };
+    state.activity = { kind, rows: kind === "payments" ? (data.payments || []) : (data.events || []), filter: "all", query: "" };
     $("activity-message").textContent = "";
     renderActivity(kind, state.activity.rows);
   } catch (error) {
@@ -1111,8 +1203,8 @@ function toast(message) {
   toast.timer = window.setTimeout(() => $("toast").hidden = true, 3200);
 }
 
-async function openVendorModal() {
-  setDestination("vendors");
+async function openVendorModal(options = {}) {
+  setDestination("vendors", options.updateUrl !== false);
   $("vendor-name").focus();
   await loadVendors();
 }
@@ -1133,12 +1225,20 @@ async function loadVendors() {
 
 function renderVendors() {
   const node = $("vendor-list");
+  const paymentReady = state.vendors.filter((vendor) => vendor.status === "verified" && vendor.onchain_status === "registered").length;
+  const blocked = state.vendors.filter((vendor) => vendor.status === "blocked").length;
+  $("vendor-summary").innerHTML = [
+    pageMetric("Total vendors", String(state.vendors.length), "Saved in this business's active network"),
+    pageMetric("Payment ready", String(paymentReady), "Verified and registered onchain", "ready"),
+    pageMetric("Blocked", String(blocked), blocked ? "Cannot receive payments" : "No revoked recipients", blocked ? "attention" : "ready")
+  ].join("");
+  $("vendor-count-label").textContent = state.vendors.length + (state.vendors.length === 1 ? " vendor" : " vendors");
   if (state.vendorRevocationSupported === false) {
     $("vendor-message").textContent = "This vault version cannot revoke vendor addresses onchain. InboxPay can block a vendor in its registry; full chain revocation needs a vault migration.";
     $("vendor-message").className = "auth-message error";
   }
   if (!state.vendors.length) {
-    node.innerHTML = '<div class="vendor-empty">No vendor addresses registered yet.</div>';
+    node.innerHTML = '<div class="vendor-empty"><strong>No vendors registered</strong><span>Add a verified recipient on the left. It will remain blocked from payment until you explicitly verify it.</span></div>';
     return;
   }
   node.innerHTML = state.vendors.map((vendor) => {
@@ -1479,7 +1579,7 @@ async function settle() {
   }
 }
 
-function setDestination(destination) {
+function setDestination(destination, updateUrl = true) {
   const activity = $("activity-modal");
   activateDestination(destination, {
     inbox: null,
@@ -1490,11 +1590,23 @@ function setDestination(destination) {
     vendors: $("vendor-modal")
   }, document.querySelectorAll(".nav[data-nav]"), document.querySelector(".content"));
   activeDestination = destination;
+  if (updateUrl && destinationFromHash(window.location.hash) !== destination) {
+    const base = window.location.pathname + window.location.search;
+    window.history.pushState({ destination }, "", destination === "inbox" ? base : base + "#" + destination);
+  }
+}
+
+async function openDestination(destination, options = {}) {
+  if (destination === "payments" || destination === "audit") return openActivity(destination, options);
+  if (destination === "policy") return openPolicyModal(options);
+  if (destination === "business") return openBusinessModal(options);
+  if (destination === "vendors") return openVendorModal(options);
+  setDestination("inbox", options.updateUrl !== false);
 }
 
 async function init() {
   try {
-    setDestination("inbox");
+    setDestination("inbox", false);
     const configResponse = await fetch("/api/config");
     const config = await readJsonResponse(configResponse);
     if (!configResponse.ok) throw new Error(config.error || "InboxPay configuration unavailable");
@@ -1527,6 +1639,17 @@ async function init() {
     $("open-audit-top").addEventListener("click", () => openActivity("audit"));
     $("close-activity").addEventListener("click", closeActivityModal);
     $("close-policy").addEventListener("click", closePolicyModal);
+    $("activity-filters").addEventListener("click", (event) => {
+      const button = event.target.closest("[data-filter]");
+      if (!button || !state.activity.kind) return;
+      state.activity.filter = button.dataset.filter;
+      renderActivity(state.activity.kind, state.activity.rows);
+    });
+    $("activity-search").addEventListener("input", (event) => {
+      if (!state.activity.kind) return;
+      state.activity.query = event.currentTarget.value;
+      renderActivity(state.activity.kind, state.activity.rows);
+    });
     $("policy-form").addEventListener("submit", savePolicy);
     $("policy-migrate").addEventListener("click", migratePolicyVault);
     $("policy-pause").addEventListener("click", togglePolicyPause);
@@ -1539,6 +1662,10 @@ async function init() {
     $("refresh").addEventListener("click", () => {
       toast("Syncing the business inbox…");
       load();
+    });
+    window.addEventListener("popstate", () => {
+      if (!state.session || !state.business) return;
+      openDestination(destinationFromHash(window.location.hash), { updateUrl: false }).catch((error) => toast(error.message));
     });
 
     state.supabase.auth.onAuthStateChange((event, session) => {
@@ -1571,6 +1698,7 @@ async function init() {
 
     state.user = state.session.user;
     await bootstrap();
+    await openDestination(destinationFromHash(window.location.hash), { updateUrl: false });
 
     const params = new URLSearchParams(window.location.search);
     if (params.get("gmail") === "connected") {

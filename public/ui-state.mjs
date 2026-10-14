@@ -49,6 +49,46 @@ export function activateDestination(destination, sections, navItems, inboxConten
   if (inboxContent) inboxContent.inert = destination !== "inbox";
 }
 
+const WORKSPACE_DESTINATIONS = new Set(["inbox", "payments", "policy", "audit", "business", "vendors"]);
+
+export function destinationFromHash(hash = "") {
+  const destination = String(hash).replace(/^#\/?/, "").trim().toLowerCase();
+  return WORKSPACE_DESTINATIONS.has(destination) ? destination : "inbox";
+}
+
+const AUDIT_EVENT_LABELS = {
+  business_network_selected: "Settlement environment selected",
+  business_profile_updated: "Business profile updated",
+  invoice_scheduled: "Invoice queued for review",
+  invoice_schedule_rescheduled: "Invoice review rescheduled",
+  invoice_schedule_cancelled: "Scheduled review cancelled",
+  payment_submitted: "Payment submitted to Circle",
+  payment_settled: "Payment settled and reconciled",
+  policy_allowance_approved: "USDC access authorized",
+  policy_allowance_revoked: "USDC access revoked",
+  policy_pause_updated: "Emergency payment control changed",
+  policy_updated: "Payment policy updated",
+  vendor_policy_updated: "Vendor policy updated",
+  vendor_registered: "Vendor registered",
+  vendor_revoked: "Vendor revoked",
+  wallet_provisioned: "Dedicated business wallet created"
+};
+
+export function auditEventLabel(type = "") {
+  if (AUDIT_EVENT_LABELS[type]) return AUDIT_EVENT_LABELS[type];
+  const words = String(type).replaceAll("_", " ").trim();
+  return words ? words[0].toUpperCase() + words.slice(1) : "Business event";
+}
+
+export function auditEventCategory(type = "") {
+  const value = String(type);
+  if (/^payment_|settlement/.test(value)) return "payments";
+  if (/vendor/.test(value)) return "vendors";
+  if (/policy|allowance/.test(value)) return "policy";
+  if (/invoice_schedule|scheduled/.test(value)) return "schedule";
+  return "business";
+}
+
 export function inboxFailurePresentation(message = "") {
   const authRevoked = /token has been expired or revoked|invalid_grant|gmail authorization must be renewed/i.test(message);
   if (authRevoked) {

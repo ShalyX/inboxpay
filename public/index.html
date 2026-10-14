@@ -59,18 +59,24 @@
         <div class="mark" aria-hidden="true"><i></i><i></i><i></i></div>
         <div><strong>InboxPay</strong><span>Payment operations</span></div>
       </div>
-      <div class="nav-label">Workspace</div>
-      <nav aria-label="Primary navigation">
-        <button class="nav active" data-nav="inbox"><span class="nav-icon">I</span><span>Invoice queue</span><b id="invoice-count">0</b></button>
-        <button id="open-payments" class="nav" data-nav="payments"><span class="nav-icon">P</span><span>Payments</span><b id="payment-count">0</b></button>
-        <button id="open-policy" class="nav" data-nav="policy"><span class="nav-icon">G</span><span>Payment policy</span></button>
-        <button id="open-audit" class="nav" data-nav="audit"><span class="nav-icon">A</span><span>Audit trail</span></button>
-      </nav>
-      <div class="nav-label nav-label-business">Business</div>
-      <nav aria-label="Business settings">
-        <button id="nav-business" class="nav" data-nav="business"><span class="nav-icon">B</span><span>Business profile</span></button>
-        <button id="nav-vendors" class="nav" data-nav="vendors"><span class="nav-icon">V</span><span>Vendor registry</span></button>
-      </nav>
+      <div class="nav-groups">
+        <div class="nav-group">
+          <div class="nav-label">Workspace</div>
+          <nav aria-label="Primary navigation">
+            <button class="nav active" data-nav="inbox"><span class="nav-icon">I</span><span>Invoice queue</span><b id="invoice-count">0</b></button>
+            <button id="open-payments" class="nav" data-nav="payments"><span class="nav-icon">P</span><span>Payments</span><b id="payment-count">0</b></button>
+            <button id="open-policy" class="nav" data-nav="policy"><span class="nav-icon">G</span><span>Payment policy</span></button>
+            <button id="open-audit" class="nav" data-nav="audit"><span class="nav-icon">A</span><span>Audit trail</span></button>
+          </nav>
+        </div>
+        <div class="nav-group nav-group-business">
+          <div class="nav-label">Business</div>
+          <nav aria-label="Business settings">
+            <button id="nav-business" class="nav" data-nav="business"><span class="nav-icon">B</span><span>Business profile</span></button>
+            <button id="nav-vendors" class="nav" data-nav="vendors"><span class="nav-icon">V</span><span>Vendor registry</span></button>
+          </nav>
+        </div>
+      </div>
       <div class="sidebar-foot">
         <div class="rail-state"><i class="dot"></i><div><span>Settlement rail</span><strong id="network-label">Arc Mainnet</strong></div></div>
         <small>USDC · Dedicated business wallet</small>
@@ -161,45 +167,68 @@
     </section>
     <div id="vendor-modal" class="vendor-modal" hidden>
       <div class="vendor-card">
-        <div class="detail-top"><div><label>VENDOR REGISTRY</label><h2>Vendor registry</h2></div><button id="close-vendor" class="ghost">Back to invoices</button></div>
-        <p>Use the vendor's verified Arc/EVM address. InboxPay will require this registry match before autonomous payment.</p>
-        <form id="vendor-form">
-          <input id="vendor-name" placeholder="Vendor name" required>
-          <input id="vendor-address" placeholder="0x…" pattern="0x[a-fA-F0-9]{40}" required>
-          <button id="vendor-submit" class="pay" type="submit">Add vendor for review</button>
-        </form>
-        <div id="vendor-message" class="auth-message"></div>
-        <div id="vendor-list" class="vendor-list"></div>
+        <div class="detail-top page-titlebar"><div><label>VENDOR CONTROL</label><h2>Vendor registry</h2><p>Approve exactly who this business can pay and verify the recipient registered in the active policy vault.</p></div><button id="close-vendor" class="ghost">Back to invoices</button></div>
+        <div id="vendor-summary" class="page-metrics" aria-live="polite"></div>
+        <div class="destination-grid vendor-workspace">
+          <section class="destination-card vendor-entry-card">
+            <div class="section-heading"><div><span>ADD VENDOR</span><h3>Register a settlement recipient</h3></div><b>Step 1 of 2</b></div>
+            <p>The address is saved for review first. Verification and onchain registration remain explicit actions.</p>
+            <form id="vendor-form">
+              <label for="vendor-name">Vendor name</label>
+              <input id="vendor-name" placeholder="e.g. Cloud infrastructure provider" required>
+              <label for="vendor-address">Arc / EVM recipient</label>
+              <input id="vendor-address" placeholder="0x…" pattern="0x[a-fA-F0-9]{40}" required>
+              <button id="vendor-submit" class="pay" type="submit">Add vendor for review</button>
+            </form>
+            <div id="vendor-message" class="auth-message" aria-live="polite"></div>
+          </section>
+          <section class="destination-card vendor-directory-card">
+            <div class="section-heading"><div><span>PAYMENT DIRECTORY</span><h3>Registered vendors</h3></div><b id="vendor-count-label">0 vendors</b></div>
+            <div id="vendor-list" class="vendor-list"></div>
+          </section>
+        </div>
       </div>
     </div>
     <div id="policy-modal" class="vendor-modal" hidden>
       <div class="vendor-card policy-card" role="region" aria-labelledby="policy-title">
-        <div class="detail-top"><div><label>PAYMENT POLICY</label><h2 id="policy-title">Choose the agent's spending boundaries</h2></div><button id="close-policy" class="ghost" type="button">Back to invoices</button></div>
-        <p id="policy-context">These limits are saved to this business and enforced by its dedicated onchain policy vault.</p>
+        <div class="detail-top page-titlebar"><div><label>PAYMENT CONTROL</label><h2 id="policy-title">Payment policy</h2><p id="policy-context">Set the financial boundaries enforced by this business's dedicated onchain policy vault.</p></div><button id="close-policy" class="ghost" type="button">Back to invoices</button></div>
         <div id="policy-chain-state" class="policy-chain-state"></div>
-        <form id="policy-form">
-          <div class="policy-grid">
-            <label for="policy-max"><span>Maximum single payment</span><div class="money-input"><input id="policy-max" type="number" min="0.000001" step="0.000001" required><b>USDC</b></div><small>No invoice above this amount can settle autonomously.</small></label>
-            <label for="policy-daily"><span>Daily spending limit</span><div class="money-input"><input id="policy-daily" type="number" min="0.000001" step="0.000001" required><b>USDC</b></div><small>Total settled payments cannot exceed this amount per UTC day.</small></label>
-            <label for="policy-floor"><span>Cash floor</span><div class="money-input"><input id="policy-floor" type="number" min="0" step="0.000001" required><b>USDC</b></div><small>The business wallet must retain at least this amount after payment.</small></label>
-          </div>
-          <div class="policy-locks">
-            <div><strong>Verified vendors only</strong><span>Locked safeguard · every recipient must be registered onchain.</span></div>
-            <div><strong>Duplicate protection</strong><span>Locked safeguard · each payment ID can execute once.</span></div>
-          </div>
-          <button id="policy-submit" class="pay" type="submit">Save policy</button>
-        </form>
-        <div id="policy-migration-control" class="policy-secondary" hidden>
-          <button id="policy-migrate" class="ghost" type="button">Migrate policy vault</button>
-          <span id="policy-migrate-note">This vault cannot revoke vendors onchain. Migration deploys a replacement vault with the same limits; USDC access and vendor registrations must be authorized again.</span>
-        </div>
-        <div class="policy-secondary">
-          <button id="policy-pause" class="ghost" type="button" hidden>Pause all payments</button>
-          <span id="policy-pause-note">Emergency pause becomes available after the vault is deployed.</span>
-        </div>
-        <div id="policy-allowance-control" class="policy-allowance" hidden>
-          <div><strong id="policy-allowance-title">USDC access not authorized</strong><span id="policy-allowance-note">The vault cannot move funds until this business explicitly authorizes it.</span></div>
-          <button id="policy-allowance" class="ghost" type="button">Authorize vault</button>
+        <div class="policy-workspace">
+          <section class="destination-card policy-limits-card">
+            <div class="section-heading"><div><span>SPENDING LIMITS</span><h3>Bound the agent's authority</h3></div><b>USDC</b></div>
+            <form id="policy-form">
+              <div class="policy-grid">
+                <label for="policy-max"><span>Maximum single payment</span><div class="money-input"><input id="policy-max" type="number" min="0.000001" step="0.000001" required><b>USDC</b></div><small>No invoice above this amount can settle autonomously.</small></label>
+                <label for="policy-daily"><span>Daily spending limit</span><div class="money-input"><input id="policy-daily" type="number" min="0.000001" step="0.000001" required><b>USDC</b></div><small>Total settled payments cannot exceed this amount per UTC day.</small></label>
+                <label for="policy-floor"><span>Cash floor</span><div class="money-input"><input id="policy-floor" type="number" min="0" step="0.000001" required><b>USDC</b></div><small>The business wallet must retain at least this amount after payment.</small></label>
+              </div>
+              <button id="policy-submit" class="pay" type="submit">Save policy</button>
+            </form>
+          </section>
+          <aside class="policy-control-stack">
+            <section class="destination-card safeguard-card">
+              <div class="section-heading"><div><span>LOCKED SAFEGUARDS</span><h3>Always enforced</h3></div><b>2 controls</b></div>
+              <div class="policy-locks">
+                <div><strong>Verified vendors only</strong><span>Every recipient must be registered onchain.</span></div>
+                <div><strong>Duplicate protection</strong><span>Each payment ID can execute once.</span></div>
+              </div>
+            </section>
+            <section class="destination-card access-card">
+              <div class="section-heading"><div><span>EXECUTION ACCESS</span><h3>Operational controls</h3></div></div>
+              <div id="policy-migration-control" class="policy-secondary" hidden>
+                <button id="policy-migrate" class="ghost" type="button">Migrate policy vault</button>
+                <span id="policy-migrate-note">This vault cannot revoke vendors onchain. Migration deploys a replacement vault with the same limits; USDC access and vendor registrations must be authorized again.</span>
+              </div>
+              <div class="policy-secondary">
+                <button id="policy-pause" class="ghost" type="button" hidden>Pause all payments</button>
+                <span id="policy-pause-note">Emergency pause becomes available after the vault is deployed.</span>
+              </div>
+              <div id="policy-allowance-control" class="policy-allowance" hidden>
+                <div><strong id="policy-allowance-title">USDC access not authorized</strong><span id="policy-allowance-note">The vault cannot move funds until this business explicitly authorizes it.</span></div>
+                <button id="policy-allowance" class="ghost" type="button">Authorize vault</button>
+              </div>
+            </section>
+          </aside>
         </div>
         <div id="policy-message" class="auth-message" aria-live="polite"></div>
       </div>
@@ -207,18 +236,32 @@
     <div id="toast" class="toast" hidden></div>
     <div id="activity-modal" class="vendor-modal" hidden>
       <div class="vendor-card activity-card" role="region" aria-labelledby="activity-title">
-        <div class="detail-top"><div><label id="activity-kicker">ACTIVITY</label><h2 id="activity-title">Payments</h2></div><button id="close-activity" class="ghost" type="button">Back to invoices</button></div>
-        <p id="activity-context">A business-scoped view of real settlement state and receipts.</p>
+        <div class="detail-top page-titlebar"><div><label id="activity-kicker">ACTIVITY</label><h2 id="activity-title">Payments</h2><p id="activity-context">A business-scoped view of real settlement state and receipts.</p></div><button id="close-activity" class="ghost" type="button">Back to invoices</button></div>
         <div id="activity-message" class="auth-message" aria-live="polite"></div>
-        <div id="activity-list" class="activity-list"></div>
+        <div id="activity-summary" class="page-metrics" aria-live="polite"></div>
+        <div class="activity-toolbar">
+          <div id="activity-filters" class="filter-group" role="group" aria-label="Filter activity"></div>
+          <label class="activity-search" for="activity-search"><span>Search records</span><input id="activity-search" type="search" placeholder="Vendor, invoice or event"></label>
+        </div>
+        <div id="activity-list" class="activity-list" aria-live="polite"></div>
       </div>
     </div>
     <div id="business-modal" class="vendor-modal" hidden>
       <div class="vendor-card business-card" role="region" aria-labelledby="business-title">
-        <div class="detail-top"><div><label>BUSINESS PROFILE</label><h2 id="business-title">Business identity</h2></div><button id="close-business" class="ghost" type="button">Back to invoices</button></div>
-        <p>This name identifies the business across InboxPay. It does not change wallet ownership, policy limits, vendors, or payment permissions.</p>
-        <form id="business-form"><label for="business-name-input">Business name</label><input id="business-name-input" maxlength="80" required><button id="business-submit" class="pay" type="submit">Save business name</button></form>
-        <div id="business-message" class="auth-message" aria-live="polite"></div>
+        <div class="detail-top page-titlebar"><div><label>BUSINESS PROFILE</label><h2 id="business-title">Business identity</h2><p>The operating identity attached to this business's inbox, dedicated wallets, policies, and audit history.</p></div><button id="close-business" class="ghost" type="button">Back to invoices</button></div>
+        <div id="business-snapshot" class="page-metrics" aria-live="polite"></div>
+        <div class="destination-grid business-workspace">
+          <section class="destination-card business-identity-card">
+            <div class="section-heading"><div><span>IDENTITY</span><h3>Business display name</h3></div><b>Owner controlled</b></div>
+            <p>Renaming the business does not change wallet ownership, policy limits, vendor permissions, or payment authorization.</p>
+            <form id="business-form"><label for="business-name-input">Business name</label><input id="business-name-input" maxlength="80" required><button id="business-submit" class="pay" type="submit">Save business name</button></form>
+            <div id="business-message" class="auth-message" aria-live="polite"></div>
+          </section>
+          <section class="destination-card business-rail-card">
+            <div class="section-heading"><div><span>SETTLEMENT RAIL</span><h3>Owned infrastructure</h3></div><b id="business-network-badge">Arc</b></div>
+            <div id="business-rail-details" class="business-rail-details"></div>
+          </section>
+        </div>
       </div>
     </div>
   </main>

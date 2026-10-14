@@ -1,11 +1,25 @@
 import assert from "node:assert/strict";
 import {
   activateDestination,
+  auditEventCategory,
+  auditEventLabel,
+  destinationFromHash,
   inboxFailurePresentation,
   networkLabel,
   paymentFlowStep,
   singleFlight
 } from "../public/ui-state.mjs";
+
+assert.equal(destinationFromHash("#payments"), "payments");
+assert.equal(destinationFromHash("#/vendors"), "vendors");
+assert.equal(destinationFromHash("#unknown"), "inbox");
+assert.equal(destinationFromHash(""), "inbox");
+assert.equal(auditEventLabel("payment_settled"), "Payment settled and reconciled");
+assert.equal(auditEventLabel("custom_business_event"), "Custom business event");
+assert.equal(auditEventCategory("payment_submitted"), "payments");
+assert.equal(auditEventCategory("policy_allowance_approved"), "policy");
+assert.equal(auditEventCategory("vendor_registered"), "vendors");
+assert.equal(auditEventCategory("invoice_schedule_rescheduled"), "schedule");
 
 function fakeElement(nav) {
   const classes = new Set();
