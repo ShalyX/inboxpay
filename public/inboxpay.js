@@ -20,6 +20,7 @@ const state = {
   vendorRevocationSupported: null,
   preflight: null,
   preflightLoading: false,
+  withdrawalRequestId: null,
   queue: { filter: "all", query: "" },
   activity: { kind: null, rows: [], filter: "all", query: "" }
 };
@@ -386,6 +387,31 @@ function renderBusinessPage() {
   document.querySelectorAll(".copy-business-address").forEach((button) => {
     button.addEventListener("click", () => copyText(button.dataset.address, button.dataset.label));
   });
+
+  const withdrawalSummary = $("withdrawal-summary");
+  const withdrawalHistory = $("withdrawal-history");
+  const withdrawalSubmit = $("withdrawal-submit");
+  if (!withdrawalSummary || !withdrawalHistory || !withdrawalSubmit) return;
+  const wallet = state.wallet;
+  withdrawalSummary.innerHTML = [
+    ["Wallet balance", wallet ? Number(wallet.balance || 0).toFixed(6) + " USDC" : "Unavailable"],
+    ["Cash floor", wallet ? Number(wallet.cashFloor || 0).toFixed(6) + " USDC" : "Unavailable"],
+    ["Reserved", wallet ? Number(wallet.reserved || 0).toFixed(6) + " USDC" : "Unavailable"],
+    ["Withdrawable", wallet ? Number(wallet.withdrawable || 0).toFixed(6) + " USDC" : "Unavailable"]
+  ].map(([label, value]) => '<div><span>' + label + '</span><strong>' + escapeHtml(value) + '</strong></div>').join("");
+  withdrawalSubmit.disabled = !walletReady || !wallet || Number(wallet.withdrawable || 0) <= 0;
+  withdrawalSubmit.textContent = withdrawalSubmit.disabled ? "No withdrawable funds" : "Review withdrawal";
+  const withdrawals = wallet?.withdrawals || [];
+  withdrawalHistory.innerHTML = withdrawals.length
+    ? withdrawals.map((withdrawal) => {
+        const explorer = withdrawal.network === "ARC" ? "https://arcscan.app/tx/" : "https://testnet.arcscan.app/tx/";
+        return '<article class="withdrawal-record"><div><strong>' + escapeHtml(Number(withdrawal.amount || 0).toFixed(6) + " USDC") + '</strong>' +
+          '<code>' + escapeHtml(withdrawal.recipientAddress) + '</code><span>' + escapeHtml(new Date(withdrawal.createdAt).toLocaleString()) +
+          (withdrawal.error ? " · " + escapeHtml(withdrawal.error) : "") + '</span></div><div><b>' + escapeHtml(withdrawal.status) + '</b>' +
+          (withdrawal.transactionHash ? '<a href="' + explorer + encodeURIComponent(withdrawal.transactionHash) + '" target="_blank" rel="noreferrer">Receipt ↗</a>' : '<span>Receipt pending</span>') +
+          '</div></article>';
+      }).join("")
+    : '<div class="empty compact"><h3>No withdrawals</h3><p>Confirmed business-wallet transfers will appear here with their Arc receipts.</p></div>';
 }
 
 function renderSetup() {
@@ -603,12 +629,20 @@ function invoicePaymentReady(invoice) {
     vendor?.onchain_status === "registered";
 }
 
-function openBusinessModal(options = {}) {
+async function openBusinessModal(options = {}) {
   setDestination("business", options.updateUrl !== false);
   $("business-name-input").value = state.business?.name || "";
   $("business-message").textContent = "";
   $("business-message").className = "auth-message";
   renderBusinessPage();
+  try {
+    const response = await apiFetch("/api/wallet");
+    const data = await readJsonResponse(response);
+    if (response.ok) {
+      state.wallet = data;
+      renderBusinessPage();
+    }
+  } catch {}
   $("business-name-input").focus();
 }
 
@@ -640,6 +674,78 @@ async function saveBusinessName(event) {
     $("business-message").className = "auth-message error";
   } finally {
     submit.disabled = false;
+  }
+}
+
+async function submitWalletWithdrawal(event) {
+  event.preventDefault();
+  const recipientAddress = $("withdrawal-recipient").value.trim();
+  const amount = $("withdrawal-amount").value.trim();
+  if (!/^0x[a-fA-F0-9]{40}$/.test(recipientAddress)) {
+    $("withdrawal-message").textContent = "Enter a valid Arc recipient address.";
+    $("withdrawal-message").className = "auth-message error";
+    return;
+  }
+  if (!/^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/.test(amount) || Number(amount) <= 0) {
+    $("withdrawal-message").textContent = "Enter a positive USDC amount with no more than six decimals.";
+    $("withdrawal-message").className = "auth-message error";
+    return;
+  }
+  const network = state.business?.wallet_blockchain === "ARC" ? "Arc Mainnet" : "Arc Testnet";
+  const confirmed = window.confirm(
+    "Withdraw " + Number(amount).toFixed(6) + " USDC on " + network + "?\n\n" +
+    "From: " + state.business.wallet_address + "\n" +
+    "To: " + recipientAddress + "\n\n" +
+    "InboxPay will preserve the " + Number(state.wallet?.cashFloor || 0).toFixed(6) + " USDC cash floor, " +
+    Number(state.wallet?.reserved || 0).toFixed(6) + " USDC in autonomous-payment reservations, and the estimated network fee. " +
+    "Verify the address carefully; confirmed onchain transfers cannot be reversed."
+  );
+  if (!confirmed) return;
+
+  const button = $("withdrawal-submit");
+  const message = $("withdrawal-message");
+  state.withdrawalRequestId ||= crypto.randomUUID();
+  button.disabled = true;
+  button.textContent = "Submitting withdrawal…";
+  message.textContent = "Submitting from this business's dedicated Circle wallet…";
+  message.className = "auth-message";
+  try {
+    const response = await apiFetch("/api/wallet", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        action: "withdraw",
+        requestId: state.withdrawalRequestId,
+        network: state.business?.wallet_blockchain,
+        recipientAddress,
+        amount,
+        confirmWithdrawal: true,
+        ...(state.business?.wallet_blockchain === "ARC" ? { confirmMainnet: true } : {})
+      })
+    });
+    const data = await readJsonResponse(response);
+    if (!response.ok) throw new Error(data.error || "Withdrawal submission failed");
+    if (!data.submissionUncertain) {
+      state.withdrawalRequestId = null;
+      $("withdrawal-recipient").value = "";
+      $("withdrawal-amount").value = "";
+    }
+    const walletResponse = await apiFetch("/api/wallet");
+    const walletData = await readJsonResponse(walletResponse);
+    if (walletResponse.ok) state.wallet = walletData;
+    renderAccount();
+    renderBusinessPage();
+    message.textContent = data.submissionUncertain
+      ? "Circle did not return a definite submission result. Retry with the same details; InboxPay will reuse the same idempotency key and will not create a second withdrawal."
+      : data.withdrawal?.status === "confirmed"
+      ? "Withdrawal confirmed and reconciled on Arc."
+      : "Withdrawal submitted. InboxPay will show the Arc receipt after confirmation.";
+    toast(data.submissionUncertain ? "Withdrawal outcome needs recovery" : data.idempotent ? "Existing withdrawal restored" : "Withdrawal submitted");
+  } catch (error) {
+    message.textContent = error.message || "Withdrawal submission failed";
+    message.className = "auth-message error";
+    button.disabled = false;
+    button.textContent = "Review withdrawal";
   }
 }
 
@@ -743,6 +849,20 @@ function renderPolicyModal() {
   const allowanceButton = $("policy-allowance");
   allowanceButton.dataset.authorized = String(state.policyAllowance);
   allowanceButton.textContent = state.policyAllowance ? "Revoke USDC access" : "Authorize vault";
+
+  const autonomyEnabled = Boolean(state.policyConfig?.autonomy_enabled);
+  const autonomyControl = $("policy-autonomy-control");
+  autonomyControl.hidden = !ready || policyUnavailable;
+  $("policy-autonomy-title").textContent = autonomyEnabled ? "Bounded autonomy enabled" : "Autonomous execution disabled";
+  $("policy-autonomy-note").textContent = autonomyEnabled
+    ? (state.policyConfig?.autonomy_last_error
+      ? "Worker attention required: " + state.policyConfig.autonomy_last_error
+      : "Eligible Gmail invoices can execute unattended inside the verified vendor, limit, cash-floor, duplicate, and pause controls.")
+    : "Eligible invoices still require an individual payment action. Enabling this grants standing authority for this network only.";
+  const autonomyButton = $("policy-autonomy");
+  autonomyButton.dataset.enabled = String(autonomyEnabled);
+  autonomyButton.textContent = autonomyEnabled ? "Disable autonomy" : "Enable bounded autonomy";
+  autonomyButton.disabled = !autonomyEnabled && !state.policyAllowance;
   document.querySelectorAll("#policy-modal .copy-address").forEach((button) => {
     button.addEventListener("click", () => copyText(button.dataset.address, button.dataset.label));
   });
@@ -956,6 +1076,49 @@ async function togglePolicyAllowance() {
   }
 }
 
+async function togglePaymentAutonomy() {
+  if (!policyIsReady()) return;
+  const enabled = Boolean(state.policyConfig?.autonomy_enabled);
+  const nextEnabled = !enabled;
+  const network = state.business?.wallet_blockchain === "ARC" ? "Arc Mainnet" : "Arc Testnet";
+  const policy = state.onchainPolicy || state.policyConfig || {};
+  const message = nextEnabled
+    ? "Enable bounded autonomous payments for this business on " + network + "?\n\n" +
+      "InboxPay may pay eligible invoices from connected Gmail without an individual payment click. Every payment must still pass the verified-vendor registry, " +
+      "" + policy.max_transaction_usdc + " USDC per-payment limit, " + policy.daily_limit_usdc + " USDC daily limit, " + policy.cash_floor_usdc + " USDC cash floor, duplicate protection, allowance, and emergency pause.\n\n" +
+      "HOLD and ESCALATE invoices will not be paid."
+    : "Disable autonomous payments for this business on " + network + "?\n\nNo new jobs will be claimed. A transaction already submitted to Arc will still be reconciled honestly.";
+  if (!window.confirm(message)) return;
+
+  const button = $("policy-autonomy");
+  button.disabled = true;
+  setPolicyMessage(nextEnabled ? "Enabling bounded autonomy…" : "Disabling autonomous execution…");
+  try {
+    const response = await apiFetch("/api/policy", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        network: state.business?.wallet_blockchain,
+        autonomyEnabled: nextEnabled,
+        confirmAutonomy: nextEnabled,
+        ...(nextEnabled && state.business?.wallet_blockchain === "ARC" ? { confirmMainnet: true } : {})
+      })
+    });
+    const data = await readJsonResponse(response);
+    if (!response.ok) throw new Error(data.error || "Autonomy update failed");
+    state.policyConfig = data.policy || state.policyConfig;
+    renderPolicyModal();
+    setPolicyMessage(nextEnabled
+      ? "Bounded autonomy is enabled for this business and network."
+      : "Autonomous execution is disabled. Manual settlement remains available.");
+    toast(nextEnabled ? "Bounded autonomy enabled" : "Autonomous execution disabled");
+  } catch (error) {
+    setPolicyMessage(error.message || "Autonomy update failed", true);
+  } finally {
+    button.disabled = false;
+  }
+}
+
 
 function renderStats() {
   renderPaymentFlow();
@@ -1084,6 +1247,8 @@ function renderDetail() {
   const checking = state.preflightLoading;
   const settled = !checking && (invoiceSettled(invoice) || preflightSettled(preflight));
   const scheduleDecision = invoice.agentDecision === "SCHEDULE" && !settled && !processing && !reviewRequired && !scheduled;
+  const autonomyEnabled = Boolean(state.policyConfig?.autonomy_enabled);
+  const autonomy = invoice.autonomy;
   const decisionReady = invoice.agentDecision === "PAY_NOW" && !settled;
   const vaultReady = policyIsReady();
   const policyPaused = Boolean(state.onchainPolicy?.paused ?? state.policyConfig?.paused);
@@ -1126,7 +1291,14 @@ function renderDetail() {
       checkRow("Policy vault", vaultReady ? "Ready" : "Not ready") +
       checkRow("USDC authorization", state.policyAllowance ? "Ready" : "Required") +
       checkRow("Emergency pause", policyPaused ? "Paused" : "Ready");
-  const scheduleHtml = scheduled
+  const autonomyHtml = autonomy
+    ? '<div class="schedule-card"><div><strong>Autonomous execution · ' + escapeHtml(autonomy.status) + '</strong><span>' +
+      escapeHtml(autonomy.scheduled_for ? new Date(autonomy.scheduled_for).toLocaleString() : "Execution time pending") +
+      '</span><small>' + escapeHtml(autonomy.last_error || (autonomy.status === "reconciling" ? "Payment submitted; awaiting confirmed Arc reconciliation." : "The worker will recheck the latest business and onchain policy before any payment.")) + '</small></div></div>'
+    : autonomyEnabled && scheduleDecision
+      ? '<div class="schedule-card"><div><strong>Bounded autonomy active</strong><span>This invoice will be queued for its due date by the background operator.</span><small>Execution still requires PAY_NOW at that time plus every live vendor, allowance, limit, cash-floor, duplicate, pause, and reconciliation check.</small></div></div>'
+      : "";
+  const scheduleHtml = autonomyHtml || (scheduled
     ? '<div class="schedule-card"><div><strong>Queued for review</strong><span>' +
       escapeHtml(invoice.schedule?.scheduledFor ? new Date(invoice.schedule.scheduledFor).toLocaleString() : "Target pending audit reconciliation") +
       '</span><small>Vendor verification and live policy preflight are still required. No payment has been submitted.</small></div><div class="schedule-actions"><button id="reschedule-button" class="ghost" type="button">Reschedule</button><button id="cancel-schedule" class="ghost" type="button">Cancel schedule</button></div></div>'
@@ -1136,7 +1308,7 @@ function renderDetail() {
         '</span><small>The queue has paused this invoice for owner review. Releasing it changes no funds; vendor verification and live policy preflight still gate payment.</small></div><button id="cancel-schedule" class="ghost" type="button">Release to review</button></div>'
     : scheduleDecision
       ? '<div class="schedule-card"><div><strong>Schedule this invoice</strong><span>Queue for review on the due date</span><small>This records a durable review queue entry only. It will not move funds or bypass vendor verification.</small></div><button id="schedule-button" class="ghost" type="button">Queue for due date</button></div>'
-      : "";
+      : "");
   $("detail").innerHTML = '<div class="detail-inner"><div class="detail-top"><div><label>INVOICE</label><h2>' +
     escapeHtml(invoice.invoiceNumber || "Needs review") + '</h2></div>' + status(detailStatus) + '</div>' +
     '<div class="merchant"><div class="avatar big">' + escapeHtml(vendorInitial) + '</div><div><strong>' +
@@ -1154,7 +1326,7 @@ function renderDetail() {
 
   if (settled) { const receiptButton = $("receipt-open-payments"); if (receiptButton) receiptButton.addEventListener("click", () => openActivity("payments")); }
   if (ready) $("pay-button").addEventListener("click", settle);
-  if (scheduleDecision) $("schedule-button").addEventListener("click", scheduleInvoice);
+  if (scheduleDecision && !autonomyEnabled) $("schedule-button").addEventListener("click", scheduleInvoice);
   if (scheduled) $("reschedule-button").addEventListener("click", rescheduleScheduledInvoice);
   if (scheduled || dueReview) {
     $("cancel-schedule").addEventListener("click", cancelScheduledInvoice);
@@ -1771,6 +1943,9 @@ async function init() {
     $("edit-business").addEventListener("click", openBusinessModal);
     $("close-business").addEventListener("click", closeBusinessModal);
     $("business-form").addEventListener("submit", saveBusinessName);
+    $("withdrawal-form").addEventListener("submit", submitWalletWithdrawal);
+    $("withdrawal-recipient").addEventListener("input", () => { state.withdrawalRequestId = null; });
+    $("withdrawal-amount").addEventListener("input", () => { state.withdrawalRequestId = null; });
     $("nav-business").addEventListener("click", openBusinessModal);
     document.querySelector('[data-nav="inbox"]').addEventListener("click", () => setDestination("inbox"));
     $("nav-vendors").addEventListener("click", openVendorModal);
@@ -1812,6 +1987,7 @@ async function init() {
     $("policy-migrate").addEventListener("click", migratePolicyVault);
     $("policy-pause").addEventListener("click", togglePolicyPause);
     $("policy-allowance").addEventListener("click", togglePolicyAllowance);
+    $("policy-autonomy").addEventListener("click", togglePaymentAutonomy);
     $("copy-wallet").addEventListener("click", () => copyText(state.business.wallet_address, "Wallet address"));
     $("sign-out").addEventListener("click", async () => {
       const button = $("sign-out"); button.disabled = true; button.textContent = "Signing out…";

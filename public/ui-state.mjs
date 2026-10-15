@@ -73,8 +73,16 @@ const AUDIT_EVENT_LABELS = {
   invoice_scheduled: "Invoice queued for review",
   invoice_schedule_rescheduled: "Invoice review rescheduled",
   invoice_schedule_cancelled: "Scheduled review cancelled",
+  invoice_evaluated: "Invoice evaluated by the payment agent",
+  invoice_autonomy_queued: "Invoice queued for autonomous execution",
+  invoice_autonomy_attempted: "Autonomous payment execution attempted",
+  invoice_autonomy_completed: "Autonomous payment completed",
+  invoice_autonomy_stopped: "Autonomous payment stopped",
+  invoice_autonomy_retry_scheduled: "Autonomous payment retry scheduled",
   payment_submitted: "Payment submitted to Circle",
   payment_settled: "Payment settled and reconciled",
+  payment_autonomy_enabled: "Bounded payment autonomy enabled",
+  payment_autonomy_disabled: "Bounded payment autonomy disabled",
   policy_allowance_approved: "USDC access authorized",
   policy_allowance_revoked: "USDC access revoked",
   policy_pause_updated: "Emergency payment control changed",
@@ -82,7 +90,13 @@ const AUDIT_EVENT_LABELS = {
   vendor_policy_updated: "Vendor policy updated",
   vendor_registered: "Vendor registered",
   vendor_revoked: "Vendor revoked",
-  wallet_provisioned: "Dedicated business wallet created"
+  wallet_provisioned: "Dedicated business wallet created",
+  wallet_withdrawal_requested: "Business wallet withdrawal requested",
+  wallet_withdrawal_submitted: "Business wallet withdrawal submitted",
+  wallet_withdrawal_submission_uncertain: "Withdrawal submission needs recovery",
+  wallet_withdrawal_confirmed: "Business wallet withdrawal confirmed",
+  wallet_withdrawal_failed: "Business wallet withdrawal failed",
+  wallet_withdrawal_reconciliation_review: "Withdrawal reconciliation needs review"
 };
 
 export function auditEventLabel(type = "") {
@@ -93,7 +107,7 @@ export function auditEventLabel(type = "") {
 
 export function auditEventCategory(type = "") {
   const value = String(type);
-  if (/^payment_|settlement/.test(value)) return "payments";
+  if (/^payment_|settlement|wallet_withdrawal|invoice_autonomy/.test(value)) return "payments";
   if (/vendor/.test(value)) return "vendors";
   if (/policy|allowance/.test(value)) return "policy";
   if (/invoice_schedule|scheduled/.test(value)) return "schedule";

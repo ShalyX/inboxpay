@@ -96,6 +96,8 @@ This repo is intentionally framework-light: static HTML/CSS/JS in `public/` plus
 
 Set the infrastructure secrets in Vercel, including Circle credentials, Supabase configuration, Gmail OAuth client credentials, and token-encryption secrets. Users supply their own OAuth consent through the product; they never configure infrastructure secrets.
 
+The bounded-autonomy worker and business-wallet withdrawals additionally require the server-only `SUPABASE_SECRET_KEY`, `AUTONOMY_CRON_SECRET`, and `supabase/migrations/20261015_autonomy_and_withdrawals.sql`. The worker is invoked through the existing invoices function so the production build remains at 12 Vercel functions. Follow [AUTONOMY-RUNBOOK.md](./AUTONOMY-RUNBOOK.md) for the Supabase Cron trigger, Testnet proof, monitoring, recovery, and Mainnet release gate.
+
 Do not commit Gmail tokens, Circle wallet exports, OAuth credentials, local invoice files, or evaluator output.
 
 ## Hackathon proof

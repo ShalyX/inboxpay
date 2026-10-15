@@ -1,5 +1,5 @@
 import { formatUnits, parseAbi } from "viem";
-import { requireUser, supabaseRest } from "../lib/supabase-server.mjs";
+import { getSupabaseServerSecret, requireUser, supabaseRest } from "../lib/supabase-server.mjs";
 import { getBusiness, updateBusinessNetworkAccount } from "../lib/businesses.mjs";
 import { deployBusinessPolicyVault, getBusinessPolicyVault, getWalletTransaction } from "../lib/policy-contract.mjs";
 import { migrationDeploymentAttempt, migrationEligibility } from "../lib/policy-migration.mjs";
@@ -33,6 +33,42 @@ async function getPolicy(token, businessId, network) {
 
 async function audit(token, values) {
   await supabaseRest("audit_events", { token, method: "POST", body: values });
+}
+
+async function assertAutonomyReady(token, user, business, policy) {
+  if (!business.wallet_id || !business.wallet_address || business.wallet_status !== "ready") {
+    throw new Error("Dedicated business wallet is not ready");
+  }
+  if (!business.policy_contract_address || business.policy_contract_status !== "ready") {
+    throw new Error("Onchain policy vault is not ready");
+  }
+  const integrations = await supabaseRest(
+    "integrations?select=id,status&user_id=eq." + encodeURIComponent(user.id) +
+      "&business_id=eq." + encodeURIComponent(business.id) +
+      "&provider=eq.google_gmail&status=eq.connected&limit=1",
+    { token }
+  );
+  if (!integrations?.[0]) throw new Error("Connected Gmail is required before autonomy can be enabled");
+
+  const [onchain, allowance, otherNetworks] = await Promise.all([
+    readPolicyState(business.policy_contract_address, business.wallet_blockchain),
+    policyClient(business.wallet_blockchain).readContract({
+      address: USDC,
+      abi: parseAbi(["function allowance(address owner,address spender) view returns (uint256)"]),
+      functionName: "allowance",
+      args: [business.wallet_address, business.policy_contract_address]
+    }),
+    supabaseRest(
+      "policies?select=id,network&business_id=eq." + encodeURIComponent(business.id) +
+        "&autonomy_enabled=eq.true&network=neq." + encodeURIComponent(business.wallet_blockchain),
+      { token }
+    )
+  ]);
+  if (onchain.paused || policy.paused) throw new Error("Resume the business payment policy before enabling autonomy");
+  if (allowance <= 0n) throw new Error("Authorize the policy vault to access USDC before enabling autonomy");
+  if (otherNetworks?.length) {
+    throw new Error("Autonomous execution is already enabled for this business on " + otherNetworks[0].network);
+  }
 }
 
 function providerError(error) {
@@ -209,6 +245,34 @@ export default async function handler(req, res) {
       }
       if (req.body?.requireVerifiedVendor === true) updates.require_verified_vendor = true;
       if (typeof req.body?.paused === "boolean") updates.paused = req.body.paused;
+      const changesAutonomy = typeof req.body?.autonomyEnabled === "boolean";
+      if (changesAutonomy) {
+        if (req.body.autonomyEnabled) {
+          if (req.body?.confirmAutonomy !== true) {
+            return res.status(409).json({
+              error: "Autonomous payments require explicit business authorization",
+              confirmation: {
+                network: business.wallet_blockchain === "ARC" ? "Arc Mainnet" : "Arc Testnet",
+                wallet: business.wallet_address,
+                policyVault: business.policy_contract_address,
+                authority: "Pay eligible Gmail invoices without individual payment clicks"
+              }
+            });
+          }
+          if (business.wallet_blockchain === "ARC" && req.body?.confirmMainnet !== true) {
+            return res.status(409).json({ error: "Arc Mainnet autonomy requires explicit Mainnet confirmation" });
+          }
+          await assertAutonomyReady(token, user, business, policy);
+          updates.autonomy_enabled = true;
+          updates.autonomy_enabled_at = new Date().toISOString();
+          updates.autonomy_confirmation_version = "bounded-autonomy-v1";
+          updates.autonomy_last_error = null;
+        } else {
+          updates.autonomy_enabled = false;
+          updates.autonomy_enabled_at = null;
+          updates.autonomy_confirmation_version = null;
+        }
+      }
 
       const maxTx = updates.max_transaction_usdc ?? Number(policy.max_transaction_usdc);
       const daily = updates.daily_limit_usdc ?? Number(policy.daily_limit_usdc);
@@ -277,8 +341,27 @@ export default async function handler(req, res) {
         "policies?id=eq." + encodeURIComponent(policy.id) +
           "&business_id=eq." + encodeURIComponent(business.id) +
           "&network=eq." + encodeURIComponent(business.wallet_blockchain),
-        { token, method: "PATCH", body: updates }
+        {
+          token: changesAutonomy ? getSupabaseServerSecret() : token,
+          method: "PATCH",
+          body: updates
+        }
       );
+      if (changesAutonomy) {
+        await audit(token, {
+          user_id: user.id,
+          business_id: business.id,
+          network: business.wallet_blockchain,
+          event_type: updates.autonomy_enabled ? "payment_autonomy_enabled" : "payment_autonomy_disabled",
+          actor: "user",
+          data: {
+            network: business.wallet_blockchain,
+            wallet_address: business.wallet_address,
+            policy_vault: business.policy_contract_address,
+            confirmation_version: updates.autonomy_confirmation_version
+          }
+        });
+      }
       return res.status(200).json({ policy: rows?.[0] || { ...policy, ...updates } });
     }
 

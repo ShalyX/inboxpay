@@ -3,6 +3,8 @@ import { listBusinessInvoices, syncBusinessInvoices } from "../lib/business-data
 import { recoverPendingBusinessInvoices } from "../lib/business-payment.mjs";
 import { advanceDueSchedules, invoiceScheduleStates, scheduleBusinessInvoice } from "../lib/invoice-scheduling.mjs";
 import { classifyInvoiceRouteError } from "../lib/invoice-route-errors.mjs";
+import { autonomyJobStates, runAutonomyCycle } from "../lib/autonomy.mjs";
+import { requireAutonomyWorker } from "../lib/worker-auth.mjs";
 
 export default async function handler(req, res) {
   if (!["GET", "PATCH", "POST"].includes(req.method)) {
@@ -11,6 +13,12 @@ export default async function handler(req, res) {
   }
 
   try {
+    if (req.method === "POST" && String(req.body?.action || "").toLowerCase() === "autonomy_tick") {
+      requireAutonomyWorker(req);
+      const result = await runAutonomyCycle();
+      return res.status(200).json({ ok: true, ...result });
+    }
+
     const { token, user } = await requireUser(req);
     if (req.method === "PATCH") {
       const action = String(req.body?.action || "").toLowerCase();
@@ -53,6 +61,12 @@ export default async function handler(req, res) {
       recoveredInvoices,
       result.business.wallet_blockchain
     );
+    const autonomyStates = await autonomyJobStates(
+      token,
+      result.business.id,
+      result.business.wallet_blockchain,
+      recoveredInvoices
+    );
     const invoices = recoveredInvoices.map((invoice) => ({
       vendor: invoice.vendor,
       invoiceNumber: invoice.invoice_number,
@@ -65,6 +79,7 @@ export default async function handler(req, res) {
       sourceCount: invoice.sources?.length || 0,
       sources: invoice.sources,
       paymentId: invoice.payment_id,
+      autonomy: autonomyStates.get(invoice.id) || null,
       schedule: ["scheduled", "review"].includes(invoice.settlement_status)
         ? (scheduleStates.get(invoice.id) || { status: "queued", scheduledFor: null, reason: "Schedule target is awaiting audit reconciliation" })
         : null,
@@ -89,6 +104,9 @@ export default async function handler(req, res) {
       invoices
     });
   } catch (error) {
+    if (error?.statusCode === 401) {
+      return res.status(401).json({ error: "Autonomy worker authentication failed" });
+    }
     const failure = classifyInvoiceRouteError(error);
     if (failure.log === "warning") {
       console.warn("InboxPay /api/invoices requires Gmail reauthorization");

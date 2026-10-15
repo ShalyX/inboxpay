@@ -21,6 +21,9 @@ assert.equal(auditEventCategory("payment_submitted"), "payments");
 assert.equal(auditEventCategory("policy_allowance_approved"), "policy");
 assert.equal(auditEventCategory("vendor_registered"), "vendors");
 assert.equal(auditEventCategory("invoice_schedule_rescheduled"), "schedule");
+assert.equal(auditEventLabel("payment_autonomy_enabled"), "Bounded payment autonomy enabled");
+assert.equal(auditEventCategory("invoice_autonomy_completed"), "payments");
+assert.equal(auditEventCategory("wallet_withdrawal_confirmed"), "payments");
 
 function fakeElement(nav) {
   const classes = new Set();

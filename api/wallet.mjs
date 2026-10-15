@@ -3,6 +3,7 @@ import { requireUser, supabaseRest } from "../lib/supabase-server.mjs";
 import { getBusiness } from "../lib/businesses.mjs";
 import { policyClient } from "../lib/policy-sync.mjs";
 import { requestBusinessTestnetFunds } from "../lib/circle-wallets.mjs";
+import { requestWalletWithdrawal, walletWithdrawalState } from "../lib/wallet-withdrawals.mjs";
 
 const USDC = "0x3600000000000000000000000000000000000000";
 
@@ -22,6 +23,32 @@ export default async function handler(req, res) {
     if (req.method === "POST") {
       if (String(req.body?.network || "") !== business.wallet_blockchain) {
         return res.status(409).json({ error: "The active wallet environment changed. Refresh and try again." });
+      }
+      if (req.body?.action === "withdraw") {
+        const recipientAddress = String(req.body?.recipientAddress || "").trim();
+        const amount = String(req.body?.amount || "").trim();
+        if (req.body?.confirmWithdrawal !== true) {
+          return res.status(409).json({
+            error: "Wallet withdrawal requires explicit confirmation",
+            confirmation: {
+              network: business.wallet_blockchain === "ARC" ? "Arc Mainnet" : "Arc Testnet",
+              token: "USDC",
+              amount,
+              recipientAddress,
+              walletAddress: business.wallet_address
+            }
+          });
+        }
+        if (business.wallet_blockchain === "ARC" && req.body?.confirmMainnet !== true) {
+          return res.status(409).json({ error: "Arc Mainnet withdrawal requires explicit Mainnet confirmation" });
+        }
+        const result = await requestWalletWithdrawal(token, user.id, {
+          requestId: req.body?.requestId,
+          network: req.body?.network,
+          recipientAddress,
+          amount
+        });
+        return res.status(result.withdrawal?.status === "confirmed" ? 200 : 202).json({ ok: true, ...result });
       }
       if (req.body?.action !== "fund_testnet") {
         return res.status(400).json({ error: "Unsupported wallet action" });
@@ -66,13 +93,8 @@ export default async function handler(req, res) {
       return res.status(202).json({ ok: true, status: "requested", auditRecorded });
     }
 
-    const client = policyClient(business.wallet_blockchain);
-    const balance = await client.readContract({
-      address: USDC,
-      abi: parseAbi(["function balanceOf(address) view returns (uint256)"]),
-      functionName: "balanceOf",
-      args: [business.wallet_address]
-    });
+    const state = await walletWithdrawalState(token, user.id, business);
+    const balance = state.balance;
 
     let policyVaultBalance = null;
     if (business.policy_contract_address) {
@@ -90,12 +112,37 @@ export default async function handler(req, res) {
       blockchain: business.wallet_blockchain,
       currency: "USDC",
       balance: formatUnits(balance, 6),
+      cashFloor: formatUnits(state.cashFloor, 6),
+      reserved: formatUnits(state.reserved, 6),
+      withdrawable: formatUnits(state.withdrawable, 6),
       policyVaultAddress: business.policy_contract_address || null,
-      policyVaultBalance: policyVaultBalance === null ? null : formatUnits(policyVaultBalance, 6)
+      policyVaultBalance: policyVaultBalance === null ? null : formatUnits(policyVaultBalance, 6),
+      policyVaultCustody: "allowance_only",
+      withdrawals: state.withdrawals.map((withdrawal) => ({
+        id: withdrawal.id,
+        requestId: withdrawal.request_id,
+        amount: String(withdrawal.amount_usdc),
+        recipientAddress: withdrawal.recipient_address,
+        network: withdrawal.network,
+        status: withdrawal.status,
+        circleTransactionId: withdrawal.circle_transaction_id,
+        transactionHash: withdrawal.transaction_hash,
+        error: withdrawal.error,
+        createdAt: withdrawal.created_at,
+        updatedAt: withdrawal.updated_at,
+        confirmedAt: withdrawal.confirmed_at
+      }))
     });
   } catch (error) {
     console.error("InboxPay wallet balance failed:", error);
     const message = error instanceof Error ? error.message : "Wallet unavailable";
-    return res.status(/Authentication required|Invalid or expired/i.test(message) ? 401 : 500).json({ error: message });
+    const status = /Authentication required|Invalid or expired/i.test(message)
+      ? 401
+      : /amount|recipient|request ID|different from/i.test(message)
+        ? 400
+        : /not ready|not provisioned|environment changed|exceeds available|cash floor|withdrawal.*processing|withdrawal.*failed|withdrawal.*review/i.test(message)
+          ? 409
+          : 500;
+    return res.status(status).json({ error: status === 500 ? "Wallet operation is temporarily unavailable" : message });
   }
 }

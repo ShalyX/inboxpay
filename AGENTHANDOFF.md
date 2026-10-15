@@ -931,6 +931,39 @@ Remaining UI worklist after this pass:
 - Improve empty activity and recovery states, then consolidate the accumulated CSS overrides.
 - Extend visual QA across keyboard-only operation, tablet widths, and high-contrast settings.
 
+### P0 — Bounded autonomy and business wallet control (feature branch; not deployed)
+
+On 2026-10-15 the product gap was confirmed: production invoice ingestion is request-driven, `SCHEDULE` is a durable review queue rather than an execution schedule, and the business wallet has no withdrawal operation. Work is isolated on `codex/autonomy-wallet-control`; production `main` and the canonical Vercel deployment have not been changed, and no Mainnet financial write was made.
+
+The feature branch now contains:
+- durable `invoice_execution_jobs` with scheduled execution, leases, bounded retries, reconciling/held/failed terminal states, service-role-only atomic claims, and business/network isolation;
+- a secret-authenticated worker action on the existing `/api/invoices` function, keeping the Vercel build at the Hobby-plan limit of 12 functions;
+- business-scoped Gmail ingestion, decision audit events, automatic `PAY_NOW` queueing, preserved future execution times, payment-attempt audit events, and reuse of the existing policy-enforced/idempotent/reconciled settlement path;
+- explicit per-business/per-network autonomy authorization, disabled by default, with Mainnet confirmation, ready-wallet/Gmail/vault/allowance/pause checks, a one-network authority constraint, and server-only autonomy-column mutation;
+- real dedicated-business-wallet withdrawals through Circle `createTransaction`, exact confirmation, request/Circle idempotency, a one-in-flight database lock, cash-floor and autonomous-job reservations, honest pending/failure states, Arc receipt verification, history, and audit events;
+- wallet UI that distinguishes balance, cash floor, reserved funds, and withdrawable funds. The active `BusinessPolicyVault` remains allowance-only: it does not custody a separate balance and exposes no withdrawal method, so no fabricated vault-recovery action was added;
+- `supabase/migrations/20261015_autonomy_and_withdrawals.sql`, `AUTONOMY-RUNBOOK.md`, and `npm run test:autonomy-wallet`.
+
+Important review findings fixed before handoff:
+- an `sb_secret_...` Supabase key is sent only in `apikey`, never incorrectly as a JWT bearer token;
+- browser-authenticated roles cannot toggle standing autonomy directly through PostgREST;
+- Gmail token lookup is bound to the specific business;
+- the autonomous settlement path resolves the job's authorized network account rather than whichever environment the UI currently displays;
+- a due-date reevaluation cannot pull a stored 09:00 UTC scheduled payment forward to midnight;
+- payment claims and withdrawal preparation share a database advisory-lock boundary, so they cannot independently pass balance/cash-floor checks and submit concurrently for the same business/network;
+- each worker cycle is bounded to five business inboxes, five pending withdrawals, and three claimed payment jobs so it fits the existing 300-second function limit.
+
+Local verification currently passes JavaScript syntax checks, `npm run test:autonomy-wallet`, `npm run test:frontend`, `npm run test:local`, `npm run test:networks`, `npm run test:profile`, `npm run test:gmail-parser`, `npm run test:scheduling`, `npm run test:preflight`, `npm run test:recovery`, `npm run test:idempotency`, `npm run test:migration`, `npm run test:invoice-route`, `npm run evaluate`, `forge test`, `git diff --check`, and a production-target `vercel build`. The built output still contains exactly 12 functions.
+
+Deployment is intentionally blocked pending:
+1. review/merge approval for the financial feature branch;
+2. applying the new Supabase migration;
+3. adding Production-only `SUPABASE_SECRET_KEY` and `AUTONOMY_CRON_SECRET`;
+4. configuring the Supabase Cron + `pg_net` trigger described in `AUTONOMY-RUNBOOK.md`;
+5. completing the controlled Arc Testnet end-to-end proof, including concurrency, rejection, delayed reconciliation, and withdrawal cases.
+
+Do not claim full autonomy or deploy/enable Mainnet autonomy until that proof exists. Vercel Hobby cron is not used because its timing cannot satisfy due-time payment execution; Supabase Cron is the selected scheduler.
+
 ### P1 — Final submission hygiene
 Before hackathon submission:
 - verify public repo
