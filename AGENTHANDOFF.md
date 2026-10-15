@@ -931,9 +931,9 @@ Remaining UI worklist after this pass:
 - Improve empty activity and recovery states, then consolidate the accumulated CSS overrides.
 - Extend visual QA across keyboard-only operation, tablet widths, and high-contrast settings.
 
-### P0 — Bounded autonomy and business wallet control (feature branch; not deployed)
+### P0 — Bounded autonomy and business wallet control (production infrastructure live; Testnet financial proof pending)
 
-On 2026-10-15 the product gap was confirmed: production invoice ingestion is request-driven, `SCHEDULE` is a durable review queue rather than an execution schedule, and the business wallet has no withdrawal operation. Work is isolated on `codex/autonomy-wallet-control`; production `main` and the canonical Vercel deployment have not been changed, and no Mainnet financial write was made.
+On 2026-10-15 the product gap was confirmed: production invoice ingestion is request-driven, `SCHEDULE` is a durable review queue rather than an execution schedule, and the business wallet has no withdrawal operation. Work remains isolated on `codex/autonomy-wallet-control` at commit `d8b96bc`; the branch is pushed to GitHub but is not merged into `main`. The reviewed branch was deployed directly to Production as Vercel deployment `dpl_9Wfq6PzTMcAeFh2cNoZ7i3DJkJZQ`, which is `READY` and owns `https://tameion-ap-agent-live.vercel.app`. No Mainnet financial write was made.
 
 The feature branch now contains:
 - durable `invoice_execution_jobs` with scheduled execution, leases, bounded retries, reconciling/held/failed terminal states, service-role-only atomic claims, and business/network isolation;
@@ -955,12 +955,15 @@ Important review findings fixed before handoff:
 
 Local verification currently passes JavaScript syntax checks, `npm run test:autonomy-wallet`, `npm run test:frontend`, `npm run test:local`, `npm run test:networks`, `npm run test:profile`, `npm run test:gmail-parser`, `npm run test:scheduling`, `npm run test:preflight`, `npm run test:recovery`, `npm run test:idempotency`, `npm run test:migration`, `npm run test:invoice-route`, `npm run evaluate`, `forge test`, `git diff --check`, and a production-target `vercel build`. The built output still contains exactly 12 functions.
 
-Deployment is intentionally blocked pending:
-1. review/merge approval for the financial feature branch;
-2. applying the new Supabase migration;
-3. adding Production-only `SUPABASE_SECRET_KEY` and `AUTONOMY_CRON_SECRET`;
-4. configuring the Supabase Cron + `pg_net` trigger described in `AUTONOMY-RUNBOOK.md`;
-5. completing the controlled Arc Testnet end-to-end proof, including concurrency, rejection, delayed reconciliation, and withdrawal cases.
+Production infrastructure completed on 2026-10-15:
+- the reviewed financial branch is pushed and deployed; merging it into `main` remains gated on the controlled Testnet proof;
+- `supabase/migrations/20261015_autonomy_and_withdrawals.sql` was applied successfully to the Production Supabase project;
+- dedicated Production-only `SUPABASE_SECRET_KEY` and `AUTONOMY_CRON_SECRET` values are installed in Vercel; the worker secret is also stored in Supabase Vault and is not reused for any other integration;
+- `pg_cron`, `pg_net`, and the `inboxpay-autonomy` every-minute trigger are active. Supabase job `1` reports `succeeded`, and the queued `pg_net` request returned HTTP `200` without timing out;
+- unauthenticated and incorrect-secret worker requests return HTTP `401`;
+- authenticated Production reload restores Caraxes Labs on Arc Testnet with its dedicated wallet `0xca32c823b85c2b5de03c7626b42293b4fe18d5e2`, `39.45 USDC`, connected live Gmail, ready policy vault, and authorized USDC access. Autonomy remains disabled.
+
+The remaining P0 release gate is the controlled Arc Testnet end-to-end proof: explicitly enable bounded authority for Caraxes Labs on Testnet, deliver or select one eligible controlled invoice, verify exactly-once autonomous settlement/reconciliation, run concurrency/rejection/delayed-reconciliation cases, and exercise one small controlled wallet withdrawal. These are financial actions and still require action-time confirmation. After the proof, merge `codex/autonomy-wallet-control` into `main` and redeploy from `main`.
 
 Do not claim full autonomy or deploy/enable Mainnet autonomy until that proof exists. Vercel Hobby cron is not used because its timing cannot satisfy due-time payment execution; Supabase Cron is the selected scheduler.
 
