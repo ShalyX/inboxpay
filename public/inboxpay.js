@@ -1253,7 +1253,9 @@ function renderDetail() {
   const vaultReady = policyIsReady();
   const policyPaused = Boolean(state.onchainPolicy?.paused ?? state.policyConfig?.paused);
   const vendor = state.vendors.find((item) => item.name === invoice.vendor);
-  const vendorReady = vendor?.status === "verified" && vendor?.onchain_status === "registered";
+  const vendorReady = vendor?.status === "verified" &&
+    vendor?.onchain_status === "registered" &&
+    (vendor?.invoice_sender_emails || []).length > 0;
   const ready = Boolean(preflight?.eligible);
   const detailStatus = checking
     ? "CHECKING"
@@ -1501,7 +1503,11 @@ async function loadVendors() {
 
 function renderVendors() {
   const node = $("vendor-list");
-  const paymentReady = state.vendors.filter((vendor) => vendor.status === "verified" && vendor.onchain_status === "registered").length;
+  const paymentReady = state.vendors.filter((vendor) =>
+    vendor.status === "verified" &&
+    vendor.onchain_status === "registered" &&
+    (vendor.invoice_sender_emails || []).length
+  ).length;
   const blocked = state.vendors.filter((vendor) => vendor.status === "blocked").length;
   $("vendor-summary").innerHTML = [
     pageMetric("Total vendors", String(state.vendors.length), "Saved in this business's active network"),
@@ -1521,11 +1527,14 @@ function renderVendors() {
     const registryStatus = vendor.status || "review";
     const chainStatus = vendor.onchain_status || "unavailable";
     const recipientMatch = registryStatus === "verified" && chainStatus === "registered";
+    const senderEmails = vendor.invoice_sender_emails || [];
     const chainLabel = chainStatus === "registered" ? "Registered" : chainStatus === "missing" ? "Missing" : chainStatus === "unavailable" ? "Unavailable" : "Not checked";
     return '<div class="vendor-row"><div><strong>' + escapeHtml(vendor.name) + '</strong><span>' +
     escapeHtml(vendor.recipient_address) +
-    '</span><button class="text-action copy-address" type="button" data-address="' + escapeHtml(vendor.recipient_address) + '" data-label="Vendor address">Copy address</button></div><div class="vendor-state"><span class="vendor-state-line"><b>Registry</b> ' + escapeHtml(registryStatus) + '</span><span class="vendor-state-line"><b>Onchain</b> ' + escapeHtml(chainLabel) + '</span><span class="vendor-state-line"><b>Recipient</b> ' + (recipientMatch ? "matches registry" : "does not match / unavailable") + '</span><b class="vendor-status ' + (recipientMatch ? "verified" : "review") + '">' +
-    (recipientMatch ? "payment ready" : "payment blocked") + '</b>' +
+    '</span><button class="text-action copy-address" type="button" data-address="' + escapeHtml(vendor.recipient_address) + '" data-label="Vendor address">Copy address</button>' +
+    '<form class="vendor-sender-form" data-id="' + escapeHtml(vendor.id) + '"><label>Verified invoice senders</label><div><input type="text" value="' + escapeHtml(senderEmails.join(", ")) + '" placeholder="billing@vendor.com" aria-label="Verified invoice sender emails for ' + escapeHtml(vendor.name) + '"><button class="ghost" type="submit">Save senders</button></div><small>Comma-separated, up to five. Unmatched Gmail invoices stay in review.</small></form>' +
+    '</div><div class="vendor-state"><span class="vendor-state-line"><b>Registry</b> ' + escapeHtml(registryStatus) + '</span><span class="vendor-state-line"><b>Onchain</b> ' + escapeHtml(chainLabel) + '</span><span class="vendor-state-line"><b>Sender identity</b> ' + (senderEmails.length ? escapeHtml(senderEmails.length + " verified") : "missing") + '</span><span class="vendor-state-line"><b>Recipient</b> ' + (recipientMatch ? "matches registry" : "does not match / unavailable") + '</span><b class="vendor-status ' + (recipientMatch && senderEmails.length ? "verified" : "review") + '">' +
+    (recipientMatch && senderEmails.length ? "payment ready" : "payment blocked") + '</b>' +
     (registryStatus === "review" || chainStatus === "missing"
       ? '<button class="ghost verify-vendor" data-id="' + escapeHtml(vendor.id) + '">' + (chainStatus === "missing" ? "Register onchain" : "Verify") + '</button>'
       : "") +
@@ -1544,6 +1553,52 @@ function renderVendors() {
   document.querySelectorAll("#vendor-list .copy-address").forEach((button) => {
     button.addEventListener("click", () => copyText(button.dataset.address, button.dataset.label));
   });
+  document.querySelectorAll("#vendor-list .vendor-sender-form").forEach((form) => {
+    form.addEventListener("submit", updateVendorSenders);
+  });
+}
+
+async function updateVendorSenders(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const vendor = state.vendors.find((item) => item.id === form.dataset.id);
+  if (!vendor) return;
+  const senderEmails = form.querySelector("input").value
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
+  const network = state.business?.wallet_blockchain === "ARC" ? "Arc Mainnet" : "Arc Testnet";
+  if (!window.confirm(
+    "Update verified invoice senders for " + vendor.name + "?\n\n" +
+    (senderEmails.join("\n") || "No sender emails") + "\n\nNetwork: " + network +
+    "\n\nInvoices from other senders will stay in review."
+  )) return;
+  const submit = form.querySelector("button");
+  submit.disabled = true;
+  try {
+    const response = await apiFetch("/api/vendors", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: vendor.id,
+        action: "update_sender_emails",
+        senderEmails,
+        network: state.business?.wallet_blockchain,
+        ...(state.business?.wallet_blockchain === "ARC" ? { confirmMainnet: true } : {})
+      })
+    });
+    const data = await readJsonResponse(response);
+    if (!response.ok) throw new Error(data.error || "Unable to update invoice senders");
+    $("vendor-message").textContent = "Verified invoice senders updated. Refreshing the invoice review queue…";
+    $("vendor-message").className = "auth-message";
+    await loadVendors();
+    await load();
+  } catch (error) {
+    $("vendor-message").textContent = error.message;
+    $("vendor-message").className = "auth-message error";
+  } finally {
+    submit.disabled = false;
+  }
 }
 
 async function verifyVendor(id) {
@@ -1553,6 +1608,7 @@ async function verifyVendor(id) {
     const network = state.business?.wallet_blockchain === "ARC" ? "Arc Mainnet" : "Arc Testnet";
     const onchain = policyIsReady();
     const prompt = "Verify " + vendor.name + " for payments?\n\nRecipient: " + vendor.recipient_address +
+      "\nInvoice senders: " + ((vendor.invoice_sender_emails || []).join(", ") || "none configured") +
       "\nNetwork: " + network + (onchain ? "\n\nThis updates the business's onchain vendor registry." : "\n\nThis saves the verification. After the vault is deployed, InboxPay will require a separate onchain registration before payment.");
     if (!window.confirm(prompt)) return;
     const response = await apiFetch("/api/vendors", {
@@ -1624,6 +1680,7 @@ async function addVendor(event) {
       body: JSON.stringify({
         name: $("vendor-name").value.trim(),
         recipientAddress: $("vendor-address").value.trim(),
+        senderEmails: [$("vendor-email").value.trim().toLowerCase()],
         network: state.business?.wallet_blockchain
       })
     });

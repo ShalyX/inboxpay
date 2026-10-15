@@ -258,6 +258,12 @@ body[data-network="ARC"] .environment-control > span { color: var(--danger); }
 .vendor-state { align-items: flex-end !important; flex-wrap: wrap; }
 .vendor-state-line { color: var(--muted); font: 9px/1.3 var(--mono); }
 .vendor-state-line b { color: var(--ink); font-family: inherit; }
+.vendor-sender-form{width:min(100%,520px);margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.vendor-sender-form label{display:block;margin-bottom:6px;color:var(--ink);font-size:10px;font-weight:700;letter-spacing:.02em}
+.vendor-sender-form>div{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;width:100%}
+.vendor-sender-form input{width:100%;min-height:38px;padding:8px 10px;border:1px solid var(--line-strong);border-radius:8px;background:var(--paper);color:var(--ink);font:11px/1.4 var(--mono)}
+.vendor-sender-form .ghost{min-height:38px;padding:0 12px;white-space:nowrap}
+.vendor-sender-form small,.vendor-entry-card #vendor-form small{display:block;margin-top:6px;color:var(--muted);font-size:10px;line-height:1.45}
 .vendor-status { margin: 7px 0 !important; font: 800 8px/1 var(--mono) !important; letter-spacing: .08em; text-transform: uppercase; }
 .vendor-status.verified { color: var(--ok); }
 .vendor-status.review { color: var(--warn); }

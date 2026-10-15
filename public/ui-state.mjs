@@ -74,6 +74,7 @@ const AUDIT_EVENT_LABELS = {
   invoice_schedule_rescheduled: "Invoice review rescheduled",
   invoice_schedule_cancelled: "Scheduled review cancelled",
   invoice_evaluated: "Invoice evaluated by the payment agent",
+  invoice_ingestion_review_required: "Invoice attachment needs extraction review",
   invoice_autonomy_queued: "Invoice queued for autonomous execution",
   invoice_autonomy_attempted: "Autonomous payment execution attempted",
   invoice_autonomy_completed: "Autonomous payment completed",

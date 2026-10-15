@@ -33,16 +33,56 @@ const invoiceRecord = {
   currency: "USDC",
   dueDate: "2026-10-20",
   source: "gmail-body",
+  senderEmail: "billing@verified.example",
   extraction: { confidence: "high" },
   bodySignals: {}
 };
-const vendorRegistry = { "Verified Vendor": { status: "verified", currency: "USDC" } };
+const vendorRegistry = {
+  "Verified Vendor": {
+    status: "verified",
+    currency: "USDC",
+    senderEmails: ["billing@verified.example"]
+  }
+};
 assert.equal(evaluateInvoiceRecords([invoiceRecord], vendorRegistry, now).invoices[0].agentDecision, "SCHEDULE");
 assert.equal(
   evaluateInvoiceRecords([invoiceRecord], vendorRegistry, new Date("2026-10-20T09:00:00.000Z")).invoices[0].agentDecision,
   "PAY_NOW",
   "a future invoice must become executable when its durable schedule is due"
 );
+
+const missingSenderIdentity = evaluateInvoiceRecords(
+  [invoiceRecord],
+  { "Verified Vendor": { status: "verified", currency: "USDC", senderEmails: [] } },
+  now
+).invoices[0];
+assert.equal(missingSenderIdentity.agentDecision, "ESCALATE");
+assert.match(missingSenderIdentity.decisionReasons.join(" "), /sender identity/i);
+
+const broadenedInvoice = {
+  ...invoiceRecord,
+  messageId: "message-broadened",
+  discoveryRoutes: ["verified_vendor_pdf"],
+  senderEmail: "spoof@unknown.test",
+  senderVerified: false
+};
+const senderBoundRegistry = {
+  "Verified Vendor": {
+    status: "verified",
+    currency: "USDC",
+    senderEmails: ["billing@verified.example"]
+  }
+};
+const unverifiedSenderResult = evaluateInvoiceRecords([broadenedInvoice], senderBoundRegistry, now).invoices[0];
+assert.equal(unverifiedSenderResult.agentDecision, "ESCALATE");
+assert.match(unverifiedSenderResult.decisionReasons.join(" "), /sender identity/i);
+
+const verifiedSenderResult = evaluateInvoiceRecords([{
+  ...broadenedInvoice,
+  senderEmail: "billing@verified.example",
+  senderVerified: true
+}], senderBoundRegistry, now).invoices[0];
+assert.equal(verifiedSenderResult.agentDecision, "SCHEDULE");
 
 assert.equal(autonomyFailureDisposition("Blocked: vendor is not verified", 1, 5, now).status, "held");
 assert.equal(autonomyFailureDisposition("Circle status temporarily unavailable", 1, 5, now).status, "retry");

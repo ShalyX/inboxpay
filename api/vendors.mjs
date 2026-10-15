@@ -1,6 +1,7 @@
 import { requireUser, supabaseRest } from "../lib/supabase-server.mjs";
 import { getBusiness } from "../lib/businesses.mjs";
 import { readVendorRecipient, readVendorRevocationSupported, writePolicy } from "../lib/policy-sync.mjs";
+import { normalizeVendorEmails } from "../lib/gmail-live.mjs";
 import { keccak256 } from "viem";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
@@ -13,7 +14,7 @@ export default async function handler(req, res) {
 
     if (req.method === "GET") {
       const vendors = await supabaseRest(
-        "vendors?select=id,name,recipient_address,currency,status,network&business_id=eq." + encodeURIComponent(business.id) +
+        "vendors?select=id,name,recipient_address,currency,status,network,invoice_sender_emails&business_id=eq." + encodeURIComponent(business.id) +
           "&network=eq." + encodeURIComponent(business.wallet_blockchain) + "&order=name",
         { token }
       );
@@ -46,8 +47,10 @@ export default async function handler(req, res) {
       }
       const id = String(req.body?.id || "").trim();
       const status = String(req.body?.status || "").trim();
-      if (!id || !["verified", "review", "blocked"].includes(status)) {
-        return res.status(400).json({ error: "Vendor id and valid status are required" });
+      const action = String(req.body?.action || "status").trim().toLowerCase();
+      if (!id) return res.status(400).json({ error: "Vendor id is required" });
+      if (action === "status" && !["verified", "review", "blocked"].includes(status)) {
+        return res.status(400).json({ error: "A valid vendor status is required" });
       }
       const existingRows = await supabaseRest(
         "vendors?select=*&id=eq." + encodeURIComponent(id) + "&business_id=eq." + encodeURIComponent(business.id) +
@@ -56,6 +59,34 @@ export default async function handler(req, res) {
       );
       const vendor = existingRows?.[0];
       if (!vendor) return res.status(404).json({ error: "Vendor not found" });
+
+      if (action === "update_sender_emails") {
+        const requested = Array.isArray(req.body?.senderEmails) ? req.body.senderEmails : [];
+        const senderEmails = normalizeVendorEmails(requested);
+        if (requested.length > 5 || senderEmails.length !== requested.length) {
+          return res.status(400).json({ error: "Provide up to five valid, unique invoice sender emails" });
+        }
+        if (business.wallet_blockchain === "ARC" && req.body?.confirmMainnet !== true) {
+          return res.status(409).json({ error: "Mainnet vendor sender changes require explicit confirmation" });
+        }
+        const rows = await supabaseRest("rpc/update_vendor_invoice_senders", {
+          token,
+          method: "POST",
+          body: {
+            p_vendor_id: id,
+            p_network: business.wallet_blockchain,
+            p_sender_emails: senderEmails,
+            p_confirm_mainnet: req.body?.confirmMainnet === true
+          }
+        });
+        return res.status(200).json({ vendor: rows?.[0] || { ...vendor, invoice_sender_emails: senderEmails } });
+      }
+      if (action !== "status") return res.status(400).json({ error: "Unsupported vendor action" });
+      if (status === "verified" && !(vendor.invoice_sender_emails || []).length) {
+        return res.status(409).json({
+          error: "Add at least one verified invoice sender email before enabling this vendor for payment"
+        });
+      }
 
       let revocationWarning = null;
       if (business.policy_contract_status === "ready" && business.policy_contract_address) {
@@ -123,12 +154,17 @@ export default async function handler(req, res) {
       const name = String(req.body?.name || "").trim();
       const recipientAddress = String(req.body?.recipientAddress || "").trim();
       const currency = String(req.body?.currency || "USDC").toUpperCase();
+      const requestedSenderEmails = Array.isArray(req.body?.senderEmails) ? req.body.senderEmails : [];
+      const senderEmails = normalizeVendorEmails(requestedSenderEmails);
 
       if (!name || !/^0x[a-fA-F0-9]{40}$/.test(recipientAddress)) {
         return res.status(400).json({ error: "Vendor name and valid EVM recipient address are required" });
       }
       if (currency !== "USDC") {
         return res.status(400).json({ error: "InboxPay currently settles vendor invoices in USDC" });
+      }
+      if (requestedSenderEmails.length > 5 || senderEmails.length !== requestedSenderEmails.length) {
+        return res.status(400).json({ error: "Provide up to five valid, unique invoice sender emails" });
       }
 
       const rows = await supabaseRest("vendors", {
@@ -140,6 +176,7 @@ export default async function handler(req, res) {
           name,
           recipient_address: recipientAddress,
           currency,
+          invoice_sender_emails: senderEmails,
           status: "review"
         }
       });

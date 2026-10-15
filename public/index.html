@@ -188,6 +188,9 @@
               <input id="vendor-name" placeholder="e.g. Cloud infrastructure provider" required>
               <label for="vendor-address">Arc / EVM recipient</label>
               <input id="vendor-address" placeholder="0x…" pattern="0x[a-fA-F0-9]{40}" required>
+              <label for="vendor-email">Invoice sender email</label>
+              <input id="vendor-email" type="email" placeholder="billing@vendor.com" required>
+              <small>This email becomes the vendor identity InboxPay requires before a Gmail invoice can be payable.</small>
               <button id="vendor-submit" class="pay" type="submit">Add vendor for review</button>
             </form>
             <div id="vendor-message" class="auth-message" aria-live="polite"></div>
