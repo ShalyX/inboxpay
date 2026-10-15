@@ -965,6 +965,8 @@ Production infrastructure completed on 2026-10-15:
 
 The remaining P0 release gate is the controlled Arc Testnet end-to-end proof: explicitly enable bounded authority for Caraxes Labs on Testnet, deliver or select one eligible controlled invoice, verify exactly-once autonomous settlement/reconciliation, run concurrency/rejection/delayed-reconciliation cases, and exercise one small controlled wallet withdrawal. These are financial actions and still require action-time confirmation. After the proof, merge `codex/autonomy-wallet-control` into `main` and redeploy from `main`.
 
+The user explicitly confirmed enabling bounded autonomy for Caraxes Labs on Arc Testnet after reporting that a new Acme test invoice was sent. Three authenticated live Gmail refreshes still returned the unchanged four-record queue (one prior Acme settlement and three review/held records), so the controlled invoice was not present in InboxPay's evaluated results. In accordance with the product's evidence-complete gate, autonomy was left disabled rather than granting standing authority without the intended invoice in view. Retry only after the message is visible and policy-eligible; the live Gmail search requires an invoice/bill/payment signal in the subject or amount/payment/balance signal in the message body, and the deterministic parser requires invoice number, amount, currency, due date, and vendor identity.
+
 Do not claim full autonomy or deploy/enable Mainnet autonomy until that proof exists. Vercel Hobby cron is not used because its timing cannot satisfy due-time payment execution; Supabase Cron is the selected scheduler.
 
 ### P1 — Final submission hygiene
