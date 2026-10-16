@@ -122,6 +122,10 @@ Tameion final submission requires a public GitHub repository and a recorded demo
 
 For continuing development in Codex or another coding agent, read **[AGENTHANDOFF.md](./AGENTHANDOFF.md)** before making changes. It records the current architecture, live infrastructure, production OAuth setup, known blockers, verification status, and the immediate execution queue.
 
+## License
+
+InboxPay is licensed under the [Apache License 2.0](./LICENSE).
+
 ## Product onboarding
 
 1. A business creates or signs into an InboxPay account.
