@@ -1019,6 +1019,8 @@ The authenticated retry showed the controlled invoice still at one evidence sour
 
 The pre-`b615145` authenticated invoice view still showed `IP-PDF-20261016-01` with one Gmail evidence source and the historical `Vendor is not verified in the payment registry` reasoning while the live preflight displayed the current registry row as verified. This is stale persisted evaluation context, not authorization to pay; the invoice remains blocked. Vercel runtime diagnostics also show repeated Arc Testnet RPC failures at `https://rpc.testnet.arc.network/` while reading wallet balance, daily spend, and `canExecute`, so those gates correctly remain unavailable and fail closed. Recheck after the inline-PDF deployment; no payment or other financial write occurred.
 
+Commit `3d02020` adds sanitized Production logs for each PDF part (`parsed` with byte count or `review` with the parser reason) so the remaining one-source result can be diagnosed from the next authenticated refresh. Deployment `dpl_Cno66KaqEWENiH61r4Joe2m8iCTB` reached `READY` and owns the canonical alias. This is observability only; no invoice, vendor, wallet, policy, allowance, or payment state is changed.
+
 ### P1 — Final submission hygiene
 Before hackathon submission:
 - verify public repo
