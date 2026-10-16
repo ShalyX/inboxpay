@@ -107,19 +107,27 @@ globalThis.fetch = async (input) => {
   if (url.pathname.endsWith("/messages")) {
     observedMessageListParams.push(Object.fromEntries(url.searchParams));
     return json(url.searchParams.get("labelIds") === "Label_42"
-      ? { messages: [{ id: "label-message" }, { id: "old-label-message" }] }
-      : { messages: [] });
+      ? { messages: [{ id: "label-message" }, { id: "old-label-message" }, { id: "sent-label-message" }] }
+      : { messages: [{ id: "sent-keyword-message" }] });
   }
-  if (url.pathname.endsWith("/messages/label-message") || url.pathname.endsWith("/messages/old-label-message")) {
+  if (
+    url.pathname.endsWith("/messages/label-message") ||
+    url.pathname.endsWith("/messages/old-label-message") ||
+    url.pathname.endsWith("/messages/sent-label-message") ||
+    url.pathname.endsWith("/messages/sent-keyword-message")
+  ) {
     const oldMessage = url.pathname.endsWith("/messages/old-label-message");
+    const sentMessage = url.pathname.includes("/messages/sent-");
+    const sentKeywordMessage = url.pathname.endsWith("/messages/sent-keyword-message");
     const html = `<p>Vendor: Acme Test Hosting</p>
       <p>Invoice Number: IP-LABEL-HTML-1</p>
       <p>Total Due: 0.12 USDC</p>
       <p>Due Date: October 31, 2026</p>`;
     return json({
-      id: oldMessage ? "old-label-message" : "label-message",
-      threadId: oldMessage ? "old-label-thread" : "label-thread",
+      id: oldMessage ? "old-label-message" : sentKeywordMessage ? "sent-keyword-message" : sentMessage ? "sent-label-message" : "label-message",
+      threadId: oldMessage ? "old-label-thread" : sentKeywordMessage ? "sent-keyword-thread" : sentMessage ? "sent-label-thread" : "label-thread",
       internalDate: String(Date.parse(oldMessage ? "2026-10-14T23:59:59.000Z" : "2026-10-16T09:21:00.000Z")),
+      labelIds: sentMessage ? ["SENT", "Label_42"] : ["INBOX", "Label_42"],
       payload: {
         mimeType: "text/html",
         headers: [
@@ -141,7 +149,12 @@ try {
   });
   assert.equal(labelScan.count, 1);
   assert.equal(labelScan.labelResolved, true);
-  assert.equal(labelScan.routeMessageCounts.label, 2);
+  assert.equal(labelScan.routeMessageCounts.label, 3);
+  assert.equal(
+    labelScan.invoices.some((invoice) => invoice.messageId === "sent-label-message" || invoice.messageId === "sent-keyword-message"),
+    false,
+    "outbound Gmail messages must never enter invoice ingestion through keyword or explicit-label discovery",
+  );
   assert.deepEqual(labelScan.invoices[0].discoveryRoutes, ["label"]);
   assert.equal(labelScan.invoices[0].invoiceNumber, "IP-LABEL-HTML-1");
   assert.equal(labelScan.invoices[0].amount, 0.12);
