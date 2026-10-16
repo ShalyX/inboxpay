@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { activateDestination, auditEventCategory, auditEventLabel, destinationFromHash, inboxFailurePresentation, invoiceQueueCategory, networkLabel, paymentFlowStep, singleFlight } from "./ui-state.mjs";
+import { activateDestination, auditEventCategory, auditEventLabel, destinationFromHash, inboxFailurePresentation, invoiceQueueCategory, networkLabel, operationsStatusPresentation, paymentFlowStep, singleFlight } from "./ui-state.mjs";
 
 const state = {
   supabase: null,
@@ -22,7 +22,7 @@ const state = {
   preflightLoading: false,
   withdrawalRequestId: null,
   queue: { filter: "all", query: "" },
-  activity: { kind: null, rows: [], filter: "all", query: "" }
+  activity: { kind: null, rows: [], data: null, filter: "all", query: "" }
 };
 
 let bootstrapPromise = null;
@@ -1358,6 +1358,7 @@ function formatActivityDate(value) {
 }
 
 function activityFilters(kind) {
+  if (kind === "operations") return [];
   return kind === "payments"
     ? [["all", "All"], ["confirmed", "Settled"], ["processing", "Processing"], ["attention", "Needs attention"]]
     : [["all", "All"], ["payments", "Payments"], ["policy", "Policy"], ["vendors", "Vendors"], ["business", "Business"]];
@@ -1377,8 +1378,18 @@ function activityMatches(kind, row) {
     (kind === "audit" && auditEventLabel(row.event_type).toLowerCase().includes(query));
 }
 
-function renderActivitySummary(kind, rows) {
+function renderActivitySummary(kind, rows, data = null) {
   const node = $("activity-summary");
+  if (kind === "operations") {
+    const summary = data?.summary || {};
+    const overall = operationsStatusPresentation(data?.overall);
+    node.innerHTML = [
+      pageMetric("Overall state", overall.label, "Last checked " + formatActivityDate(data?.checkedAt), overall.tone),
+      pageMetric("Services healthy", String(summary.healthyServices || 0) + " / " + String(summary.totalServices || 0), "Gmail, Circle, Arc, Supabase and reconciliation", summary.degradedServices ? "attention" : "ready"),
+      pageMetric("Recovery queue", String((summary.recoveringCount || 0) + (summary.attentionCount || 0)), summary.attentionCount ? String(summary.attentionCount) + " need operator review" : summary.recoveringCount ? "Bounded retries are active" : "No unresolved records", summary.attentionCount ? "attention" : "ready")
+    ].join("");
+    return;
+  }
   if (kind === "payments") {
     const confirmed = rows.filter((row) => String(row.status).toLowerCase() === "confirmed");
     const confirmedUsdc = confirmed.filter((row) => row.currency === "USDC").reduce((total, row) => total + Number(row.amount || 0), 0);
@@ -1399,16 +1410,42 @@ function renderActivitySummary(kind, rows) {
 }
 
 function renderActivityControls(kind) {
+  const toolbar = $("activity-toolbar");
+  const search = document.querySelector('.activity-search[for="activity-search"]');
+  if (kind === "operations") {
+    toolbar.hidden = false;
+    $("activity-filters").innerHTML = '<button type="button" class="filter-button active" data-operations-refresh>Refresh service health</button>';
+    search.hidden = true;
+    return;
+  }
+  toolbar.hidden = false;
+  search.hidden = false;
   $("activity-filters").innerHTML = activityFilters(kind).map(([value, label]) =>
     '<button type="button" class="filter-button' + (state.activity.filter === value ? " active" : "") + '" data-filter="' + value + '" aria-pressed="' + (state.activity.filter === value) + '">' + label + '</button>'
   ).join("");
   $("activity-search").value = state.activity.query || "";
 }
 
-function renderActivity(kind, rows) {
+function renderActivity(kind, rows, data = null) {
   const node = $("activity-list");
-  renderActivitySummary(kind, rows);
+  renderActivitySummary(kind, rows, data);
   renderActivityControls(kind);
+  if (kind === "operations") {
+    const services = data?.services || [];
+    const recoveryItems = data?.recovery?.items || [];
+    const serviceMarkup = services.map((service) => {
+      const presentation = operationsStatusPresentation(service.status);
+      return '<article class="operations-service"><div class="operations-service-head"><div><span>SERVICE</span><h3>' + escapeHtml(service.label) + '</h3></div><b class="operations-badge ' + escapeHtml(presentation.tone) + '">' + escapeHtml(presentation.label) + '</b></div><p>' + escapeHtml(service.detail) + '</p><small>' + escapeHtml(service.action || "No action required") + '</small></article>';
+    }).join("");
+    const recoveryMarkup = recoveryItems.length
+      ? recoveryItems.map((item) => {
+        const presentation = operationsStatusPresentation(item.state);
+        return '<article class="operations-recovery"><div><span>' + escapeHtml(item.kind) + '</span><h3>' + escapeHtml(item.title) + '</h3><p>' + escapeHtml(item.detail) + '</p></div><div class="operations-recovery-state"><b class="operations-badge ' + escapeHtml(presentation.tone) + '">' + escapeHtml(presentation.label) + '</b><time>' + escapeHtml(formatActivityDate(item.nextAttemptAt || item.updatedAt)) + '</time></div></article>';
+      }).join("")
+      : '<div class="activity-empty compact"><strong>No recovery work is waiting</strong><span>There are no unresolved payment, withdrawal, or reconciliation records for this business and environment.</span></div>';
+    node.innerHTML = '<section class="operations-grid" aria-label="Service health">' + serviceMarkup + '</section><section class="operations-recovery-list" aria-label="Recovery queue"><div class="operations-section-heading"><span>DURABLE RECOVERY</span><h3>Operator queue</h3></div>' + recoveryMarkup + '</section>';
+    return;
+  }
   const visibleRows = rows.filter((row) => activityMatches(kind, row));
   if (!visibleRows.length) {
     const hasRecords = rows.length > 0;
@@ -1445,14 +1482,16 @@ function renderActivityLoading(kind) {
 async function openActivity(kind, options = {}) {
   setDestination(kind, options.updateUrl !== false);
   const requestId = ++activityRequestId;
-  $("activity-kicker").textContent = kind === "payments" ? "SETTLEMENTS" : "AUDIT TRAIL";
-  $("activity-title").textContent = kind === "payments" ? "Payments" : "Audit trail";
+  $("activity-kicker").textContent = kind === "payments" ? "SETTLEMENTS" : kind === "operations" ? "PRODUCTION OPERATIONS" : "AUDIT TRAIL";
+  $("activity-title").textContent = kind === "payments" ? "Payments" : kind === "operations" ? "Service health & recovery" : "Audit trail";
   $("activity-context").textContent = kind === "payments"
     ? "Every submitted, failed, processing, or reconciled payment for this business."
+    : kind === "operations"
+      ? "Read-only health checks and durable recovery state for this business and settlement environment."
     : "Business-scoped evidence for policy, vendor, wallet, and settlement decisions.";
   $("activity-message").textContent = "Loading live activity…";
   $("activity-message").className = "auth-message loading-message";
-  state.activity = { kind, rows: [], filter: "all", query: "" };
+  state.activity = { kind, rows: [], data: null, filter: "all", query: "" };
   $("activity-list").setAttribute("aria-busy", "true");
   renderActivityLoading(kind);
   try {
@@ -1460,11 +1499,12 @@ async function openActivity(kind, options = {}) {
     const data = await readJsonResponse(response);
     if (requestId !== activityRequestId || activeDestination !== kind) return;
     if (!response.ok) throw new Error(data.error || "Activity unavailable");
-    state.activity = { kind, rows: kind === "payments" ? (data.payments || []) : (data.events || []), filter: "all", query: "" };
+    const rows = kind === "payments" ? (data.payments || []) : kind === "audit" ? (data.events || []) : [];
+    state.activity = { kind, rows, data: kind === "operations" ? data : null, filter: "all", query: "" };
     $("activity-message").textContent = "";
     $("activity-message").className = "auth-message";
     $("activity-list").setAttribute("aria-busy", "false");
-    renderActivity(kind, state.activity.rows);
+    renderActivity(kind, state.activity.rows, state.activity.data);
   } catch (error) {
     if (requestId !== activityRequestId || activeDestination !== kind) return;
     $("activity-list").setAttribute("aria-busy", "false");
@@ -1946,6 +1986,7 @@ function setDestination(destination, updateUrl = true) {
     payments: activity,
     policy: $("policy-modal"),
     audit: activity,
+    operations: activity,
     business: $("business-modal"),
     vendors: $("vendor-modal")
   }, document.querySelectorAll(".nav[data-nav]"), document.querySelector(".content"));
@@ -1955,6 +1996,7 @@ function setDestination(destination, updateUrl = true) {
     payments: "Payments",
     policy: "Payment policy",
     audit: "Audit trail",
+    operations: "Operations",
     business: "Business profile",
     vendors: "Vendor registry"
   };
@@ -1974,7 +2016,7 @@ function setDestination(destination, updateUrl = true) {
 }
 
 async function openDestination(destination, options = {}) {
-  if (destination === "payments" || destination === "audit") return openActivity(destination, options);
+  if (destination === "payments" || destination === "audit" || destination === "operations") return openActivity(destination, options);
   if (destination === "policy") return openPolicyModal(options);
   if (destination === "business") return openBusinessModal(options);
   if (destination === "vendors") return openVendorModal(options);
@@ -2015,6 +2057,7 @@ async function init() {
     $("open-policy-top").addEventListener("click", openPolicyModal);
     $("open-payments").addEventListener("click", () => openActivity("payments"));
     $("open-audit").addEventListener("click", () => openActivity("audit"));
+    $("open-operations").addEventListener("click", () => openActivity("operations"));
     $("open-payments-top").addEventListener("click", () => openActivity("payments"));
     $("open-audit-top").addEventListener("click", () => openActivity("audit"));
     $("close-activity").addEventListener("click", closeActivityModal);
@@ -2030,15 +2073,19 @@ async function init() {
       renderList();
     });
     $("activity-filters").addEventListener("click", (event) => {
+      if (event.target.closest("[data-operations-refresh]")) {
+        openActivity("operations", { updateUrl: false });
+        return;
+      }
       const button = event.target.closest("[data-filter]");
       if (!button || !state.activity.kind) return;
       state.activity.filter = button.dataset.filter;
-      renderActivity(state.activity.kind, state.activity.rows);
+      renderActivity(state.activity.kind, state.activity.rows, state.activity.data);
     });
     $("activity-search").addEventListener("input", (event) => {
       if (!state.activity.kind) return;
       state.activity.query = event.currentTarget.value;
-      renderActivity(state.activity.kind, state.activity.rows);
+      renderActivity(state.activity.kind, state.activity.rows, state.activity.data);
     });
     $("policy-form").addEventListener("submit", savePolicy);
     $("policy-migrate").addEventListener("click", migratePolicyVault);

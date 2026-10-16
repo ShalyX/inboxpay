@@ -1,6 +1,6 @@
 # InboxPay autonomy and business-funds runbook
 
-This runbook applies to the bounded autonomous-payment worker and business-wallet withdrawals introduced on `codex/autonomy-wallet-control`. It does not authorize a Mainnet payment, withdrawal, allowance, vendor registration, or contract migration by itself.
+This runbook applies to the bounded autonomous-payment worker, business-wallet withdrawals, service health checks, and durable recovery queues on `main`. It does not authorize a Mainnet payment, withdrawal, allowance, vendor registration, or contract migration by itself.
 
 ## Safety model
 
@@ -95,6 +95,27 @@ Mocked/unit tests and a successful build are necessary but do not replace this T
 
 ## Monitoring and recovery
 
+### Operator view
+
+Open **Operations** in the production sidebar. The view performs read-only, business-scoped checks for:
+
+- Gmail authorization and profile reachability without scanning or storing message content;
+- the active environment's dedicated Circle wallet and USDC asset;
+- the expected Arc chain ID through the configured RPC;
+- Supabase access to the business's durable payment, withdrawal, and reconciliation records;
+- unresolved reconciliation work, split into bounded automatic recovery and operator attention.
+
+The health request never creates a wallet, refreshes the invoice queue, submits a payment, registers a vendor, changes a policy, approves USDC, or switches the active environment. Gmail access-token refresh may occur when the saved short-lived token has expired; this preserves the existing read-only OAuth connection and does not broaden its scope.
+
+Interpret the states as follows:
+
+- **Healthy** — the dependency is reachable and its expected identity is verified.
+- **Recovering** — a previously recorded transaction or job remains inside its bounded retry/reconciliation window. Do not resubmit it manually.
+- **Needs attention** — execution stopped safely, the recovery window expired, authorization needs renewal, or an operator decision is required.
+- **Unavailable** — the live dependency check failed or returned an unexpected chain. Treat payment authorization as blocked until the check recovers.
+
+Refresh the Operations view after correcting a dependency. A green service card is evidence of a fresh read only; it is not evidence that a payment was submitted or settled.
+
 Inspect scheduler runs:
 
 ```sql
@@ -115,6 +136,38 @@ limit 50;
 ```
 
 Operator-visible recovery lives in `invoice_execution_jobs`, invoice settlement state, `wallet_withdrawals`, and `audit_events`. Do not manually resubmit a payment or withdrawal when the prior Circle outcome is uncertain. Restore the provider/RPC dependency and let reconciliation recover the recorded transaction.
+
+### Incident playbooks
+
+**Gmail**
+
+1. If the card says authorization needs renewal, reconnect Gmail from the same business account.
+2. If Gmail is unavailable, do not broaden the search query or replace live ingestion with fixtures. Retry after the provider recovers.
+3. Confirm a fresh invoice evaluation and its audit evidence after recovery. Gmail failure does not change wallet or policy state.
+
+**Circle**
+
+1. Stop new payment authorization for the affected environment while the wallet check is unavailable.
+2. Preserve every stored Circle transaction ID and idempotency key. Never create a replacement submission solely because a status read timed out.
+3. Restore provider access, then allow the existing reconciliation path to resolve the recorded transaction.
+
+**Arc RPC**
+
+1. Confirm the endpoint returns chain ID `5042002` for Arc Testnet or `5042` for Arc Mainnet.
+2. Treat the wrong chain or an unavailable receipt as a hard block. Do not fall back from Mainnet to Testnet or vice versa.
+3. After RPC recovery, reconcile the existing hash before permitting any retry.
+
+**Supabase**
+
+1. Treat an unreadable durable queue as a financial-operations block even if Gmail, Circle, or Arc is healthy.
+2. Restore project/API availability and verify business/network RLS isolation before restarting the worker.
+3. Do not delete or hand-edit recovery rows to force a green state.
+
+**Reconciliation**
+
+1. `retry`, `reconciling`, recent `leased`, and recent `processing` states stay in bounded recovery.
+2. `held`, `failed`, `review`, or states older than the recovery window require operator review.
+3. Compare the stored Circle transaction, Arc receipt, vendor balance/event, payment ID, and invoice state. Mark complete only when the evidence agrees.
 
 Emergency stop, in order:
 

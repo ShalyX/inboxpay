@@ -1031,6 +1031,24 @@ The unavailable Arc Testnet reads were then traced to a stale hostname rather th
 
 Commit `d19ed45` (`fix: update Arc Testnet RPC endpoint`) is pushed to `main`. Production deployment `dpl_4QYk9aqKq7pfuboxyK5rC5bsDVML` reached `READY` at `https://tameion-ap-agent-live-lcuztnfcq-shalyxs-projects.vercel.app` and owns the canonical alias. Authenticated reads now return HTTP `200` for wallet, policy, and invoice preflight: Caraxes Labs has `39.332433 USDC`, `19.332433 USDC` withdrawable above its `20 USDC` cash floor, the policy vault is ready and unpaused, USDC authorization is present, Acme is onchain-registered, daily headroom is `5000 USDC`, and `canExecute` returns `ALLOWED`. `IP-PDF-20261016-01` remains correctly ineligible only because its bounded decision is `SCHEDULE`, not `PAY_NOW`; settlement is still unsubmitted. No schedule action or financial/configuration authority was granted during verification. The Arc Testnet read-path recovery is complete.
 
+### Production operations hardening (2026-10-16)
+
+The production-operations slice now adds an authenticated **Operations** destination without increasing the Vercel function count. `GET /api/activity?view=operations` reuses the existing activity function and runs bounded, read-only checks for the active business/network:
+
+- Gmail authorization and profile reachability, without broadening invoice discovery or returning message content;
+- the business's dedicated Circle wallet and Arc USDC asset;
+- Arc RPC reachability plus exact chain-ID verification (`5042002` Testnet / `5042` Mainnet);
+- Supabase access to the business-scoped durable job, withdrawal, and reconciliation rows;
+- unresolved recovery state classified as bounded automatic recovery or operator attention.
+
+The view does not create a wallet, scan invoices, submit or retry a payment, register a vendor, change policy, approve USDC, withdraw funds, or switch networks. Gmail may refresh the existing short-lived read-only access token. External checks have explicit time bounds; provider failures are independently represented so one unavailable integration does not hide the other service states. Error details are reduced to safe operator categories instead of exposing credentials or raw provider output.
+
+Recovery visibility is derived from the existing `invoice_execution_jobs`, `wallet_withdrawals`, and invoice settlement state. `queued`, recent `leased`, `retry`, `reconciling`, and recent `processing` records appear as recovering; terminal/review or stale records require attention. Invoice rows already represented by a durable job are deduplicated in the operator queue. No new database migration or payment authority was added.
+
+`AUTONOMY-RUNBOOK.md` now documents the state meanings and incident playbooks for Gmail, Circle, Arc RPC, Supabase, and reconciliation. The full JavaScript regression suite passes, including the new operations-health tests, and a Production-target Vercel build succeeds with exactly 12 functions. Production deployment and authenticated live UI/API verification remain the next step at the time of this entry.
+
+The public-repository hygiene pass found no tracked `.env`, OAuth credential file, Gmail token, private key, `output/` artifact, or historical commit of the known local credential filenames. Secret-pattern hits were environment-variable names, documented key prefixes, and Supabase role names rather than values. The internal Circle wallet ID was removed from the public deployment proof and from the proof scripts that generate it; public addresses and transaction hashes remain as intentional onchain evidence. The locally cached production-dependency advisory check reports zero vulnerabilities; the live npm advisory endpoint was unreachable from this environment, so a fresh registry-backed audit should still be rerun before final submission. The repository also has no license file; selecting license terms remains an owner decision rather than an engineering default.
+
 ### P1 — Final submission hygiene
 Before hackathon submission:
 - verify public repo

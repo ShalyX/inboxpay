@@ -7,6 +7,7 @@ import {
   inboxFailurePresentation,
   invoiceQueueCategory,
   networkLabel,
+  operationsStatusPresentation,
   paymentFlowStep,
   singleFlight
 } from "../public/ui-state.mjs";
@@ -14,6 +15,7 @@ import {
 assert.equal(destinationFromHash("#payments"), "payments");
 assert.equal(destinationFromHash("#/vendors"), "vendors");
 assert.equal(destinationFromHash("#unknown"), "inbox");
+assert.equal(destinationFromHash("#operations"), "operations");
 assert.equal(destinationFromHash(""), "inbox");
 assert.equal(auditEventLabel("payment_settled"), "Payment settled and reconciled");
 assert.equal(auditEventLabel("custom_business_event"), "Custom business event");
@@ -49,6 +51,7 @@ const sections = {
   payments: activitySection,
   policy: fakeElement(),
   audit: activitySection,
+  operations: activitySection,
   business: fakeElement(),
   vendors: fakeElement()
 };
@@ -70,6 +73,11 @@ assert.throws(() => activateDestination("missing", sections, navItems), /Unknown
 assert.equal(networkLabel("ARC"), "Arc Mainnet");
 assert.equal(networkLabel("ARC-TESTNET"), "Arc Testnet");
 assert.equal(networkLabel("UNKNOWN"), "Arc");
+
+assert.deepEqual(operationsStatusPresentation("healthy"), { label: "Healthy", tone: "ready" });
+assert.deepEqual(operationsStatusPresentation("recovering"), { label: "Recovering", tone: "recovering" });
+assert.deepEqual(operationsStatusPresentation("attention"), { label: "Needs attention", tone: "attention" });
+assert.deepEqual(operationsStatusPresentation("degraded"), { label: "Unavailable", tone: "degraded" });
 
 assert.equal(paymentFlowStep({}), 0);
 assert.equal(paymentFlowStep({ selected: { invoiceNumber: "INV-1" } }), 1);

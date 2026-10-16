@@ -80,7 +80,6 @@ const deployment = {
   usdc: USDC,
   vaultAddress: receipt.contractAddress,
   deploymentTxHash: receipt.transactionHash,
-  executorWalletId: wallet.walletId,
   executorAddress: wallet.address,
   txLimit: TX_LIMIT.toString(),
   dailyLimit: DAILY_LIMIT.toString(),

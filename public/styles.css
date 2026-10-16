@@ -1414,6 +1414,24 @@ body:has(.vendor-modal.page-mode:not([hidden])){overflow:hidden}
 .audit-record details{margin-top:10px}
 .audit-record summary{color:#5d7190;font-size:10px;font-weight:650;cursor:pointer}
 .audit-record pre{max-height:260px;overflow:auto;margin:10px 0 0;padding:13px;border-radius:8px;background:#172033;color:#dce5f2;font:10px/1.55 var(--mono);white-space:pre-wrap}
+.operations-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:1px;background:var(--line)}
+.operations-service{display:grid;align-content:start;gap:12px;min-height:190px;padding:18px;background:var(--paper)}
+.operations-service-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.operations-service-head span,.operations-section-heading span,.operations-recovery>div>span{color:var(--muted);font:700 9px/1.3 var(--mono);letter-spacing:.08em;text-transform:uppercase}
+.operations-service h3,.operations-section-heading h3,.operations-recovery h3{margin:4px 0 0;font-size:14px;letter-spacing:-.02em}
+.operations-service p,.operations-recovery p{margin:0;color:var(--ink);font-size:11px;line-height:1.55}
+.operations-service small{margin-top:auto;color:var(--muted);font-size:10px;line-height:1.45}
+.operations-badge{display:inline-flex;align-items:center;min-height:23px;border:1px solid var(--line);border-radius:999px;padding:4px 7px;color:var(--muted);background:var(--soft-2);font:700 8px/1 var(--mono);letter-spacing:.03em;text-transform:uppercase;white-space:nowrap}
+.operations-badge.ready{border-color:#c8e2d1;color:var(--ok);background:var(--ok-soft)}
+.operations-badge.recovering{border-color:#ead7a8;color:#8b6415;background:#fff8e8}
+.operations-badge.attention,.operations-badge.degraded{border-color:#e8c6c0;color:var(--danger);background:var(--danger-soft)}
+.operations-recovery-list{border-top:1px solid var(--line);background:var(--paper)}
+.operations-section-heading{padding:18px 20px;border-bottom:1px solid var(--line);background:var(--soft-2)}
+.operations-recovery{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:18px;padding:17px 20px;border-bottom:1px solid var(--line)}
+.operations-recovery:last-child{border-bottom:0}
+.operations-recovery p{margin-top:6px;color:var(--muted)}
+.operations-recovery-state{display:grid;justify-items:end;gap:7px}
+.operations-recovery-state time{color:var(--muted);font-size:9px}
 .business-workspace{grid-template-columns:minmax(420px,.9fr) minmax(420px,1.1fr)}
 .treasury-card{grid-column:1/-1}
 .withdrawal-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;margin:18px 20px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden}
@@ -1449,6 +1467,7 @@ body:has(.vendor-modal.page-mode:not([hidden])){overflow:hidden}
  .record-receipt{grid-column:2/-1;display:flex;align-items:center;justify-content:space-between;flex-direction:row;text-align:left}
  .withdrawal-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
  .withdrawal-form{grid-template-columns:1fr}
+ .operations-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 
 @media(max-width:800px){
@@ -1487,6 +1506,10 @@ body:has(.vendor-modal.page-mode:not([hidden])){overflow:hidden}
  .record-network{grid-column:2}.record-amount{grid-column:3;grid-row:1/3}.record-receipt{grid-column:2/-1}
  .audit-record{padding:17px 15px}
  .audit-record-meta{align-items:flex-start;flex-direction:column;gap:7px}
+ .operations-grid{grid-template-columns:1fr}
+ .operations-service{min-height:0}
+ .operations-recovery{grid-template-columns:1fr}
+ .operations-recovery-state{justify-items:start}
  .business-rail-details>div{grid-template-columns:1fr;gap:6px}
  .business-rail-details .text-action{justify-self:start}
 }
