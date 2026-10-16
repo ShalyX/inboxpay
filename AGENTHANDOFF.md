@@ -999,6 +999,8 @@ Commit `422f9aa` (`fix: parse Gmail rich-text invoice fields`) normalizes only a
 
 Remaining live ingestion QA requires controlled messages for a strict HTML-only transport and a text-based PDF invoice from the verified sender. Unit coverage already proves HTML conversion, while the live Gmail composer proof covered its multipart rich-text/plain alternative. Sending additional messages is representational communication and remains separately gated on explicit user authorization. Scanned/image-only or encrypted PDFs remain review-only; OCR is not implemented.
 
+Read-only follow-up QA on 2026-10-16 found one genuine text PDF from the configured Acme sender `akkurtkamil17@gmail.com`: `Invoice-227342.pdf`, received 2026-10-15 at 16:17 Africa/Lagos. That message predates the durable discovery watermark (`2026-10-15T16:01:46.270346Z`, or 17:01:46 Africa/Lagos), so the production route correctly excludes it rather than silently broadening its historical scan. The exact downloaded attachment was passed through the production `pdf-parse` and deterministic invoice parser locally without modifying Gmail or InboxPay state. It produced invoice number `227342`, amount `5`, currency `USD`, due date `Sunday, June 28, 2026`, and high extraction confidence. This proves the real attachment is text-extractable and the parser path accepts it, but it does not complete the end-to-end post-watermark verified-sender discovery proof. That proof still requires the registered sender to send or resend a fresh PDF. `npm run test:gmail-parser` and `npm run test:autonomy-wallet` pass, and the working tree remains otherwise clean.
+
 ### P1 — Final submission hygiene
 Before hackathon submission:
 - verify public repo
