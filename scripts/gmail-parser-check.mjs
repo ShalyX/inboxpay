@@ -1,10 +1,13 @@
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import {
+  buildGmailMessageListParams,
   buildGmailInvoiceQueries,
   extractEmailAddress,
   extractHtmlText,
+  findGmailLabelId,
   parseInvoiceText,
+  scanGmailInvoices,
 } from "../lib/gmail-live.mjs";
 
 const parsed = parseInvoiceText(`Vendor: Manny
@@ -47,8 +50,89 @@ assert.match(discoveryQueries[0].query, /subject:invoice/);
 
 const labelQuery = discoveryQueries.find(({ route }) => route === "label");
 assert.ok(labelQuery);
-assert.match(labelQuery.query, /label:InboxPay/);
+assert.equal(labelQuery.label, "InboxPay");
+assert.doesNotMatch(labelQuery.query, /label:/);
 assert.match(labelQuery.query, /after:1792022400/);
+
+assert.equal(
+  findGmailLabelId([
+    { id: "INBOX", name: "INBOX" },
+    { id: "Label_42", name: "InboxPay" },
+  ], "inboxpay"),
+  "Label_42",
+  "custom Gmail labels must resolve case-insensitively to their stable label ID",
+);
+assert.equal(findGmailLabelId([{ id: "Label_42", name: "Other" }], "InboxPay"), null);
+
+assert.deepEqual(
+  buildGmailMessageListParams(labelQuery, { labelId: "Label_42" }),
+  {
+    q: "in:anywhere after:1792022400",
+    maxResults: 25,
+    labelIds: "Label_42",
+  },
+  "label discovery must use Gmail's stable labelIds filter instead of free-text label search",
+);
+assert.equal(
+  buildGmailMessageListParams(labelQuery),
+  null,
+  "label discovery must fail closed when the configured custom label cannot be resolved",
+);
+
+const originalFetch = globalThis.fetch;
+const observedMessageListParams = [];
+globalThis.fetch = async (input) => {
+  const url = new URL(String(input));
+  const json = (body) => ({
+    ok: true,
+    status: 200,
+    statusText: "OK",
+    async json() { return body; },
+  });
+  if (url.pathname.endsWith("/labels")) {
+    return json({ labels: [{ id: "Label_42", name: "InboxPay" }] });
+  }
+  if (url.pathname.endsWith("/messages")) {
+    observedMessageListParams.push(Object.fromEntries(url.searchParams));
+    return json(url.searchParams.get("labelIds") === "Label_42"
+      ? { messages: [{ id: "label-message" }] }
+      : { messages: [] });
+  }
+  if (url.pathname.endsWith("/messages/label-message")) {
+    const html = `<p>Vendor: Acme Test Hosting</p>
+      <p>Invoice Number: IP-LABEL-HTML-1</p>
+      <p>Total Due: 0.12 USDC</p>
+      <p>Due Date: October 31, 2026</p>`;
+    return json({
+      id: "label-message",
+      threadId: "label-thread",
+      payload: {
+        mimeType: "text/html",
+        headers: [
+          { name: "From", value: "Shallom <shallomalabi89@gmail.com>" },
+          { name: "Subject", value: "October hosting notice" },
+          { name: "Date", value: "Fri, 16 Oct 2026 09:21:00 +0000" },
+          { name: "Message-ID", value: "<label-message@example.test>" },
+        ],
+        body: { data: Buffer.from(html).toString("base64url") },
+      },
+    });
+  }
+  throw new Error(`Unexpected Gmail test request: ${url}`);
+};
+try {
+  const labelScan = await scanGmailInvoices("test-token", {
+    label: "InboxPay",
+    broadenedAfter: "2026-10-15T00:00:00.000Z",
+  });
+  assert.equal(labelScan.count, 1);
+  assert.deepEqual(labelScan.invoices[0].discoveryRoutes, ["label"]);
+  assert.equal(labelScan.invoices[0].invoiceNumber, "IP-LABEL-HTML-1");
+  assert.equal(labelScan.invoices[0].amount, 0.12);
+  assert.ok(observedMessageListParams.some((params) => params.labelIds === "Label_42"));
+} finally {
+  globalThis.fetch = originalFetch;
+}
 
 const vendorPdfQuery = discoveryQueries.find(({ route }) => route === "verified_vendor_pdf");
 assert.ok(vendorPdfQuery);
