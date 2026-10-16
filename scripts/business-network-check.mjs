@@ -4,6 +4,14 @@ import {
   projectBusinessNetwork,
   summarizeNetworkAccounts
 } from "../lib/business-networks.mjs";
+import { chainFor, rpcFor } from "../lib/policy-sync.mjs";
+
+assert.equal(rpcFor("ARC"), process.env.ARC_RPC_URL || "https://rpc.mainnet.arc.io");
+assert.equal(rpcFor("ARC-TESTNET"), process.env.ARC_TESTNET_RPC_URL || "https://rpc.testnet.arc.io");
+assert.equal(chainFor("ARC"), 5042);
+assert.equal(chainFor("ARC-TESTNET"), 5042002);
+assert.throws(() => rpcFor("ETH"), /Unsupported settlement network/);
+assert.throws(() => chainFor("ETH"), /Unsupported settlement network/);
 
 const base = {
   id: "business-1",
