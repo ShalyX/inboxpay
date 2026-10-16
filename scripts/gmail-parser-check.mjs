@@ -7,6 +7,7 @@ import {
   extractEmailAddress,
   extractHtmlText,
   findGmailLabelId,
+  getGmailAttachmentBytes,
   parseInvoiceText,
   scanGmailInvoices,
 } from "../lib/gmail-live.mjs";
@@ -85,6 +86,17 @@ assert.equal(
   "custom Gmail labels must resolve case-insensitively to their stable label ID",
 );
 assert.equal(findGmailLabelId([{ id: "Label_42", name: "Other" }], "InboxPay"), null);
+
+const inlinePdfBytes = Buffer.from("inline-pdf-test");
+assert.deepEqual(
+  await getGmailAttachmentBytes("test-token", "inline-message", {
+    filename: "invoice.pdf",
+    mimeType: "application/pdf",
+    body: { data: inlinePdfBytes.toString("base64url") }
+  }),
+  inlinePdfBytes,
+  "Gmail inline PDF bytes must be extracted without an attachmentId request",
+);
 
 assert.deepEqual(
   buildGmailMessageListParams(labelQuery, { labelId: "Label_42" }),
