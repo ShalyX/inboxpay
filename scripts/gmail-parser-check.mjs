@@ -11,6 +11,7 @@ import {
   parseInvoiceText,
   scanGmailInvoices,
 } from "../lib/gmail-live.mjs";
+import { evaluateInvoiceRecords } from "../lib/evaluator.mjs";
 
 for (const name of ["DOMMatrix", "ImageData", "Path2D"]) delete globalThis[name];
 await ensurePdfDomGlobals();
@@ -32,6 +33,72 @@ assert.equal(parsed.amount, 1);
 assert.equal(parsed.currency, "USDC");
 assert.equal(parsed.dueDate, "a future date");
 assert.equal(parsed.extraction.confidence, "high");
+assert.equal(parsed.extraction.vendorSource, "content");
+
+const senderFallback = parseInvoiceText(`Invoice Number: IP-PDF-20261016-01
+Total Due: 0.13 USDC
+Due Date: October 31, 2026`, "Kamil Akkurt");
+assert.equal(senderFallback.vendor, "Kamil Akkurt");
+assert.equal(senderFallback.extraction.vendorSource, "sender");
+
+const mergedInvoice = evaluateInvoiceRecords([
+  {
+    ...parseInvoiceText(`Vendor: Acme Test Hosting
+Invoice Number: IP-PDF-20261016-01
+Total Due: 0.13 USDC
+Due Date: October 31, 2026`, "Kamil Akkurt"),
+    messageId: "pdf-message",
+    threadId: "pdf-thread",
+    senderEmail: "akkurtkamil17@gmail.com",
+    discoveryRoutes: ["keyword", "verified_vendor_pdf"],
+    source: "gmail-email",
+  },
+  {
+    ...senderFallback,
+    messageId: "pdf-message",
+    threadId: "pdf-thread",
+    senderEmail: "akkurtkamil17@gmail.com",
+    discoveryRoutes: ["keyword", "verified_vendor_pdf"],
+    source: "gmail-pdf",
+  },
+], {
+  "Acme Test Hosting": {
+    status: "verified",
+    currency: "USDC",
+    senderEmails: ["akkurtkamil17@gmail.com"],
+  },
+}, new Date("2026-10-16T12:00:00.000Z"));
+assert.equal(mergedInvoice.count, 1, "email body and PDF from one message must evaluate as one invoice");
+assert.equal(mergedInvoice.invoices[0].vendor, "Acme Test Hosting", "explicit invoice vendor must outrank sender fallback");
+assert.equal(mergedInvoice.invoices[0].sourceCount, 2);
+assert.deepEqual(mergedInvoice.invoices[0].sources.sort(), ["gmail-email", "gmail-pdf"]);
+assert.equal(mergedInvoice.invoices[0].agentDecision, "SCHEDULE");
+
+const conflictingVendors = evaluateInvoiceRecords([
+  {
+    ...parseInvoiceText(`Vendor: Acme Test Hosting
+Invoice Number: VENDOR-CONFLICT-1
+Total Due: 0.13 USDC
+Due Date: October 31, 2026`, "Kamil Akkurt"),
+    messageId: "conflict-message",
+    threadId: "conflict-thread",
+    senderEmail: "akkurtkamil17@gmail.com",
+    source: "gmail-email",
+  },
+  {
+    ...parseInvoiceText(`Vendor: Different Supplier
+Invoice Number: VENDOR-CONFLICT-1
+Total Due: 0.13 USDC
+Due Date: October 31, 2026`, "Kamil Akkurt"),
+    messageId: "conflict-message",
+    threadId: "conflict-thread",
+    senderEmail: "akkurtkamil17@gmail.com",
+    source: "gmail-pdf",
+  },
+], {}, new Date("2026-10-16T12:00:00.000Z"));
+assert.equal(conflictingVendors.count, 1);
+assert.equal(conflictingVendors.invoices[0].agentDecision, "ESCALATE");
+assert.match(conflictingVendors.invoices[0].decisionReasons[0], /conflicting vendor identities/i);
 
 const gmailRichTextAlternative = parseInvoiceText(`*Vendor:* Acme Test Hosting
 *Invoice Number:* IP-LABEL-HTML-20261015-01
