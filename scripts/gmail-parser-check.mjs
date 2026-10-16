@@ -23,6 +23,18 @@ assert.equal(parsed.currency, "USDC");
 assert.equal(parsed.dueDate, "a future date");
 assert.equal(parsed.extraction.confidence, "high");
 
+const gmailRichTextAlternative = parseInvoiceText(`*Vendor:* Acme Test Hosting
+*Invoice Number:* IP-LABEL-HTML-20261015-01
+*Total Due:* 0.12 USDC
+*Due Date:* October 31, 2026
+*Currency:* USDC`, "shallomalabi89@gmail.com");
+assert.equal(gmailRichTextAlternative.vendor, "Acme Test Hosting");
+assert.equal(gmailRichTextAlternative.invoiceNumber, "IP-LABEL-HTML-20261015-01");
+assert.equal(gmailRichTextAlternative.amount, 0.12);
+assert.equal(gmailRichTextAlternative.currency, "USDC");
+assert.equal(gmailRichTextAlternative.dueDate, "October 31, 2026");
+assert.equal(gmailRichTextAlternative.extraction.confidence, "high");
+
 assert.equal(
   extractEmailAddress('"Acme Billing" <Billing@Acme.example>'),
   "billing@acme.example",
