@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
-import { ensurePdfDomGlobals } from "../lib/pdf-runtime.mjs";
+import { ensurePdfDomGlobals, loadPdfParser } from "../lib/pdf-runtime.mjs";
 import {
   buildGmailMessageListParams,
   buildGmailInvoiceQueries,
@@ -16,6 +16,8 @@ await ensurePdfDomGlobals();
 assert.equal(typeof globalThis.DOMMatrix, "function");
 assert.equal(typeof globalThis.ImageData, "function");
 assert.equal(typeof globalThis.Path2D, "function");
+const PDFParse = await loadPdfParser();
+assert.match(PDFParse.setWorker(), /^data:text\/javascript;base64,/);
 
 const parsed = parseInvoiceText(`Vendor: Manny
 Invoice number: unique-test-001
