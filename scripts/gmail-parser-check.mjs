@@ -52,7 +52,8 @@ const labelQuery = discoveryQueries.find(({ route }) => route === "label");
 assert.ok(labelQuery);
 assert.equal(labelQuery.label, "InboxPay");
 assert.doesNotMatch(labelQuery.query, /label:/);
-assert.match(labelQuery.query, /after:1792022400/);
+assert.equal(labelQuery.query, "in:anywhere");
+assert.equal(labelQuery.afterMs, Date.parse("2026-10-15T00:00:00.000Z"));
 
 assert.equal(
   findGmailLabelId([
@@ -67,11 +68,10 @@ assert.equal(findGmailLabelId([{ id: "Label_42", name: "Other" }], "InboxPay"), 
 assert.deepEqual(
   buildGmailMessageListParams(labelQuery, { labelId: "Label_42" }),
   {
-    q: "in:anywhere after:1792022400",
     maxResults: 25,
     labelIds: "Label_42",
   },
-  "label discovery must use Gmail's stable labelIds filter instead of free-text label search",
+  "label discovery must use Gmail's stable labelIds filter and enforce its watermark after retrieval",
 );
 assert.equal(
   buildGmailMessageListParams(labelQuery),
@@ -95,17 +95,19 @@ globalThis.fetch = async (input) => {
   if (url.pathname.endsWith("/messages")) {
     observedMessageListParams.push(Object.fromEntries(url.searchParams));
     return json(url.searchParams.get("labelIds") === "Label_42"
-      ? { messages: [{ id: "label-message" }] }
+      ? { messages: [{ id: "label-message" }, { id: "old-label-message" }] }
       : { messages: [] });
   }
-  if (url.pathname.endsWith("/messages/label-message")) {
+  if (url.pathname.endsWith("/messages/label-message") || url.pathname.endsWith("/messages/old-label-message")) {
+    const oldMessage = url.pathname.endsWith("/messages/old-label-message");
     const html = `<p>Vendor: Acme Test Hosting</p>
       <p>Invoice Number: IP-LABEL-HTML-1</p>
       <p>Total Due: 0.12 USDC</p>
       <p>Due Date: October 31, 2026</p>`;
     return json({
-      id: "label-message",
-      threadId: "label-thread",
+      id: oldMessage ? "old-label-message" : "label-message",
+      threadId: oldMessage ? "old-label-thread" : "label-thread",
+      internalDate: String(Date.parse(oldMessage ? "2026-10-14T23:59:59.000Z" : "2026-10-16T09:21:00.000Z")),
       payload: {
         mimeType: "text/html",
         headers: [
