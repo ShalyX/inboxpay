@@ -1017,6 +1017,8 @@ Commit `cbbf930` (`fix: bundle PDF worker for production ingestion`) is now push
 
 The authenticated retry showed the controlled invoice still at one evidence source, so the deployed worker fix did not yet complete acceptance. A second ingestion edge case was isolated: Gmail can return a small PDF's bytes inline in `part.body.data` instead of providing `part.body.attachmentId`; the previous code skipped that part entirely. A regression test now covers inline bytes, and `getGmailAttachmentBytes()` accepts either representation while preserving the attachment-download path. Focused Gmail parsing, local runtime, frontend, and evaluator checks pass. Commit `b615145` is pushed to `main`; Production deployment `dpl_BU7cFchSux8R62Gm5bFwUAHXFThk` reached `READY` and owns the canonical alias. The next authenticated refresh remains the acceptance check; no financial state changed.
 
+The pre-`b615145` authenticated invoice view still showed `IP-PDF-20261016-01` with one Gmail evidence source and the historical `Vendor is not verified in the payment registry` reasoning while the live preflight displayed the current registry row as verified. This is stale persisted evaluation context, not authorization to pay; the invoice remains blocked. Vercel runtime diagnostics also show repeated Arc Testnet RPC failures at `https://rpc.testnet.arc.network/` while reading wallet balance, daily spend, and `canExecute`, so those gates correctly remain unavailable and fail closed. Recheck after the inline-PDF deployment; no payment or other financial write occurred.
+
 ### P1 — Final submission hygiene
 Before hackathon submission:
 - verify public repo
