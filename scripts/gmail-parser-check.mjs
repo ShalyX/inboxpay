@@ -128,6 +128,8 @@ try {
     broadenedAfter: "2026-10-15T00:00:00.000Z",
   });
   assert.equal(labelScan.count, 1);
+  assert.equal(labelScan.labelResolved, true);
+  assert.equal(labelScan.routeMessageCounts.label, 2);
   assert.deepEqual(labelScan.invoices[0].discoveryRoutes, ["label"]);
   assert.equal(labelScan.invoices[0].invoiceNumber, "IP-LABEL-HTML-1");
   assert.equal(labelScan.invoices[0].amount, 0.12);
