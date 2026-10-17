@@ -2,6 +2,10 @@
 
 InboxPay is an autonomous accounts-payable operator built for Tameion.
 
+![InboxPay — bounded accounts payable on Arc](./docs/submission/assets/demo-cover.svg)
+
+[Live product](https://inboxpay.vercel.app/) · [Submission materials](./docs/submission/) · [Operations runbook](./AUTONOMY-RUNBOOK.md) · [Apache-2.0 license](./LICENSE)
+
 Each business gets its own InboxPay account, Gmail integration, AP policy, vendor registry, and isolated Circle developer-controlled wallet for each enabled Arc environment. The agent reads the business's real invoice inbox, makes a bounded payment decision, and can settle approved USDC invoices from that business wallet on Arc. Mainnet financial writes remain explicitly gated.
 
 ## The product
@@ -23,13 +27,17 @@ Use Node.js 20+.
 
 Install dependencies:
 
+```bash
 npm install
+```
 
 Authenticate the Canteen Arc CLI and export the unique Canteen RPC:
 
-uv tool install git+https://github.com/the-canteen-dev/ARC-cli
+```bash
+uv tool install arc-canteen
 arc-canteen login
 arc-canteen rpc-url --export
+```
 
 The app expects the resulting RPC as ARC_RPC_URL or the exported RPC value.
 
@@ -45,12 +53,16 @@ Google refresh tokens are used only server-side to refresh short-lived access to
 
 ### Local Gmail scanning
 
+```bash
 npm run scan:gmail
 npm run evaluate
+```
 
 Start the product:
 
+```bash
 npm start
+```
 
 Then open http://localhost:3000.
 
@@ -92,7 +104,7 @@ The Gmail connector is a separate Google OAuth flow. Its callback is:
 
 ## Deployment
 
-This repo is intentionally framework-light: static HTML/CSS/JS in `public/` plus native Vercel Node functions under `api/`. There is no frontend build step. `dev-server.mjs` is for local development only, but it dispatches to the same production-shaped API handlers rather than a mock invoice/payment layer; local API calls still require the configured environment and an authenticated session. Production traffic goes directly to the Vercel functions.
+This repo is intentionally framework-light: static HTML/CSS/JS in `public/` plus native Vercel Node functions under `api/`. There is no frontend build step. `dev-server.mjs` is for local development only, but it dispatches to the same production-shaped API handlers rather than a mock invoice/payment layer; local API calls still require the configured environment and an authenticated session. Production traffic goes directly to the Vercel functions. The canonical public product URL is [inboxpay.vercel.app](https://inboxpay.vercel.app/); the longer Vercel project alias remains in use for registered OAuth callbacks.
 
 Set the infrastructure secrets in Vercel, including Circle credentials, Supabase configuration, Gmail OAuth client credentials, and token-encryption secrets. Users supply their own OAuth consent through the product; they never configure infrastructure secrets.
 

@@ -1,6 +1,16 @@
 {
   "name": "inboxpay",
   "private": true,
+  "description": "A bounded accounts-payable operator for Gmail, Circle developer-controlled wallets, and Arc USDC.",
+  "license": "Apache-2.0",
+  "homepage": "https://inboxpay.vercel.app/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ShalyX/inboxpay.git"
+  },
+  "engines": {
+    "node": ">=20"
+  },
   "type": "module",
   "scripts": {
     "start": "node dev-server.mjs",

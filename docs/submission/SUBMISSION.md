@@ -6,7 +6,7 @@ InboxPay turns a business Gmail inbox into a bounded accounts-payable operator: 
 
 ## Links
 
-- Live product: https://tameion-ap-agent-live.vercel.app/
+- Live product: https://inboxpay.vercel.app/
 - Public repository: https://github.com/ShalyX/inboxpay
 - License: Apache License 2.0
 - Demo video: **add the final public URL after recording**

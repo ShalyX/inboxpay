@@ -13,6 +13,7 @@ web-run-result.json
 circle-*.json
 out/
 cache/
+output/
 
 gmail-payment-result.json
 invoice-email-inspection.json
