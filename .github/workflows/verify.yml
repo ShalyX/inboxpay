@@ -1,0 +1,45 @@
+name: Verify application
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  application:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run deterministic regression suite
+        run: |
+          npm run test:profile
+          npm run test:gmail-parser
+          npm run test:local
+          npm run test:scheduling
+          npm run test:preflight
+          npm run test:recovery
+          npm run test:idempotency
+          npm run test:networks
+          npm run test:migration
+          npm run test:frontend
+          npm run test:invoice-route
+          npm run test:autonomy-wallet
+          npm run test:operations
+
+      - name: Check production dependencies
+        run: npm audit --omit=dev
+
+      - name: Check whitespace
+        run: git diff --check

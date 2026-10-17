@@ -2,9 +2,9 @@
 
 InboxPay is an autonomous accounts-payable operator built for Tameion.
 
-![InboxPay — bounded accounts payable on Arc](./docs/assets/demo-cover.svg)
+![InboxPay — bounded accounts payable on Arc](./public/brand/inboxpay-og.svg)
 
-[Live product](https://inboxpay.vercel.app/) · [Operations runbook](./AUTONOMY-RUNBOOK.md) · [Apache-2.0 license](./LICENSE)
+[Live product](https://inboxpay.vercel.app/) · [Documentation](./docs/) · [Brand assets](./docs/BRAND.md) · [Operations runbook](./AUTONOMY-RUNBOOK.md) · [Apache-2.0 license](./LICENSE)
 
 Each business gets its own InboxPay account, Gmail integration, AP policy, vendor registry, and isolated Circle developer-controlled wallet for each enabled Arc environment. The agent reads the business's real invoice inbox, makes a bounded payment decision, and can settle approved USDC invoices from that business wallet on Arc. Mainnet financial writes remain explicitly gated.
 
@@ -50,13 +50,6 @@ Users do not enter Gmail client IDs, client secrets, or refresh tokens. After si
 The OAuth callback binds the Google connection to the authenticated InboxPay user, encrypts the provider tokens before persistence, and stores only the minimum integration metadata in Supabase. Invoice bodies and PDF contents are never written to Git.
 
 Google refresh tokens are used only server-side to refresh short-lived access tokens when InboxPay syncs the user's inbox.
-
-### Local Gmail scanning
-
-```bash
-npm run scan:gmail
-npm run evaluate
-```
 
 Start the product:
 
@@ -116,9 +109,11 @@ Do not commit Gmail tokens, Circle wallet exports, OAuth credentials, local invo
 
 ## Hackathon proof
 
-The project includes a real Gmail-derived evaluator, email and PDF evidence ingestion, dedicated Circle developer-controlled wallets, onchain payment policy enforcement, durable autonomous execution, reconciliation, a live x402 purchase on Arc Mainnet, and an Arc Mainnet PaymentPolicyVault deployment. Private Gmail/OAuth/Circle artifacts stay local; `demo-decisions.json` is the redacted reviewer-facing sample.
+The project includes a real Gmail-derived evaluator, email and PDF evidence ingestion, dedicated Circle developer-controlled wallets, onchain payment policy enforcement, durable autonomous execution, reconciliation, a live x402 purchase on Arc Mainnet, and an Arc Mainnet PaymentPolicyVault deployment. Private Gmail, OAuth, Circle, and invoice artifacts stay local.
 
 The complete autonomous AP proof is on **Arc Testnet**. Invoice `AUTONOMY-TEST-002` settled exactly once for `0.10 USDC` from the dedicated Caraxes Labs wallet and reconciled in InboxPay. Its transaction is `0x77f9bd481c33497a13c256198bea277f21cb3232c47b6cbf0f6fda2345369564`.
+
+Public deployment evidence is kept in [`deployments/`](./deployments/). Redacted response shapes are kept in [`examples/`](./examples/) and are not used by the hosted product.
 
 ## Arc mainnet proof
 

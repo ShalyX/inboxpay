@@ -1,5 +1,7 @@
 node_modules/
 .env
+.env.*
+!.env.example
 credentials.json
 credentials.json.json
 gmail-token.json

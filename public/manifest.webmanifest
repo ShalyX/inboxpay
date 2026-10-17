@@ -1,0 +1,17 @@
+{
+  "name": "InboxPay",
+  "short_name": "InboxPay",
+  "description": "Bounded accounts payable from Gmail evidence to reconciled USDC settlement on Arc.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f6f0",
+  "theme_color": "#172033",
+  "icons": [
+    {
+      "src": "/brand/inboxpay-mark.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

@@ -6,7 +6,17 @@
   <title>InboxPay — Autonomous AP</title>
   <meta name="description" content="Autonomous accounts payable with bounded USDC settlement on Arc.">
   <meta name="theme-color" content="#151915">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="InboxPay — bounded accounts payable">
+  <meta property="og:description" content="From Gmail invoice evidence to policy-controlled USDC settlement on Arc.">
+  <meta property="og:url" content="https://inboxpay.vercel.app/">
+  <meta property="og:image" content="https://inboxpay.vercel.app/brand/inboxpay-og.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="InboxPay — bounded accounts payable">
+  <meta name="twitter:description" content="From Gmail invoice evidence to policy-controlled USDC settlement on Arc.">
+  <meta name="twitter:image" content="https://inboxpay.vercel.app/brand/inboxpay-og.png">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.webmanifest">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
@@ -15,7 +25,7 @@
     <div class="auth-layout">
       <div class="auth-story">
         <div class="brand auth-brand">
-          <div class="mark" aria-hidden="true"><i></i><i></i><i></i></div>
+          <img class="brand-mark" src="/brand/inboxpay-mark.svg" width="38" height="38" alt="">
           <div><strong>InboxPay</strong><span>Autonomous accounts payable</span></div>
         </div>
         <div class="auth-story-copy">
@@ -52,12 +62,49 @@
         <p id="auth-message" class="auth-message" aria-live="polite"></p>
       </div>
     </div>
+    <div class="landing-proof" aria-label="InboxPay control path">
+      <div><span>01</span><strong>Evidence arrives</strong><small>Gmail email and text-PDF sources</small></div>
+      <div><span>02</span><strong>The agent decides</strong><small>Pay, hold, escalate, or schedule</small></div>
+      <div><span>03</span><strong>Authority is checked</strong><small>Business wallet and onchain policy</small></div>
+      <div><span>04</span><strong>The receipt closes the loop</strong><small>Circle submission reconciled on Arc</small></div>
+    </div>
+    <section class="landing-section landing-mechanism" aria-labelledby="mechanism-title">
+      <div class="landing-copy">
+        <span class="landing-kicker">THE CONTROL LAYER</span>
+        <h2 id="mechanism-title">The invoice can ask.<br>The policy still decides.</h2>
+        <p>InboxPay gives an agent enough context to do useful work without giving it unlimited authority. Invoice evidence, business identity, vendor registration, live wallet state, and the policy vault must agree before USDC can move.</p>
+      </div>
+      <div class="authority-diagram" aria-label="Invoice evidence passes application checks before onchain settlement">
+        <div class="evidence-stack"><span>EMAIL BODY</span><span>PDF EVIDENCE</span><span>VERIFIED SENDER</span></div>
+        <div class="authority-seam"><b>AUTHORITY<br>GATE</b></div>
+        <div class="settlement-stack"><strong>PAYMENT POLICY</strong><span>recipient · limits · cash floor · pause · duplicate ID</span><b>RECONCILED USDC</b></div>
+      </div>
+    </section>
+    <section class="landing-section landing-evidence" aria-labelledby="evidence-title">
+      <div>
+        <span class="landing-kicker">PROVEN EXECUTION</span>
+        <h2 id="evidence-title">One invoice. One attempt. One receipt.</h2>
+      </div>
+      <div class="evidence-ledger">
+        <div><span>01</span><strong>Evaluation</strong><small>Gmail evidence classified once</small></div>
+        <div><span>02</span><strong>Durable job</strong><small>Business and network scoped</small></div>
+        <div><span>03</span><strong>Circle submission</strong><small>Original provider identity preserved</small></div>
+        <div><span>04</span><strong>Arc confirmation</strong><small>Receipt and policy event reconciled</small></div>
+        <div><span>05</span><strong>Duplicate rejected</strong><small>Payment ID cannot execute twice</small></div>
+      </div>
+      <p class="proof-note">The complete autonomous AP proof is on Arc Testnet. Mainnet infrastructure is live, but InboxPay does not claim a genuine Mainnet invoice settlement.</p>
+    </section>
+    <footer class="landing-footer">
+      <img src="/brand/inboxpay-lockup.svg" width="270" height="60" alt="InboxPay">
+      <p>Dedicated Circle wallets. Policy-controlled Arc settlement. Business-scoped evidence and receipts.</p>
+      <div><a href="https://github.com/ShalyX/inboxpay" target="_blank" rel="noreferrer">View source ↗</a><a href="#auth-form">Open your payment desk ↑</a></div>
+    </footer>
   </section>
 
   <main id="app-shell" class="shell" hidden>
     <aside class="sidebar">
       <div class="brand">
-        <div class="mark" aria-hidden="true"><i></i><i></i><i></i></div>
+        <img class="brand-mark" src="/brand/inboxpay-mark.svg" width="34" height="34" alt="">
         <div><strong>InboxPay</strong><span>Payment operations</span></div>
       </div>
       <div class="nav-groups">

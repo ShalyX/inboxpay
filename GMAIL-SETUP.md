@@ -46,8 +46,4 @@ Gmail ingestion alone never moves funds. Settlement requires the business wallet
 
 ## Local development
 
-The repository still contains local Gmail scanner utilities for development and investigation, including:
-
-`npm run scan:gmail`
-
-Those scripts are separate from the production OAuth connector and should not be represented as the hosted user onboarding flow.
+Local development uses the same hosted OAuth-shaped API handlers as Production. Configure the environment names in `.env.example`, start the local server with `npm start`, authenticate through the browser, and connect a controlled Gmail account. Do not use downloaded tokens, committed credential files, or a separate mock invoice path.

@@ -10,7 +10,7 @@ on:
       - ".github/workflows/build-policy-vault.yml"
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   compile:
@@ -20,7 +20,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 20
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
@@ -31,14 +31,8 @@ jobs:
       - name: Compile
         run: node scripts/compile-policy.mjs
 
-      - name: Update lockfile
-        run: npm install --package-lock-only --ignore-scripts
+      - name: Verify committed artifact
+        run: git diff --exit-code -- contracts/artifacts/BusinessPolicyVault.json
 
-      - name: Commit generated artifacts
-        run: |
-          git config user.name "inboxpay-bot"
-          git config user.email "inboxpay-bot@users.noreply.github.com"
-          git add contracts/artifacts/BusinessPolicyVault.json package-lock.json
-          git diff --cached --quiet && exit 0
-          git commit -m "Build policy vault artifact"
-          git push
+      - name: Test contracts
+        run: forge test

@@ -14,8 +14,6 @@
   "type": "module",
   "scripts": {
     "start": "node dev-server.mjs",
-    "scan:gmail": "node gmail-bridge.mjs scan",
-    "evaluate": "node agent-evaluator.mjs",
     "test:profile": "node scripts/business-profile-check.mjs",
     "test:gmail-parser": "node scripts/gmail-parser-check.mjs",
     "test:local": "node scripts/local-server-check.mjs",

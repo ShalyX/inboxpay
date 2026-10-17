@@ -1,0 +1,88 @@
+# Security model
+
+## Scope
+
+InboxPay coordinates real business email evidence and programmable USDC wallets. A defect can disclose invoice data, confuse business boundaries, or move funds. Financial writes therefore fail closed when identity, network, provider, or reconciliation evidence is incomplete.
+
+Security reports should not include credentials, Gmail content, private business data, or unredacted provider responses in a public issue. Until a dedicated security mailbox exists, contact the repository owner privately through the GitHub profile.
+
+## Authority model
+
+- Supabase Auth identifies the user.
+- A business row binds the authenticated owner to one business identity.
+- Each Arc environment has a separate business network account, Circle wallet, policy vault, policy, vendors, invoices, and audit state.
+- Gmail OAuth tokens are encrypted before persistence and used only on the server.
+- Circle entity secrets and API keys remain server-side.
+- The autonomy worker uses a dedicated bearer secret that grants only worker invocation, not Supabase or Circle access by itself.
+- Mainnet writes require both server configuration and action-specific user confirmation.
+- The policy vault is the final onchain authority for payment recipient, limits, cash floor, pause, and duplicate payment ID.
+
+## Trust boundaries
+
+| Boundary | Untrusted input | Required control |
+| --- | --- | --- |
+| Browser to API | Session token, network, invoice/vendor identifiers, amounts, confirmations | Authenticate every protected request; reload business ownership server-side; compare expected network; validate amounts and addresses. |
+| Gmail to evaluator | Sender names, bodies, HTML, attachments, filenames | Bounded discovery routes, verified sender matching, deterministic parsing, text-PDF limits, no HTML execution, review on ambiguity. |
+| API to Supabase | User-scoped and service-role operations | RLS for authenticated access; narrow service-role functions for leases, claims, and withdrawals. |
+| API to Circle | Wallet IDs, transaction requests, provider status | Wallet must belong to the active business/network; deterministic idempotency; persist provider ID; never interpret timeout as safe retry. |
+| API to Arc | RPC responses, receipts, logs, chain identity | Verify chain ID, policy address, transaction target, event fields, payment ID, amount, recipient, and receipt success. |
+| Agent decision to settlement | `PAY_NOW` or scheduled state | Re-run deterministic server and onchain preflight immediately before submission. |
+
+## Onchain enforcement
+
+`BusinessPolicyVault` enforces:
+
+- registered vendor recipient;
+- maximum amount per payment;
+- UTC-day spending limit;
+- owner-wallet cash floor;
+- emergency pause;
+- one-time payment ID.
+
+Invoice extraction, Gmail sender verification, evidence confidence, currency selection, wallet/provider readiness, and reconciliation are application controls. They must not be described as contract enforcement.
+
+## Secrets
+
+Never commit or expose:
+
+- Circle API keys or entity secrets;
+- Supabase secret/service-role keys;
+- Gmail OAuth client secret, access token, or refresh token;
+- `INBOXPAY_TOKEN_ENCRYPTION_KEY`;
+- `AUTONOMY_CRON_SECRET`;
+- local credential files, invoice downloads, provider dumps, or browser session data.
+
+Use separate Testnet and live Circle credentials. Rotate the token-encryption key only through a migration that can decrypt and re-encrypt existing provider tokens. Rotate the worker secret in Vercel and Supabase Vault together.
+
+## Primary threats and controls
+
+| Threat | Current control | Remaining work |
+| --- | --- | --- |
+| Cross-business or cross-network payment | Server-side ownership reload, network match, business-scoped records, dedicated wallets and vaults | Add multi-user role and approval controls before team access. |
+| Forged invoice sender | Verified sender list plus vendor registry; unmatched messages remain review-only | Add full vendor onboarding and recipient-change verification. |
+| Duplicate payment | Durable claim/idempotency plus onchain used-payment marker | Continue concurrency and recovery testing in CI. |
+| Provider timeout causing resubmission | Persist Circle ID and reconcile original attempt | Add external alerts for aged reconciliation states. |
+| Compromised browser session | Server never trusts client wallet/policy identity | Add device/session management and step-up authentication for high-value actions. |
+| Malicious PDF or HTML | Text extraction, no HTML execution, parse failures become review events | Add file-size/page limits and malware scanning before broader upload support. |
+| Mainnet action by mistake | Explicit Mainnet confirmations and server write gate | Add organizational approval policy and release controls. |
+| Secret leakage | `.gitignore`, server-only variables, public-history scans | Add automated secret scanning in CI. |
+
+## Incident response
+
+For a financial incident:
+
+1. Disable autonomy for the affected business/network.
+2. Pause its policy contract.
+3. Revoke the policy vault's USDC allowance if authority must be removed onchain.
+4. Preserve invoices, audit events, Circle IDs, transaction hashes, execution jobs, and withdrawal rows.
+5. Stop the global scheduler only if all businesses must stop.
+6. Reconcile the existing transaction before permitting a retry.
+
+The detailed provider and reconciliation procedures are in [AUTONOMY-RUNBOOK.md](../AUTONOMY-RUNBOOK.md).
+
+## Known security limitations
+
+- The current product is owner-operated; it does not yet implement team roles or maker-checker approval.
+- The repository does not yet contain a clean-room baseline database migration.
+- External alerting, automated secret scanning, dependency auditing, and application tests are not yet enforced by CI.
+- There is no published privacy policy, retention policy, or account-deletion workflow yet.
