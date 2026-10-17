@@ -136,5 +136,6 @@ assert.match(indexHtml, /id="main-content" class="content" tabindex="-1"/);
 assert.match(styles, /@media\(max-width:1180px\) and \(min-width:801px\)[\s\S]*?\.nav-groups nav\{display:grid;grid-template-columns:minmax\(0,1fr\)/);
 assert.match(styles, /@media\(max-width:1180px\) and \(min-width:801px\)[\s\S]*?\.workspace\{grid-template-columns:minmax\(0,1fr\)\}/);
 assert.match(styles, /@media\(max-width:800px\)[\s\S]*?\.shell,\.sidebar,\.content\{min-width:0;width:100%;max-width:100%\}/);
+assert.match(styles, /@media\(max-width:800px\)[\s\S]*?\.workspace>\.queue,\.workspace>\.detail,\.workspace>\.execution-rail\{grid-column:auto;grid-row:auto\}/);
 
 console.log("frontend state checks passed");

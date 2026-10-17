@@ -14,7 +14,7 @@ The local correction establishes one breakpoint contract:
 - 800px and below: horizontal mobile destination navigation and stacked content.
 - A keyboard skip link now targets the main workspace.
 - Non-submit controls now declare `type="button"` explicitly.
-- The post-release authenticated matrix also found a min-content expansion at exactly 768px. The mobile shell, sidebar, content, and scrollable navigation now explicitly cap themselves to the viewport instead of allowing the navigation's intrinsic width to widen the document.
+- The post-release authenticated matrix also found two accumulated-cascade defects at exactly 768px: the navigation's min-content width widened the document, and older tablet placement rules left queue/detail children in implicit side-by-side columns. The mobile shell is now capped to the viewport and the workspace plus all three children explicitly reset to one column.
 
 ## Automated checks
 
