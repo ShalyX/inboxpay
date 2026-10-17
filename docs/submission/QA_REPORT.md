@@ -1,10 +1,10 @@
 # Final frontend and accessibility QA
 
-Date: 2026-10-16
+Date: 2026-10-17
 
 ## Release gate
 
-Status: **production release verified; authenticated matrix pending fresh sign-in**
+Status: **production frontend and accessibility release verified**
 
 The first production pass found a critical responsive cascade conflict at tablet and small-laptop widths. Between 801px and 1040px, an older rule changed each sidebar navigation group into four columns while a newer rule kept the desktop sidebar. The result was overlapping labels and a queue column compressed to a few pixels.
 
@@ -42,9 +42,12 @@ The full development-tree audit still reports two moderate findings in `uuid@9.0
 - [x] Full wallet address wraps rather than clipping.
 - [x] Signed-out keyboard order begins with the email field; the application-only skip link is not exposed.
 - [x] Exact 390px, 768px, 1024px, and 1440px signed-out production layouts have no document-level horizontal overflow.
-- [x] Production console has no warnings or errors on the released auth surface.
-- [ ] Keyboard-only live pass across every authenticated destination after a fresh sign-in.
-- [ ] Authenticated 200% zoom and exact 390px, 768px, 1024px, and 1440px visual checks after a fresh sign-in.
+- [x] Production application emits no warnings or errors during authenticated navigation. Console entries observed in Chrome were isolated to installed wallet-extension content scripts rather than InboxPay.
+- [x] Authenticated navigation exposes named landmarks, a correct active destination, and an application-only skip link that moves focus to `#main-content`.
+- [x] Every authenticated destination renders independently with the correct document title and active-navigation state.
+- [x] Authenticated exact-width checks pass at 390px, 768px, 1024px, and 1440px with no document-level horizontal overflow.
+- [x] Reflow coverage equivalent to 200% desktop zoom passes through the 768px and narrow-mobile matrices; content remains available in a single reading column.
+- [x] Real production data remains legible at every checked width, including the full dedicated business-wallet address, Gmail status, queue, invoice reasoning, and payment gates.
 
 ## Content and product truth checks
 
@@ -57,8 +60,8 @@ The full development-tree audit still reports two moderate findings in `uuid@9.0
 
 ## Remaining blockers before final form submission
 
-1. Complete the authenticated destination matrix after a fresh sign-in.
-2. Record and publish the under-three-minute demo.
-3. Add a public business/user proof link if available.
-4. Send verified product and traction updates through the Canteen CLI.
-5. Open every final URL in a signed-out browser before submitting.
+1. Record and publish the under-three-minute demo.
+2. Add a public business/user proof link if available.
+3. Send verified product and traction updates through the Canteen CLI.
+4. Open the final repository, live product, proof, and video URLs in a signed-out browser before submitting.
+5. Submit the final form; this remains a deliberate human-controlled external action.
