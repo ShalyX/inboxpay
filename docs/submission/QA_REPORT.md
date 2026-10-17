@@ -36,6 +36,7 @@ The full development-tree audit still reports two moderate findings in `uuid@9.0
 - [x] Live feedback uses polite status regions.
 - [x] Keyboard-visible focus treatment exists for interactive controls.
 - [x] Skip-to-content path added.
+- [x] Skip link is exposed only after the authenticated application target becomes available.
 - [x] Reduced-motion rules cover navigation scrolling and loading animation.
 - [x] Full wallet address wraps rather than clipping.
 - [ ] Keyboard-only live pass across every destination after deployment.

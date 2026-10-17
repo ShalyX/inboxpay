@@ -85,6 +85,7 @@ function status(decision) {
 
 function showAuth() {
   setDestination("inbox", false);
+  $("skip-link").hidden = true;
   $("auth-gate").hidden = false;
   $("app-shell").hidden = true;
 }
@@ -92,6 +93,7 @@ function showAuth() {
 function showApp() {
   $("auth-gate").hidden = true;
   $("app-shell").hidden = false;
+  $("skip-link").hidden = false;
 }
 
 function pageMetric(label, value, note, tone = "") {

@@ -131,7 +131,7 @@ const [indexHtml, styles] = await Promise.all([
   readFile(new URL("../public/index.html", import.meta.url), "utf8"),
   readFile(new URL("../public/styles.css", import.meta.url), "utf8")
 ]);
-assert.match(indexHtml, /class="skip-link" href="#main-content"/);
+assert.match(indexHtml, /id="skip-link" class="skip-link" href="#main-content" hidden/);
 assert.match(indexHtml, /id="main-content" class="content" tabindex="-1"/);
 assert.match(styles, /@media\(max-width:1180px\) and \(min-width:801px\)[\s\S]*?\.nav-groups nav\{display:grid;grid-template-columns:minmax\(0,1fr\)/);
 assert.match(styles, /@media\(max-width:1180px\) and \(min-width:801px\)[\s\S]*?\.workspace\{grid-template-columns:minmax\(0,1fr\)\}/);
