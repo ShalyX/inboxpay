@@ -24,6 +24,8 @@
 * { box-sizing: border-box; }
 html { min-height: 100%; background: var(--canvas); scroll-behavior: smooth; }
 body { margin: 0; min-height: 100%; background: var(--canvas); color: var(--ink); font-family: var(--font); -webkit-font-smoothing: antialiased; }
+.skip-link { position: fixed; top: 10px; left: 10px; z-index: 200; padding: 10px 14px; border: 2px solid var(--ink); border-radius: 8px; color: #fff; background: var(--ink); font-size: 13px; font-weight: 750; transform: translateY(-160%); }
+.skip-link:focus { transform: translateY(0); }
 button, input, select { font: inherit; color: inherit; }
 button { -webkit-tap-highlight-color: transparent; }
 button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible { outline: 3px solid rgba(117, 163, 0, .28); outline-offset: 2px; }
@@ -1681,6 +1683,19 @@ body[data-network="ARC"] .environment-control>span{color:var(--danger)}
 .utility-actions .sign-out{min-height:38px;justify-content:center;margin:0;padding:0 7px;color:var(--muted);font-size:10px;white-space:nowrap}
 
 @media(max-width:1180px) and (min-width:801px){
+ .shell{grid-template-columns:190px minmax(0,1fr)}
+ .sidebar{width:190px;position:sticky;top:0;height:100vh;padding:24px 16px 18px}
+ .sidebar .brand{display:flex}
+ .nav-label,.sidebar-foot{display:block}
+ .nav-groups{display:block;height:auto;overflow:visible}
+ .nav-group{display:block}
+ .nav-group-business{margin-top:24px}
+ .nav-groups nav{display:grid;grid-template-columns:minmax(0,1fr);min-width:0;gap:4px}
+ .nav{width:100%;min-width:0;display:grid;grid-template-columns:23px minmax(0,1fr) auto;justify-items:stretch;text-align:left;white-space:normal}
+ .nav-icon{display:grid}
+ .content{padding:18px 16px 30px}
+ .workspace{grid-template-columns:minmax(0,1fr)}
+ .workspace>.queue,.workspace>.detail,.workspace>.execution-rail{grid-column:auto;grid-row:auto}
  .account-actions{grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr)}
  .environment-control{grid-column:1;grid-row:1}
  .gmail-context{grid-column:2;grid-row:1}

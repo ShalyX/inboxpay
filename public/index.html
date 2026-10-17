@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
   <section id="auth-gate" class="auth-gate">
     <div class="auth-layout">
       <div class="auth-story">
@@ -84,7 +85,7 @@
       </div>
     </aside>
 
-    <section class="content">
+    <section id="main-content" class="content" tabindex="-1">
       <header class="topbar">
         <div class="topbar-row">
           <div class="page-heading">
@@ -104,8 +105,8 @@
           <div class="action-cluster" aria-label="Business controls">
             <button id="open-payments-top" class="ghost" type="button">Payments</button>
             <button id="open-audit-top" class="ghost" type="button">Audit</button>
-            <button id="open-policy-top" class="ghost">Policy</button>
-            <button id="add-vendor" class="ghost">Vendors</button>
+            <button id="open-policy-top" class="ghost" type="button">Policy</button>
+            <button id="add-vendor" class="ghost" type="button">Vendors</button>
           </div>
           <section class="gmail-context" aria-label="Business inbox">
             <div class="context-label">INVOICE SOURCE</div>
@@ -114,9 +115,9 @@
               <div id="feed-meta" class="feed-meta">Waiting for live Gmail evaluation</div>
             </div>
             <div class="utility-actions" aria-label="Inbox controls">
-              <button id="connect-gmail" class="ghost">Connect Gmail</button>
-              <button id="refresh" class="ghost refresh-action">Refresh inbox</button>
-              <button id="sign-out" class="text-action sign-out">Sign out</button>
+              <button id="connect-gmail" class="ghost" type="button">Connect Gmail</button>
+              <button id="refresh" class="ghost refresh-action" type="button">Refresh inbox</button>
+              <button id="sign-out" class="text-action sign-out" type="button">Sign out</button>
             </div>
           </section>
         </div>
@@ -178,7 +179,7 @@
     </section>
     <div id="vendor-modal" class="vendor-modal" hidden>
       <div class="vendor-card">
-        <div class="detail-top page-titlebar"><div><label>VENDOR CONTROL</label><h2>Vendor registry</h2><p>Approve exactly who this business can pay and verify the recipient registered in the active policy vault.</p></div><button id="close-vendor" class="ghost">Back to invoices</button></div>
+        <div class="detail-top page-titlebar"><div><label>VENDOR CONTROL</label><h2>Vendor registry</h2><p>Approve exactly who this business can pay and verify the recipient registered in the active policy vault.</p></div><button id="close-vendor" class="ghost" type="button">Back to invoices</button></div>
         <div id="vendor-summary" class="page-metrics" aria-live="polite"></div>
         <div class="destination-grid vendor-workspace">
           <section class="destination-card vendor-entry-card">

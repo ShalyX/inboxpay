@@ -2,7 +2,7 @@
 
 InboxPay is an autonomous accounts-payable operator built for Tameion.
 
-Each business gets its own InboxPay account, Gmail integration, AP policy, vendor registry, and isolated Circle developer-controlled wallet for each enabled Arc environment. The agent reads the business's real invoice inbox, makes a bounded payment decision, and settles approved USDC invoices from that business wallet on Arc Mainnet.
+Each business gets its own InboxPay account, Gmail integration, AP policy, vendor registry, and isolated Circle developer-controlled wallet for each enabled Arc environment. The agent reads the business's real invoice inbox, makes a bounded payment decision, and can settle approved USDC invoices from that business wallet on Arc. Mainnet financial writes remain explicitly gated.
 
 ## The product
 
@@ -104,7 +104,9 @@ Do not commit Gmail tokens, Circle wallet exports, OAuth credentials, local invo
 
 ## Hackathon proof
 
-The project includes a real Gmail-derived evaluator, Circle developer-controlled wallet integration, a live x402 purchase on Arc mainnet, and an Arc mainnet PaymentPolicyVault deployment. Private Gmail/OAuth/Circle artifacts stay local; demo-decisions.json is the redacted reviewer-facing sample.
+The project includes a real Gmail-derived evaluator, email and PDF evidence ingestion, dedicated Circle developer-controlled wallets, onchain payment policy enforcement, durable autonomous execution, reconciliation, a live x402 purchase on Arc Mainnet, and an Arc Mainnet PaymentPolicyVault deployment. Private Gmail/OAuth/Circle artifacts stay local; `demo-decisions.json` is the redacted reviewer-facing sample.
+
+The complete autonomous AP proof is on **Arc Testnet**. Invoice `AUTONOMY-TEST-002` settled exactly once for `0.10 USDC` from the dedicated Caraxes Labs wallet and reconciled in InboxPay. Its transaction is `0x77f9bd481c33497a13c256198bea277f21cb3232c47b6cbf0f6fda2345369564`.
 
 ## Arc mainnet proof
 
@@ -112,9 +114,11 @@ The production PaymentPolicyVault is deployed on Arc Mainnet at `0xa1dafca93784e
 
 InboxPay also completed a real x402 purchase on Arc Mainnet through Circle's developer-controlled wallet. The 0.001 USDC settlement transaction is `0x0957a0febac2b4d5757148aa8e9d36861167ef4139c20bfd5105a4b404ac0186`.
 
-The live demo uses the same mainnet USDC rail and reads settlement state directly from the vault's `PaymentExecuted` events.
+The Mainnet policy deployment and x402 purchase prove the live Arc/Circle rail separately; they are not presented as a Mainnet invoice settlement. A genuine third-party vendor Mainnet AP payment remains a release gate.
 
 Tameion final submission requires a public GitHub repository and a recorded demo under three minutes. A live product URL is encouraged.
+
+Submission copy, the demo script, QA status, and visual assets live in [`docs/submission`](./docs/submission/).
 
 
 
