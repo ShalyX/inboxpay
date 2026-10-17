@@ -1474,9 +1474,10 @@ body:has(.vendor-modal.page-mode:not([hidden])){overflow:hidden}
 
 @media(max-width:800px){
  body:has(.vendor-modal.page-mode:not([hidden])){overflow:hidden}
+ .shell,.sidebar,.content{min-width:0;width:100%;max-width:100%}
  .sidebar{position:sticky;top:0;z-index:80;height:64px;padding:8px 10px;background:rgba(255,255,255,.96);backdrop-filter:blur(14px)}
  .sidebar .brand,.sidebar-foot,.nav-label{display:none}
- .nav-groups{display:flex;gap:4px;height:48px;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none}
+ .nav-groups{display:flex;max-width:100%;gap:4px;height:48px;overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none}
  .nav-groups::-webkit-scrollbar{display:none}
  .nav-group{display:contents}
  .nav-groups nav{display:flex;flex:0 0 auto;min-width:max-content;gap:4px}

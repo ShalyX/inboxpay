@@ -4,7 +4,7 @@ Date: 2026-10-16
 
 ## Release gate
 
-Status: **in progress**
+Status: **production release verified; authenticated matrix pending fresh sign-in**
 
 The first production pass found a critical responsive cascade conflict at tablet and small-laptop widths. Between 801px and 1040px, an older rule changed each sidebar navigation group into four columns while a newer rule kept the desktop sidebar. The result was overlapping labels and a queue column compressed to a few pixels.
 
@@ -14,6 +14,7 @@ The local correction establishes one breakpoint contract:
 - 800px and below: horizontal mobile destination navigation and stacked content.
 - A keyboard skip link now targets the main workspace.
 - Non-submit controls now declare `type="button"` explicitly.
+- The post-release authenticated matrix also found a min-content expansion at exactly 768px. The mobile shell, sidebar, content, and scrollable navigation now explicitly cap themselves to the viewport instead of allowing the navigation's intrinsic width to widen the document.
 
 ## Automated checks
 
@@ -39,9 +40,11 @@ The full development-tree audit still reports two moderate findings in `uuid@9.0
 - [x] Skip link is exposed only after the authenticated application target becomes available.
 - [x] Reduced-motion rules cover navigation scrolling and loading animation.
 - [x] Full wallet address wraps rather than clipping.
-- [ ] Keyboard-only live pass across every destination after deployment.
-- [ ] 200% zoom and exact 390px, 768px, 1024px, and 1440px visual checks after deployment.
-- [ ] Production console and failed-request review after deployment.
+- [x] Signed-out keyboard order begins with the email field; the application-only skip link is not exposed.
+- [x] Exact 390px, 768px, 1024px, and 1440px signed-out production layouts have no document-level horizontal overflow.
+- [x] Production console has no warnings or errors on the released auth surface.
+- [ ] Keyboard-only live pass across every authenticated destination after a fresh sign-in.
+- [ ] Authenticated 200% zoom and exact 390px, 768px, 1024px, and 1440px visual checks after a fresh sign-in.
 
 ## Content and product truth checks
 
@@ -54,7 +57,7 @@ The full development-tree audit still reports two moderate findings in `uuid@9.0
 
 ## Remaining blockers before final form submission
 
-1. Deploy the responsive/accessibility correction and repeat the live matrix.
+1. Complete the authenticated destination matrix after a fresh sign-in.
 2. Record and publish the under-three-minute demo.
 3. Add a public business/user proof link if available.
 4. Send verified product and traction updates through the Canteen CLI.
