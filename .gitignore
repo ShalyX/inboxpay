@@ -18,3 +18,15 @@ output/
 gmail-payment-result.json
 invoice-email-inspection.json
 x402-mainnet-receipt.json
+
+# Personal continuity notes
+AGENTHANDOFF.md
+
+# Local demo production workspace and large render artifacts
+reference-kina/
+videos/inboxpay-demo/node_modules/
+videos/inboxpay-demo/.hyperframes/
+videos/inboxpay-demo/.media/
+videos/inboxpay-demo/.thumbnails/
+videos/inboxpay-demo/capture/
+videos/inboxpay-demo/renders/

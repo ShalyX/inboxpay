@@ -2,9 +2,9 @@
 
 InboxPay is an autonomous accounts-payable operator built for Tameion.
 
-![InboxPay — bounded accounts payable on Arc](./docs/submission/assets/demo-cover.svg)
+![InboxPay — bounded accounts payable on Arc](./docs/assets/demo-cover.svg)
 
-[Live product](https://inboxpay.vercel.app/) · [Submission materials](./docs/submission/) · [Operations runbook](./AUTONOMY-RUNBOOK.md) · [Apache-2.0 license](./LICENSE)
+[Live product](https://inboxpay.vercel.app/) · [Operations runbook](./AUTONOMY-RUNBOOK.md) · [Apache-2.0 license](./LICENSE)
 
 Each business gets its own InboxPay account, Gmail integration, AP policy, vendor registry, and isolated Circle developer-controlled wallet for each enabled Arc environment. The agent reads the business's real invoice inbox, makes a bounded payment decision, and can settle approved USDC invoices from that business wallet on Arc. Mainnet financial writes remain explicitly gated.
 
@@ -127,16 +127,6 @@ The production PaymentPolicyVault is deployed on Arc Mainnet at `0xa1dafca93784e
 InboxPay also completed a real x402 purchase on Arc Mainnet through Circle's developer-controlled wallet. The 0.001 USDC settlement transaction is `0x0957a0febac2b4d5757148aa8e9d36861167ef4139c20bfd5105a4b404ac0186`.
 
 The Mainnet policy deployment and x402 purchase prove the live Arc/Circle rail separately; they are not presented as a Mainnet invoice settlement. A genuine third-party vendor Mainnet AP payment remains a release gate.
-
-Tameion final submission requires a public GitHub repository and a recorded demo under three minutes. A live product URL is encouraged.
-
-Submission copy, the demo script, QA status, and visual assets live in [`docs/submission`](./docs/submission/).
-
-
-
-## Agent handoff
-
-For continuing development in Codex or another coding agent, read **[AGENTHANDOFF.md](./AGENTHANDOFF.md)** before making changes. It records the current architecture, live infrastructure, production OAuth setup, known blockers, verification status, and the immediate execution queue.
 
 ## License
 
