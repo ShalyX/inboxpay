@@ -14,12 +14,16 @@ Configure these GitHub Actions secrets:
 | `BACKUP_AWS_ACCESS_KEY_ID` | Write/read credential restricted to the backup prefix. |
 | `BACKUP_AWS_SECRET_ACCESS_KEY` | Matching restricted credential. |
 | `BACKUP_AWS_REGION` | Bucket region. |
+| `TELEGRAM_BOT_TOKEN` | Preferred Telegram bot credential for backup-failure alerts. |
+| `TELEGRAM_ALERT_CHAT_ID` | Telegram destination for backup-failure alerts. |
 | `OPERATIONS_ALERT_WEBHOOK_URL` | Optional failure-notification destination. |
 | `OPERATIONS_ALERT_WEBHOOK_SECRET` | Optional bearer secret for that destination. |
 
 The `Encrypted database backup` workflow runs daily at 02:17 UTC and can be dispatched manually. It creates a custom-format dump, encrypts it with AES-256 through GnuPG, uploads the encrypted file plus SHA-256 checksum, and deletes runner-local copies. Configure bucket versioning, server-side encryption, access logging, and a retention lifecycle of at least 35 daily copies plus monthly archives.
 
 The workflow fails closed when any required destination or encryption secret is absent. A workflow existing in GitHub is not evidence that backups are active: verify a successful run and the object in the private bucket.
+
+Telegram is the preferred alert channel when both Telegram secrets are present. The generic webhook remains available as a fallback. Backup success stays quiet; only a failed run sends an alert.
 
 ## Quarterly restore drill
 

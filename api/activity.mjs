@@ -1,6 +1,7 @@
 import { requireUser, supabaseRest } from "../lib/supabase-server.mjs";
 import { getBusiness } from "../lib/businesses.mjs";
 import { probeBusinessOperations } from "../lib/operations-monitor.mjs";
+import { isOperationsAlertDeliveryConfigured } from "../lib/operations-alerts.mjs";
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
@@ -58,7 +59,7 @@ export default async function handler(req, res) {
       return res.status(200).json({
         ...health,
         alerting: {
-          deliveryConfigured: Boolean(process.env.OPERATIONS_ALERT_WEBHOOK_URL),
+          deliveryConfigured: isOperationsAlertDeliveryConfigured(),
           states: serviceStates || []
         }
       });

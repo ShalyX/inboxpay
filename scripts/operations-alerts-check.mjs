@@ -1,5 +1,9 @@
 import assert from "node:assert/strict";
-import { nextOperationsServiceState } from "../lib/operations-alerts.mjs";
+import {
+  formatTelegramAlert,
+  isOperationsAlertDeliveryConfigured,
+  nextOperationsServiceState
+} from "../lib/operations-alerts.mjs";
 
 const firstFailure = nextOperationsServiceState(null, {
   key: "circle", status: "degraded", detail: "Service check failed", action: "Retry"
@@ -41,5 +45,29 @@ const incompleteSetup = nextOperationsServiceState({ status: "attention", consec
   key: "circle", status: "attention", detail: "Dedicated business wallet is not provisioned", action: "Provision wallet"
 }, "2026-10-17T20:25:00.000Z");
 assert.equal(incompleteSetup.notification, null, "Expected onboarding gaps stay visible without paging as outages");
+
+assert.equal(isOperationsAlertDeliveryConfigured({}), false);
+assert.equal(isOperationsAlertDeliveryConfigured({ TELEGRAM_BOT_TOKEN: "token" }), false);
+assert.equal(isOperationsAlertDeliveryConfigured({
+  TELEGRAM_BOT_TOKEN: "token",
+  TELEGRAM_ALERT_CHAT_ID: "123"
+}), true);
+assert.equal(isOperationsAlertDeliveryConfigured({ OPERATIONS_ALERT_WEBHOOK_URL: "https://alerts.example" }), true);
+
+const telegramMessage = formatTelegramAlert({
+  event: "service_attention",
+  incidentKey: "business:ARC-TESTNET:circle",
+  business: { name: "Caraxes Labs" },
+  network: "ARC-TESTNET",
+  service: { key: "circle", label: "Circle" },
+  severity: "critical",
+  detail: "Dedicated wallet is unavailable",
+  action: "Preserve transaction IDs and inspect Circle",
+  checkedAt: "2026-10-18T15:00:00.000Z"
+});
+assert.match(telegramMessage, /InboxPay operations alert/);
+assert.match(telegramMessage, /InboxPay operations alert\nService: Circle/);
+assert.match(telegramMessage, /Caraxes Labs/);
+assert.match(telegramMessage, /Preserve transaction IDs/);
 
 console.log("Operations alert transition gate passed");

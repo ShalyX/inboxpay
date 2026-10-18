@@ -1452,7 +1452,7 @@ function renderActivity(kind, rows, data = null) {
         return '<article class="operations-recovery"><div><span>' + escapeHtml(item.service) + '</span><h3>' + escapeHtml(item.detail) + '</h3><p>' + escapeHtml(item.action) + '</p></div><div class="operations-recovery-state"><b class="operations-badge ' + escapeHtml(presentation.tone) + '">' + escapeHtml(presentation.label) + '</b><time>Checked ' + escapeHtml(formatActivityDate(item.last_checked_at)) + '</time></div></article>';
       }).join("")
       : '<div class="activity-empty compact"><strong>Awaiting the first scheduled monitor pass</strong><span>Service state will appear after the bounded worker records its first check.</span></div>';
-    const deliveryLabel = data?.alerting?.deliveryConfigured ? "Webhook delivery active" : "Operator view only · webhook not configured";
+    const deliveryLabel = data?.alerting?.deliveryConfigured ? "External alerts active" : "Operator view only · external alerts not configured";
     node.innerHTML = '<section class="operations-grid" aria-label="Service health">' + serviceMarkup + '</section><section class="operations-recovery-list" aria-label="Persisted alert state"><div class="operations-section-heading"><span>ALERT STATE</span><h3>' + escapeHtml(deliveryLabel) + '</h3></div>' + alertMarkup + '</section><section class="operations-recovery-list" aria-label="Recovery queue"><div class="operations-section-heading"><span>DURABLE RECOVERY</span><h3>Operator queue</h3></div>' + recoveryMarkup + '</section>';
     return;
   }
