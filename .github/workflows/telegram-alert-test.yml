@@ -1,0 +1,30 @@
+name: Test Telegram operations alert
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  alert:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+      TELEGRAM_ALERT_CHAT_ID: ${{ secrets.TELEGRAM_ALERT_CHAT_ID }}
+    steps:
+      - name: Send configuration test
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          : "${TELEGRAM_BOT_TOKEN:?Missing TELEGRAM_BOT_TOKEN secret}"
+          : "${TELEGRAM_ALERT_CHAT_ID:?Missing TELEGRAM_ALERT_CHAT_ID secret}"
+          payload="$(jq -nc \
+            --arg chat_id "$TELEGRAM_ALERT_CHAT_ID" \
+            --arg text $'InboxPay alert channel test\nStatus: configuration verified\nNo financial action was performed.' \
+            '{chat_id:$chat_id,text:$text,disable_web_page_preview:true}')"
+          curl --silent --show-error --fail --max-time 8 \
+            -H "Content-Type: application/json" \
+            --data "$payload" \
+            "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" >/dev/null

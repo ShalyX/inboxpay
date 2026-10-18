@@ -25,6 +25,8 @@ The workflow fails closed when any required destination or encryption secret is 
 
 Telegram is the preferred alert channel when both Telegram secrets are present. The generic webhook remains available as a fallback. Backup success stays quiet; only a failed run sends an alert.
 
+After changing either Telegram secret, manually run **Test Telegram operations alert**. A green workflow plus the received Telegram message is the delivery acceptance check; it does not access the database or perform a financial action.
+
 ## Quarterly restore drill
 
 1. Create an empty, disposable PostgreSQL database that is isolated from production.
