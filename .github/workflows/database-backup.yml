@@ -41,9 +41,7 @@ jobs:
             if [[ -n "${TELEGRAM_BOT_TOKEN:-}" && -n "${TELEGRAM_ALERT_CHAT_ID:-}" ]]; then
               curl --silent --show-error --fail --max-time 8 \
                 -H "Content-Type: application/json" \
-                --data "$(jq -nc --arg chat_id "$TELEGRAM_ALERT_CHAT_ID" --arg text 'InboxPay backup failed
-Severity: critical
-Action: Inspect the GitHub Actions run and preserve the last verified backup.' '{chat_id:$chat_id,text:$text,disable_web_page_preview:true}')" \
+                --data "$(jq -nc --arg chat_id "$TELEGRAM_ALERT_CHAT_ID" --arg text $'InboxPay backup failed\nSeverity: critical\nAction: Inspect the GitHub Actions run and preserve the last verified backup.' '{chat_id:$chat_id,text:$text,disable_web_page_preview:true}')" \
                 "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" >/dev/null || true
             elif [[ -n "${OPERATIONS_ALERT_WEBHOOK_URL:-}" ]]; then
               if [[ -n "${OPERATIONS_ALERT_WEBHOOK_SECRET:-}" ]]; then
