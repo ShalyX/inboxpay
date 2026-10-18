@@ -270,7 +270,7 @@ assert.deepEqual(
 );
 
 const discoveryMigration = await fs.readFile(
-  new URL("../supabase/migrations/20261015_vendor_aware_invoice_discovery.sql", import.meta.url),
+  new URL("../supabase/migrations/20261015000000_vendor_aware_invoice_discovery.sql", import.meta.url),
   "utf8",
 );
 assert.match(discoveryMigration, /invoice_sender_emails text\[\]/i);

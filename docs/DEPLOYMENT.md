@@ -30,6 +30,8 @@ Node.js 20 or newer is required. The production repository is framework-light an
 | `ARC_RPC_URL` | Server | Arc Mainnet RPC. |
 | `INBOXPAY_WALLET_IDEMPOTENCY_SECRET` | Server | Deterministic wallet-operation idempotency. |
 | `AUTONOMY_CRON_SECRET` | Server/Supabase Vault | Dedicated worker bearer secret. |
+| `OPERATIONS_ALERT_WEBHOOK_URL` | Server | Optional incident and recovery notification destination. |
+| `OPERATIONS_ALERT_WEBHOOK_SECRET` | Server | Optional dedicated bearer secret for the notification destination. |
 | `INBOXPAY_ALLOW_MAINNET_WRITES` | Server | Must equal `true` before server-side Mainnet writes are allowed. |
 
 `CIRCLE_API_KEY` and `CIRCLE_ENTITY_SECRET` remain supported as legacy Testnet fallbacks. Do not configure a global wallet ID or shared treasury address.
@@ -38,11 +40,16 @@ Node.js 20 or newer is required. The production repository is framework-light an
 
 Apply committed migrations in filename order:
 
-1. `supabase/migrations/20261012_business_network_accounts.sql`
-2. `supabase/migrations/20261015_vendor_aware_invoice_discovery.sql`
-3. `supabase/migrations/20261015_autonomy_and_withdrawals.sql`
+1. `supabase/migrations/20261004172924_create_inboxpay_multi_user_core.sql`
+2. `supabase/migrations/20261004174052_add_business_wallet_and_vendor_tenants.sql`
+3. `supabase/migrations/20261004175622_add_business_policy_contract_state.sql`
+4. `supabase/migrations/20261004175808_track_policy_contract_configuration.sql`
+5. `supabase/migrations/20261012000000_business_network_accounts.sql`
+6. `supabase/migrations/20261015000000_vendor_aware_invoice_discovery.sql`
+7. `supabase/migrations/20261015010000_autonomy_and_withdrawals.sql`
+8. `supabase/migrations/20261017232500_operations_service_states.sql`
 
-These are incremental migrations. They do not create the foundational InboxPay schema from an empty project. A clean deployment must first apply the canonical baseline schema from the controlled production schema export. That baseline is not yet committed, so independent clean-room deployment is currently blocked and must not be improvised.
+The first four files are the exact foundational migrations already recorded by the production Supabase project. Do not squash, renumber, or replace them. They make clean-room deployment reproducible while preserving production migration identity.
 
 After migrations, verify RLS as an authenticated user from two separate accounts and verify that service-role claim functions reject authenticated callers.
 
@@ -67,6 +74,8 @@ npm run test:frontend
 npm run test:invoice-route
 npm run test:autonomy-wallet
 npm run test:operations
+npm run test:alerts
+npm run test:database
 npm run compile:policy
 npm audit --omit=dev
 ```
@@ -102,4 +111,4 @@ Also run `forge test` when Foundry is available. A green unit/build pass does no
 - Operations health reports Gmail, Circle, Arc RPC, Supabase, and reconciliation independently.
 - No Mainnet financial write is performed merely as a health check.
 
-See [AUTONOMY-RUNBOOK.md](../AUTONOMY-RUNBOOK.md) for scheduler SQL and incident recovery.
+See [AUTONOMY-RUNBOOK.md](../AUTONOMY-RUNBOOK.md) for scheduler SQL and incident recovery, and [BACKUP-RECOVERY.md](./BACKUP-RECOVERY.md) for encrypted backups and restore drills.

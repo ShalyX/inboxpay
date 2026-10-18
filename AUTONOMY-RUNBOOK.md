@@ -13,7 +13,7 @@ This runbook applies to the bounded autonomous-payment worker, business-wallet w
 
 ## Required database change
 
-Apply `supabase/migrations/20261015_autonomy_and_withdrawals.sql` in the production Supabase project before deploying the application code.
+Apply `supabase/migrations/20261015010000_autonomy_and_withdrawals.sql` in the production Supabase project before deploying the application code.
 
 The migration adds durable execution jobs, withdrawal records, leases, retry/reconciliation state, RLS, a service-role-only claim function, and server-only autonomy-control columns. Confirm the migration committed successfully before continuing.
 
@@ -104,6 +104,8 @@ Open **Operations** in the production sidebar. The view performs read-only, busi
 - the expected Arc chain ID through the configured RPC;
 - Supabase access to the business's durable payment, withdrawal, and reconciliation records;
 - unresolved reconciliation work, split into bounded automatic recovery and operator attention.
+
+The existing worker also records these service states every five minutes per business and environment. Two consecutive provider failures are required before a webhook notification, which suppresses transient noise. A stopped reconciliation record is immediately alertable. Recovery is notified once after a previously delivered incident, and repeat failure notifications are limited to one per 30 minutes. Concurrent workers conditionally claim each delivery to prevent duplicate pages. Configure `OPERATIONS_ALERT_WEBHOOK_URL` and, when supported by the receiver, `OPERATIONS_ALERT_WEBHOOK_SECRET`; without them, persisted states remain visible in Operations but no external page is sent. The receiver should also deduplicate the stable `incidentKey`, which protects the direct Supabase-outage path when the database cannot store a notification lease.
 
 The health request never creates a wallet, refreshes the invoice queue, submits a payment, registers a vendor, changes a policy, approves USDC, or switches the active environment. Gmail access-token refresh may occur when the saved short-lived token has expired; this preserves the existing read-only OAuth connection and does not broaden its scope.
 

@@ -98,7 +98,7 @@ assert.throws(() => requireAutonomyWorker({ headers: { authorization: "Bearer wr
 if (previousSecret === undefined) delete process.env.AUTONOMY_CRON_SECRET;
 else process.env.AUTONOMY_CRON_SECRET = previousSecret;
 
-const migration = await fs.readFile(new URL("../supabase/migrations/20261015_autonomy_and_withdrawals.sql", import.meta.url), "utf8");
+const migration = await fs.readFile(new URL("../supabase/migrations/20261015010000_autonomy_and_withdrawals.sql", import.meta.url), "utf8");
 assert.match(migration, /unique \(invoice_id\)/i);
 assert.match(migration, /for update of jobs skip locked/i);
 assert.match(migration, /auth\.role\(\) <> 'service_role'/i);

@@ -27,6 +27,8 @@
     "test:invoice-route": "node scripts/invoice-route-error-check.mjs",
     "test:autonomy-wallet": "node scripts/autonomy-wallet-control-check.mjs",
     "test:operations": "node scripts/operations-health-check.mjs",
+    "test:alerts": "node scripts/operations-alerts-check.mjs",
+    "test:database": "node scripts/database-schema-check.mjs",
     "compile:policy": "node scripts/compile-policy.mjs"
   },
   "dependencies": {

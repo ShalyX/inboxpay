@@ -15,6 +15,9 @@ The mark deliberately avoids wallets, coins, shields, locks, chain links, circui
 | `public/brand/inboxpay-lockup.svg` | Horizontal product lockup. |
 | `public/brand/inboxpay-og.svg` | Editable 1200×630 social source. |
 | `public/brand/inboxpay-og.png` | Open Graph and X sharing image. |
+| `public/brand/inboxpay-x-avatar.png` | X profile avatar, exported at 800×800. |
+| `public/brand/inboxpay-x-header.svg` | Editable X header source. |
+| `public/brand/inboxpay-x-header.png` | X header, exported at 1500×500. |
 | `public/favicon.svg` | Browser favicon. |
 
 ## Core colors

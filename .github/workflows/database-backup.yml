@@ -1,0 +1,75 @@
+name: Encrypted database backup
+
+on:
+  schedule:
+    - cron: "17 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inboxpay-database-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
+      BACKUP_S3_URI: ${{ secrets.BACKUP_S3_URI }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: ${{ secrets.BACKUP_AWS_REGION }}
+      OPERATIONS_ALERT_WEBHOOK_URL: ${{ secrets.OPERATIONS_ALERT_WEBHOOK_URL }}
+      OPERATIONS_ALERT_WEBHOOK_SECRET: ${{ secrets.OPERATIONS_ALERT_WEBHOOK_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install PostgreSQL and S3 clients
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Create, encrypt, and upload backup
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          notify_failure() {
+            if [[ -n "${OPERATIONS_ALERT_WEBHOOK_URL:-}" ]]; then
+              if [[ -n "${OPERATIONS_ALERT_WEBHOOK_SECRET:-}" ]]; then
+                curl --silent --show-error --fail --max-time 8 \
+                  -H "Content-Type: application/json" \
+                  -H "Authorization: Bearer ${OPERATIONS_ALERT_WEBHOOK_SECRET}" \
+                  --data '{"product":"InboxPay","event":"backup_failed","severity":"critical","detail":"The scheduled encrypted Supabase backup failed.","action":"Inspect the GitHub Actions run and preserve the last verified backup."}' \
+                  "$OPERATIONS_ALERT_WEBHOOK_URL" >/dev/null || true
+              else
+                curl --silent --show-error --fail --max-time 8 \
+                  -H "Content-Type: application/json" \
+                  --data '{"product":"InboxPay","event":"backup_failed","severity":"critical","detail":"The scheduled encrypted Supabase backup failed.","action":"Inspect the GitHub Actions run and preserve the last verified backup."}' \
+                  "$OPERATIONS_ALERT_WEBHOOK_URL" >/dev/null || true
+              fi
+            fi
+          }
+          trap notify_failure ERR
+          : "${SUPABASE_DB_URL:?Missing SUPABASE_DB_URL secret}"
+          : "${BACKUP_ENCRYPTION_PASSPHRASE:?Missing BACKUP_ENCRYPTION_PASSPHRASE secret}"
+          : "${BACKUP_S3_URI:?Missing BACKUP_S3_URI secret}"
+          : "${AWS_ACCESS_KEY_ID:?Missing BACKUP_AWS_ACCESS_KEY_ID secret}"
+          : "${AWS_SECRET_ACCESS_KEY:?Missing BACKUP_AWS_SECRET_ACCESS_KEY secret}"
+          : "${AWS_DEFAULT_REGION:?Missing BACKUP_AWS_REGION secret}"
+
+          stamp="$(date -u +'%Y%m%dT%H%M%SZ')"
+          dump="inboxpay-${stamp}.dump"
+          encrypted="${dump}.gpg"
+          checksum="${encrypted}.sha256"
+
+          pg_dump "$SUPABASE_DB_URL" --format=custom --no-owner --no-privileges --file="$dump"
+          printf '%s' "$BACKUP_ENCRYPTION_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback \
+            --passphrase-fd 0 \
+            --symmetric --cipher-algo AES256 --output "$encrypted" "$dump"
+          rm -f "$dump"
+          sha256sum "$encrypted" > "$checksum"
+          aws s3 cp "$encrypted" "${BACKUP_S3_URI%/}/$encrypted" --only-show-errors
+          aws s3 cp "$checksum" "${BACKUP_S3_URI%/}/$checksum" --only-show-errors
+          rm -f "$encrypted" "$checksum"

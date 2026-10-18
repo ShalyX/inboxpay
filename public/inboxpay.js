@@ -1435,6 +1435,7 @@ function renderActivity(kind, rows, data = null) {
   if (kind === "operations") {
     const services = data?.services || [];
     const recoveryItems = data?.recovery?.items || [];
+    const alertStates = data?.alerting?.states || [];
     const serviceMarkup = services.map((service) => {
       const presentation = operationsStatusPresentation(service.status);
       return '<article class="operations-service"><div class="operations-service-head"><div><span>SERVICE</span><h3>' + escapeHtml(service.label) + '</h3></div><b class="operations-badge ' + escapeHtml(presentation.tone) + '">' + escapeHtml(presentation.label) + '</b></div><p>' + escapeHtml(service.detail) + '</p><small>' + escapeHtml(service.action || "No action required") + '</small></article>';
@@ -1445,7 +1446,14 @@ function renderActivity(kind, rows, data = null) {
         return '<article class="operations-recovery"><div><span>' + escapeHtml(item.kind) + '</span><h3>' + escapeHtml(item.title) + '</h3><p>' + escapeHtml(item.detail) + '</p></div><div class="operations-recovery-state"><b class="operations-badge ' + escapeHtml(presentation.tone) + '">' + escapeHtml(presentation.label) + '</b><time>' + escapeHtml(formatActivityDate(item.nextAttemptAt || item.updatedAt)) + '</time></div></article>';
       }).join("")
       : '<div class="activity-empty compact"><strong>No recovery work is waiting</strong><span>There are no unresolved payment, withdrawal, or reconciliation records for this business and environment.</span></div>';
-    node.innerHTML = '<section class="operations-grid" aria-label="Service health">' + serviceMarkup + '</section><section class="operations-recovery-list" aria-label="Recovery queue"><div class="operations-section-heading"><span>DURABLE RECOVERY</span><h3>Operator queue</h3></div>' + recoveryMarkup + '</section>';
+    const alertMarkup = alertStates.length
+      ? alertStates.map((item) => {
+        const presentation = operationsStatusPresentation(item.status);
+        return '<article class="operations-recovery"><div><span>' + escapeHtml(item.service) + '</span><h3>' + escapeHtml(item.detail) + '</h3><p>' + escapeHtml(item.action) + '</p></div><div class="operations-recovery-state"><b class="operations-badge ' + escapeHtml(presentation.tone) + '">' + escapeHtml(presentation.label) + '</b><time>Checked ' + escapeHtml(formatActivityDate(item.last_checked_at)) + '</time></div></article>';
+      }).join("")
+      : '<div class="activity-empty compact"><strong>Awaiting the first scheduled monitor pass</strong><span>Service state will appear after the bounded worker records its first check.</span></div>';
+    const deliveryLabel = data?.alerting?.deliveryConfigured ? "Webhook delivery active" : "Operator view only · webhook not configured";
+    node.innerHTML = '<section class="operations-grid" aria-label="Service health">' + serviceMarkup + '</section><section class="operations-recovery-list" aria-label="Persisted alert state"><div class="operations-section-heading"><span>ALERT STATE</span><h3>' + escapeHtml(deliveryLabel) + '</h3></div>' + alertMarkup + '</section><section class="operations-recovery-list" aria-label="Recovery queue"><div class="operations-section-heading"><span>DURABLE RECOVERY</span><h3>Operator queue</h3></div>' + recoveryMarkup + '</section>';
     return;
   }
   const visibleRows = rows.filter((row) => activityMatches(kind, row));

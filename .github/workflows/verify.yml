@@ -37,6 +37,8 @@ jobs:
           npm run test:invoice-route
           npm run test:autonomy-wallet
           npm run test:operations
+          npm run test:alerts
+          npm run test:database
 
       - name: Check production dependencies
         run: npm audit --omit=dev

@@ -8,6 +8,7 @@ InboxPay is a production-oriented accounts-payable operator. These documents des
 - [API](./API.md) — authenticated server endpoints and financial confirmation rules.
 - [Brand assets](./BRAND.md) — identity idea, asset inventory, colors, and usage rules.
 - [Operations runbook](../AUTONOMY-RUNBOOK.md) — worker health, recovery, and emergency response.
+- [Backup and recovery](./BACKUP-RECOVERY.md) — encrypted off-site backups and disposable restore drills.
 - [Gmail setup](../GMAIL-SETUP.md) — Google OAuth configuration and invoice ingestion.
 
 ## Evidence boundary
