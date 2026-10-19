@@ -38,7 +38,7 @@ jobs:
         uses: google-github-actions/setup-gcloud@v3
 
       - name: Install PostgreSQL client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client-17
 
       - name: Restore into disposable database and verify core tables
         shell: bash
