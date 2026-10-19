@@ -38,8 +38,8 @@ jobs:
       - name: Set up Google Cloud CLI
         uses: google-github-actions/setup-gcloud@v3
 
-      - name: Install PostgreSQL client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client-17
+      - name: Pull PostgreSQL 17 client
+        run: docker pull postgres:17-alpine
 
       - name: Create, encrypt, and upload backup
         shell: bash
@@ -75,9 +75,14 @@ jobs:
           dump="inboxpay-${stamp}.dump"
           encrypted="${dump}.gpg"
           checksum="${encrypted}.sha256"
-          PGPASSWORD="$SUPABASE_DB_PASSWORD" pg_dump \
-            --dbname="host=aws-0-eu-west-1.pooler.supabase.com port=5432 dbname=postgres user=postgres.ecportgmionyhlofyobc sslmode=require" \
-            --format=custom --no-owner --no-privileges --file="$dump"
+          PGPASSWORD="$SUPABASE_DB_PASSWORD" docker run --rm \
+            -e PGPASSWORD \
+            --volume "$PWD:/work" \
+            --workdir /work \
+            postgres:17-alpine \
+            pg_dump \
+              --dbname="host=aws-0-eu-west-1.pooler.supabase.com port=5432 dbname=postgres user=postgres.ecportgmionyhlofyobc sslmode=require" \
+              --format=custom --no-owner --no-privileges --file="$dump"
           printf '%s' "$BACKUP_ENCRYPTION_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback \
             --passphrase-fd 0 \
             --symmetric --cipher-algo AES256 --output "$encrypted" "$dump"

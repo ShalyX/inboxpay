@@ -37,8 +37,8 @@ jobs:
       - name: Set up Google Cloud CLI
         uses: google-github-actions/setup-gcloud@v3
 
-      - name: Install PostgreSQL client
-        run: sudo apt-get update && sudo apt-get install -y postgresql-client-17
+      - name: Pull PostgreSQL 17 client
+        run: docker pull postgres:17-alpine
 
       - name: Restore into disposable database and verify core tables
         shell: bash
@@ -57,8 +57,16 @@ jobs:
           printf '%s' "$BACKUP_ENCRYPTION_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback \
             --passphrase-fd 0 \
             --decrypt --output backup.dump backup.dump.gpg
-          pg_restore --exit-on-error --no-owner --no-privileges --dbname="$RESTORE_DATABASE_URL" backup.dump
-          psql "$RESTORE_DATABASE_URL" --set=ON_ERROR_STOP=1 <<'SQL'
+          docker run --rm \
+            -e RESTORE_DATABASE_URL \
+            --volume "$PWD:/work" \
+            --workdir /work \
+            postgres:17-alpine \
+            sh -c 'pg_restore --exit-on-error --no-owner --no-privileges --dbname="$RESTORE_DATABASE_URL" backup.dump'
+          docker run --rm --interactive \
+            -e RESTORE_DATABASE_URL \
+            postgres:17-alpine \
+            sh -c 'psql "$RESTORE_DATABASE_URL" --set=ON_ERROR_STOP=1' <<'SQL'
           do $$
           begin
             if (
