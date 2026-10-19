@@ -13,7 +13,8 @@ const requiredFiles = [
   "20261015000000_vendor_aware_invoice_discovery.sql",
   "20261015010000_autonomy_and_withdrawals.sql",
   "20261017232500_operations_service_states.sql",
-  "20261019000000_business_notification_channels.sql"
+  "20261019000000_business_notification_channels.sql",
+  "20261019000001_fix_telegram_link_conflict.sql"
 ];
 
 assert.deepEqual(files, requiredFiles, "Migration inventory or ordering changed without updating the schema gate");
@@ -48,5 +49,7 @@ assert.match(combined, /claim_invoice_execution_jobs/i,
   "The durable autonomy queue claim function must remain in migrations");
 assert.match(combined, /create or replace function public\.consume_business_telegram_link/i);
 assert.match(combined, /revoke all on function public\.consume_business_telegram_link\(text, text, text, text\) from public, anon, authenticated/i);
+assert.match(sql[requiredFiles.at(-1)], /on conflict on constraint business_notification_channels_business_id_channel_key/i,
+  "Telegram link upsert must avoid PL/pgSQL output-parameter ambiguity");
 
 console.log(`Database schema gate passed (${files.length} ordered migrations)`);
