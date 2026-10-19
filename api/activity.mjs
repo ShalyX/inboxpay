@@ -2,8 +2,12 @@ import { requireUser, supabaseRest } from "../lib/supabase-server.mjs";
 import { getBusiness } from "../lib/businesses.mjs";
 import { probeBusinessOperations } from "../lib/operations-monitor.mjs";
 import { getBusinessNotificationChannel } from "../lib/business-notifications.mjs";
+import notificationsHandler from "../lib/notifications-route.mjs";
 
 export default async function handler(req, res) {
+  if (String(req.query?.view || "").toLowerCase() === "notifications") {
+    return notificationsHandler(req, res);
+  }
   if (req.method !== "GET") {
     res.setHeader("Allow", "GET");
     return res.status(405).json({ error: "Method Not Allowed" });

@@ -30,6 +30,7 @@
     "test:alerts": "node scripts/operations-alerts-check.mjs",
     "test:notifications": "node scripts/business-notifications-check.mjs",
     "test:database": "node scripts/database-schema-check.mjs",
+    "test:deployment": "node scripts/deployment-budget-check.mjs",
     "compile:policy": "node scripts/compile-policy.mjs"
   },
   "dependencies": {

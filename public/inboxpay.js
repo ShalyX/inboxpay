@@ -679,7 +679,7 @@ function renderNotifications() {
 async function loadNotifications() {
   $("notifications-message").textContent = "Checking Telegram connection…";
   $("notifications-message").className = "auth-message";
-  const response = await apiFetch("/api/notifications");
+  const response = await apiFetch("/api/activity?view=notifications");
   const data = await readJsonResponse(response);
   if (!response.ok) throw new Error(data.error || "Telegram notification status unavailable");
   state.notification = data.notification;
@@ -695,7 +695,7 @@ async function openNotifications(options = {}) {
 }
 
 async function notificationAction(action, body = {}) {
-  const response = await apiFetch("/api/notifications", {
+  const response = await apiFetch("/api/activity?view=notifications", {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, ...body })
   });
   const data = await readJsonResponse(response);
