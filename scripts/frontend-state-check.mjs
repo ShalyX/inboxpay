@@ -17,6 +17,7 @@ assert.equal(destinationFromHash("#payments"), "payments");
 assert.equal(destinationFromHash("#/vendors"), "vendors");
 assert.equal(destinationFromHash("#unknown"), "inbox");
 assert.equal(destinationFromHash("#operations"), "operations");
+assert.equal(destinationFromHash("#notifications"), "notifications");
 assert.equal(destinationFromHash(""), "inbox");
 assert.equal(auditEventLabel("payment_settled"), "Payment settled and reconciled");
 assert.equal(auditEventLabel("custom_business_event"), "Custom business event");
@@ -54,7 +55,8 @@ const sections = {
   audit: activitySection,
   operations: activitySection,
   business: fakeElement(),
-  vendors: fakeElement()
+  vendors: fakeElement(),
+  notifications: fakeElement()
 };
 const navItems = Object.keys(sections).map(fakeElement);
 const inboxContent = fakeElement();
@@ -133,6 +135,8 @@ const [indexHtml, styles] = await Promise.all([
 ]);
 assert.match(indexHtml, /id="skip-link" class="skip-link" href="#main-content" hidden/);
 assert.match(indexHtml, /id="main-content" class="content" tabindex="-1"/);
+assert.match(indexHtml, /data-nav="notifications"/);
+assert.match(indexHtml, /id="notifications-modal"/);
 assert.match(styles, /@media\(max-width:1180px\) and \(min-width:801px\)[\s\S]*?\.nav-groups nav\{display:grid;grid-template-columns:minmax\(0,1fr\)/);
 assert.match(styles, /@media\(max-width:1180px\) and \(min-width:801px\)[\s\S]*?\.workspace\{grid-template-columns:minmax\(0,1fr\)\}/);
 assert.match(styles, /@media\(max-width:800px\)[\s\S]*?\.shell,\.sidebar,\.content\{min-width:0;width:100%;max-width:100%\}/);

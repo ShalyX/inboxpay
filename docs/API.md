@@ -37,6 +37,8 @@ The server reloads business ownership and active network state for every protect
 | `/api/activity?view=payments` | `GET` | User | Returns up to 100 payment records for the active business/network. |
 | `/api/activity?view=audit` | `GET` | User | Returns up to 100 business/network audit events. |
 | `/api/activity?view=operations` | `GET` | User | Performs bounded read-only provider health checks and returns unresolved recovery records. |
+| `/api/notifications` | `GET`, `POST` | User | Reads or manages the active business's encrypted Telegram destination and alert preferences. POST actions are `begin_telegram_link`, `send_test`, `update_preferences`, and `disconnect`. |
+| `/api/telegram/webhook` | `POST` | Telegram secret header | Consumes a short-lived one-time `/start` code and links the Telegram chat to exactly one business. |
 
 ## Financial response states
 

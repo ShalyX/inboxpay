@@ -1,7 +1,7 @@
 import { requireUser, supabaseRest } from "../lib/supabase-server.mjs";
 import { getBusiness } from "../lib/businesses.mjs";
 import { probeBusinessOperations } from "../lib/operations-monitor.mjs";
-import { isOperationsAlertDeliveryConfigured } from "../lib/operations-alerts.mjs";
+import { getBusinessNotificationChannel } from "../lib/business-notifications.mjs";
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
@@ -45,7 +45,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ business, count: events?.length || 0, events: events || [] });
     }
     if (view === "operations") {
-      const [health, serviceStates] = await Promise.all([
+      const [health, serviceStates, notificationChannel] = await Promise.all([
         probeBusinessOperations(token, user, business),
         supabaseRest(
           "operations_service_states?select=service,status,severity,detail,action,consecutive_failures,last_checked_at,last_transition_at,last_notified_at,notification_error" +
@@ -54,12 +54,13 @@ export default async function handler(req, res) {
             "&network=eq." + encodeURIComponent(business.wallet_blockchain) +
             "&order=last_checked_at.desc",
           { token }
-        ).catch(() => [])
+        ).catch(() => []),
+        getBusinessNotificationChannel(business.id).catch(() => null)
       ]);
       return res.status(200).json({
         ...health,
         alerting: {
-          deliveryConfigured: isOperationsAlertDeliveryConfigured(),
+          deliveryConfigured: notificationChannel?.status === "active",
           states: serviceStates || []
         }
       });

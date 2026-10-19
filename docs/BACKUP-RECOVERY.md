@@ -29,7 +29,7 @@ The workflow fails closed when any required destination or encryption secret is 
 
 For Google Cloud Storage, use a private Standard bucket in an eligible region and a dedicated service account restricted to that bucket. GitHub authenticates through Workload Identity Federation using repository-scoped OIDC claims. The workflow stores no Google service-account key or HMAC secret; every run receives short-lived credentials. Keep the organisation policy that blocks external service-account keys enabled.
 
-Telegram is the preferred alert channel when both Telegram secrets are present. The generic webhook remains available as a fallback. Backup success stays quiet; only a failed run sends an alert.
+Telegram is the preferred operator alert channel when both Telegram secrets are present. The generic webhook remains available as a fallback. Business-linked Telegram destinations do not receive backup failures. Backup success stays quiet; only a failed run sends an alert.
 
 After changing either Telegram secret, manually run **Test Telegram operations alert**. A green workflow plus the received Telegram message is the delivery acceptance check; it does not access the database or perform a financial action.
 

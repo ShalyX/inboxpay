@@ -60,7 +60,7 @@ export function activateDestination(destination, sections, navItems, inboxConten
   if (inboxContent) inboxContent.inert = destination !== "inbox";
 }
 
-const WORKSPACE_DESTINATIONS = new Set(["inbox", "payments", "policy", "audit", "operations", "business", "vendors"]);
+const WORKSPACE_DESTINATIONS = new Set(["inbox", "payments", "policy", "audit", "operations", "business", "vendors", "notifications"]);
 
 export function destinationFromHash(hash = "") {
   const destination = String(hash).replace(/^#\/?/, "").trim().toLowerCase();
@@ -101,6 +101,11 @@ const AUDIT_EVENT_LABELS = {
   vendor_policy_updated: "Vendor policy updated",
   vendor_registered: "Vendor registered",
   vendor_revoked: "Vendor revoked",
+  telegram_notifications_link_started: "Telegram connection started",
+  telegram_notifications_connected: "Telegram alerts connected",
+  telegram_notifications_tested: "Telegram alert tested",
+  telegram_notifications_preferences_updated: "Telegram alert preferences updated",
+  telegram_notifications_disconnected: "Telegram alerts disconnected",
   wallet_provisioned: "Dedicated business wallet created",
   wallet_withdrawal_requested: "Business wallet withdrawal requested",
   wallet_withdrawal_submitted: "Business wallet withdrawal submitted",

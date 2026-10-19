@@ -28,6 +28,7 @@
     "test:autonomy-wallet": "node scripts/autonomy-wallet-control-check.mjs",
     "test:operations": "node scripts/operations-health-check.mjs",
     "test:alerts": "node scripts/operations-alerts-check.mjs",
+    "test:notifications": "node scripts/business-notifications-check.mjs",
     "test:database": "node scripts/database-schema-check.mjs",
     "compile:policy": "node scripts/compile-policy.mjs"
   },

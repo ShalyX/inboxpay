@@ -123,6 +123,7 @@
           <nav aria-label="Business settings">
             <button id="nav-business" class="nav" data-nav="business" type="button"><span class="nav-icon">B</span><span>Business profile</span></button>
             <button id="nav-vendors" class="nav" data-nav="vendors" type="button"><span class="nav-icon">V</span><span>Vendor registry</span></button>
+            <button id="nav-notifications" class="nav" data-nav="notifications" type="button"><span class="nav-icon">N</span><span>Notifications</span></button>
           </nav>
         </div>
       </div>
@@ -338,6 +339,31 @@
             </form>
             <div id="withdrawal-message" class="auth-message" aria-live="polite"></div>
             <div id="withdrawal-history" class="withdrawal-history"></div>
+          </section>
+        </div>
+      </div>
+    </div>
+    <div id="notifications-modal" class="vendor-modal" hidden>
+      <div class="vendor-card notifications-card" role="region" aria-labelledby="notifications-title">
+        <div class="detail-top page-titlebar"><div><label>BUSINESS NOTIFICATIONS</label><h2 id="notifications-title">Telegram alerts</h2><p>Connect this business to the shared InboxPay bot. Alert destinations are encrypted and isolated from every other business.</p></div><button id="close-notifications" class="ghost" type="button">Back to invoices</button></div>
+        <div id="notifications-message" class="auth-message" aria-live="polite"></div>
+        <div class="destination-grid notifications-workspace">
+          <section class="destination-card notification-status-card">
+            <div class="section-heading"><div><span>TELEGRAM</span><h3>Business alert destination</h3></div><b id="notification-status">Checking</b></div>
+            <p id="notification-description">Checking this business's Telegram connection…</p>
+            <div id="notification-destination" class="notification-destination" hidden></div>
+            <div class="notification-actions">
+              <button id="notification-connect" class="pay" type="button">Connect Telegram</button>
+              <button id="notification-refresh" class="ghost" type="button">Refresh status</button>
+              <button id="notification-test" class="ghost" type="button" hidden>Send test alert</button>
+              <button id="notification-disconnect" class="ghost danger" type="button" hidden>Disconnect</button>
+            </div>
+          </section>
+          <section class="destination-card notification-preferences-card">
+            <div class="section-heading"><div><span>DELIVERY RULES</span><h3>What InboxPay sends</h3></div><b>Business scoped</b></div>
+            <label class="notification-choice"><input id="notify-service-attention" type="checkbox" checked><span><strong>Service needs attention</strong><small>Gmail, Circle, Arc RPC, Supabase, or reconciliation failures affecting this business.</small></span></label>
+            <label class="notification-choice"><input id="notify-service-recovered" type="checkbox" checked><span><strong>Service recovered</strong><small>A confirmation after a previously delivered business incident clears.</small></span></label>
+            <button id="notification-save" class="pay" type="button" disabled>Save alert preferences</button>
           </section>
         </div>
       </div>

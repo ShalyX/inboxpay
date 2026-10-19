@@ -38,6 +38,7 @@ jobs:
           npm run test:autonomy-wallet
           npm run test:operations
           npm run test:alerts
+          npm run test:notifications
           npm run test:database
 
       - name: Check production dependencies

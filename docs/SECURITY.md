@@ -86,3 +86,9 @@ The detailed provider and reconciliation procedures are in [AUTONOMY-RUNBOOK.md]
 - The repository does not yet contain a clean-room baseline database migration.
 - External alerting, automated secret scanning, dependency auditing, and application tests are not yet enforced by CI.
 - There is no published privacy policy, retention policy, or account-deletion workflow yet.
+
+## Business notification isolation
+
+InboxPay uses one operator-owned Telegram bot, but it does not use one shared customer destination. A business owner creates a short-lived, one-time link in the authenticated product and starts the bot in the intended Telegram chat. Only the link hash is stored while pending. After consumption, the Telegram chat ID is encrypted with `INBOXPAY_TOKEN_ENCRYPTION_KEY`; browser responses expose only a masked hint.
+
+The notification tables have RLS enabled and grant no access to `anon` or `authenticated`. Only server-side routes using the Supabase secret may resolve or decrypt a destination. Business incident delivery requires an active row for the incident's exact `business_id`. Platform operator alerts are a separate path and are never a fallback for customer alerts.

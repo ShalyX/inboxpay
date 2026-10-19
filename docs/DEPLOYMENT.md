@@ -30,15 +30,17 @@ Node.js 20 or newer is required. The production repository is framework-light an
 | `ARC_RPC_URL` | Server | Arc Mainnet RPC. |
 | `INBOXPAY_WALLET_IDEMPOTENCY_SECRET` | Server | Deterministic wallet-operation idempotency. |
 | `AUTONOMY_CRON_SECRET` | Server/Supabase Vault | Dedicated worker bearer secret. |
-| `TELEGRAM_BOT_TOKEN` | Server | Preferred Telegram bot credential for incident and recovery alerts. |
-| `TELEGRAM_ALERT_CHAT_ID` | Server | Telegram user, group, or channel receiving operations alerts. |
+| `TELEGRAM_BOT_TOKEN` | Server | InboxPay-owned bot credential used for platform and opted-in business delivery. Businesses never provide this token. |
+| `TELEGRAM_ALERT_CHAT_ID` | Server | Platform operator destination for backup and system failures only. |
+| `TELEGRAM_WEBHOOK_SECRET` | Server | Random 24+ character secret used to authenticate Telegram webhook requests. |
+| `INBOXPAY_PUBLIC_URL` | Server | Canonical HTTPS origin used when registering the Telegram webhook. |
 | `OPERATIONS_ALERT_WEBHOOK_URL` | Server | Optional incident and recovery notification destination. |
 | `OPERATIONS_ALERT_WEBHOOK_SECRET` | Server | Optional dedicated bearer secret for the notification destination. |
 | `INBOXPAY_ALLOW_MAINNET_WRITES` | Server | Must equal `true` before server-side Mainnet writes are allowed. |
 
 `CIRCLE_API_KEY` and `CIRCLE_ENTITY_SECRET` remain supported as legacy Testnet fallbacks. Do not configure a global wallet ID or shared treasury address.
 
-Telegram delivery takes precedence when both Telegram values are configured. The generic webhook remains a fallback for non-Telegram receivers. Never place the bot token in browser code or a public workflow variable.
+Platform system alerts use `TELEGRAM_ALERT_CHAT_ID` and retain the generic webhook fallback. Business alerts never fall back to that operator destination: each business links its Telegram chat from **Business → Notifications** with a ten-minute, one-time Telegram deep link. Chat IDs are encrypted at rest, link tokens are stored only as SHA-256 hashes, and both notification tables are server-only under RLS. Never place the bot token or webhook secret in browser code or a public workflow variable.
 
 ## Database
 

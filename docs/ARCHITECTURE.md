@@ -34,6 +34,7 @@ flowchart LR
 | Settlement | Arc Testnet / Arc Mainnet | USDC transfers execute through the business policy contract and are accepted only after receipt and event reconciliation. |
 | Policy | `contracts/BusinessPolicyVault.sol` | Registered vendor recipient, per-payment limit, daily limit, cash floor, pause state, and duplicate payment ID. |
 | Worker | `lib/autonomy.mjs` through `POST /api/invoices` | Claims durable jobs, re-runs all live gates, submits at most one payment attempt, and reconciles uncertain outcomes. |
+| Notifications | `api/notifications.mjs`, `api/telegram/webhook.mjs` | Links one encrypted Telegram destination per business with a short-lived code; delivers business service incidents independently of platform operator alerts. |
 
 ## Invoice and payment lifecycle
 

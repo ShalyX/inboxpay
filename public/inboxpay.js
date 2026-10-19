@@ -21,6 +21,7 @@ const state = {
   preflight: null,
   preflightLoading: false,
   withdrawalRequestId: null,
+  notification: null,
   queue: { filter: "all", query: "" },
   activity: { kind: null, rows: [], data: null, filter: "all", query: "" }
 };
@@ -651,6 +652,102 @@ async function openBusinessModal(options = {}) {
 function closeBusinessModal() {
   setDestination("inbox");
   $("business-message").textContent = "";
+}
+
+function renderNotifications() {
+  const notification = state.notification || { status: "not_connected", preferences: { service_attention: true, service_recovered: true } };
+  const connected = notification.status === "connected";
+  $("notification-status").textContent = connected ? "Connected" : "Not connected";
+  $("notification-status").className = connected ? "ready" : "";
+  $("notification-description").textContent = connected
+    ? "Operational incidents for this business can be delivered to its linked Telegram destination."
+    : "Link your Telegram chat without sharing a bot token with InboxPay.";
+  $("notification-destination").hidden = !connected;
+  $("notification-destination").textContent = connected
+    ? `${notification.destinationHint || "Telegram destination"} · ${notification.chatType || "chat"}${notification.lastTestedAt ? " · tested " + new Date(notification.lastTestedAt).toLocaleString() : ""}`
+    : "";
+  $("notification-connect").hidden = connected;
+  $("notification-test").hidden = !connected;
+  $("notification-disconnect").hidden = !connected;
+  $("notify-service-attention").checked = notification.preferences?.service_attention !== false;
+  $("notify-service-recovered").checked = notification.preferences?.service_recovered !== false;
+  $("notify-service-attention").disabled = !connected;
+  $("notify-service-recovered").disabled = !connected;
+  $("notification-save").disabled = !connected;
+}
+
+async function loadNotifications() {
+  $("notifications-message").textContent = "Checking Telegram connection…";
+  $("notifications-message").className = "auth-message";
+  const response = await apiFetch("/api/notifications");
+  const data = await readJsonResponse(response);
+  if (!response.ok) throw new Error(data.error || "Telegram notification status unavailable");
+  state.notification = data.notification;
+  $("notifications-message").textContent = "";
+  renderNotifications();
+}
+
+async function openNotifications(options = {}) {
+  setDestination("notifications", options.updateUrl !== false);
+  renderNotifications();
+  try { await loadNotifications(); }
+  catch (error) { $("notifications-message").textContent = error.message; $("notifications-message").className = "auth-message error"; }
+}
+
+async function notificationAction(action, body = {}) {
+  const response = await apiFetch("/api/notifications", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, ...body })
+  });
+  const data = await readJsonResponse(response);
+  if (!response.ok) throw new Error(data.error || "Telegram notification action failed");
+  return data;
+}
+
+async function connectTelegram() {
+  const popup = window.open("about:blank", "_blank");
+  if (popup) popup.opener = null;
+  const button = $("notification-connect");
+  button.disabled = true;
+  $("notifications-message").textContent = "Creating a secure one-time Telegram link…";
+  $("notifications-message").className = "auth-message";
+  try {
+    const data = await notificationAction("begin_telegram_link");
+    if (popup) popup.location = data.link.url;
+    else window.location.assign(data.link.url);
+    $("notifications-message").textContent = "In Telegram, press Start. Then return here and refresh status. This link expires in 10 minutes.";
+  } catch (error) {
+    popup?.close();
+    $("notifications-message").textContent = error.message;
+    $("notifications-message").className = "auth-message error";
+  } finally { button.disabled = false; }
+}
+
+async function saveNotificationPreferences() {
+  const button = $("notification-save");
+  button.disabled = true;
+  try {
+    const data = await notificationAction("update_preferences", { preferences: {
+      service_attention: $("notify-service-attention").checked,
+      service_recovered: $("notify-service-recovered").checked
+    } });
+    state.notification = data.notification;
+    renderNotifications();
+    toast("Telegram alert preferences saved");
+  } catch (error) { toast(error.message); }
+  finally { button.disabled = false; }
+}
+
+async function testTelegramNotification() {
+  $("notification-test").disabled = true;
+  try { await notificationAction("send_test"); await loadNotifications(); toast("Test alert sent to this business"); }
+  catch (error) { toast(error.message); }
+  finally { $("notification-test").disabled = false; }
+}
+
+async function disconnectTelegram() {
+  if (!window.confirm("Disconnect Telegram alerts for this business? Platform operator monitoring is not affected.")) return;
+  try { const data = await notificationAction("disconnect"); state.notification = data.notification; renderNotifications(); toast("Telegram alerts disconnected"); }
+  catch (error) { toast(error.message); }
 }
 
 async function saveBusinessName(event) {
@@ -1452,7 +1549,7 @@ function renderActivity(kind, rows, data = null) {
         return '<article class="operations-recovery"><div><span>' + escapeHtml(item.service) + '</span><h3>' + escapeHtml(item.detail) + '</h3><p>' + escapeHtml(item.action) + '</p></div><div class="operations-recovery-state"><b class="operations-badge ' + escapeHtml(presentation.tone) + '">' + escapeHtml(presentation.label) + '</b><time>Checked ' + escapeHtml(formatActivityDate(item.last_checked_at)) + '</time></div></article>';
       }).join("")
       : '<div class="activity-empty compact"><strong>Awaiting the first scheduled monitor pass</strong><span>Service state will appear after the bounded worker records its first check.</span></div>';
-    const deliveryLabel = data?.alerting?.deliveryConfigured ? "External alerts active" : "Operator view only · external alerts not configured";
+    const deliveryLabel = data?.alerting?.deliveryConfigured ? "Business Telegram alerts active" : "Business Telegram alerts not connected";
     node.innerHTML = '<section class="operations-grid" aria-label="Service health">' + serviceMarkup + '</section><section class="operations-recovery-list" aria-label="Persisted alert state"><div class="operations-section-heading"><span>ALERT STATE</span><h3>' + escapeHtml(deliveryLabel) + '</h3></div>' + alertMarkup + '</section><section class="operations-recovery-list" aria-label="Recovery queue"><div class="operations-section-heading"><span>DURABLE RECOVERY</span><h3>Operator queue</h3></div>' + recoveryMarkup + '</section>';
     return;
   }
@@ -1998,7 +2095,8 @@ function setDestination(destination, updateUrl = true) {
     audit: activity,
     operations: activity,
     business: $("business-modal"),
-    vendors: $("vendor-modal")
+    vendors: $("vendor-modal"),
+    notifications: $("notifications-modal")
   }, document.querySelectorAll(".nav[data-nav]"), document.querySelector(".content"));
   activeDestination = destination;
   const titles = {
@@ -2008,7 +2106,8 @@ function setDestination(destination, updateUrl = true) {
     audit: "Audit trail",
     operations: "Operations",
     business: "Business profile",
-    vendors: "Vendor registry"
+    vendors: "Vendor registry",
+    notifications: "Notifications"
   };
   document.title = (titles[destination] || "InboxPay") + " — InboxPay";
   if (window.matchMedia("(max-width: 800px)").matches) {
@@ -2030,6 +2129,7 @@ async function openDestination(destination, options = {}) {
   if (destination === "policy") return openPolicyModal(options);
   if (destination === "business") return openBusinessModal(options);
   if (destination === "vendors") return openVendorModal(options);
+  if (destination === "notifications") return openNotifications(options);
   setDestination("inbox", options.updateUrl !== false);
 }
 
@@ -2058,6 +2158,13 @@ async function init() {
     $("nav-business").addEventListener("click", openBusinessModal);
     document.querySelector('[data-nav="inbox"]').addEventListener("click", () => setDestination("inbox"));
     $("nav-vendors").addEventListener("click", openVendorModal);
+    $("nav-notifications").addEventListener("click", openNotifications);
+    $("close-notifications").addEventListener("click", () => setDestination("inbox"));
+    $("notification-connect").addEventListener("click", connectTelegram);
+    $("notification-refresh").addEventListener("click", () => loadNotifications().catch((error) => toast(error.message)));
+    $("notification-test").addEventListener("click", testTelegramNotification);
+    $("notification-save").addEventListener("click", saveNotificationPreferences);
+    $("notification-disconnect").addEventListener("click", disconnectTelegram);
     $("add-vendor").addEventListener("click", openVendorModal);
     $("close-vendor").addEventListener("click", closeVendorModal);
     $("vendor-form").addEventListener("submit", addVendor);
