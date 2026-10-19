@@ -32,3 +32,4 @@ videos/inboxpay-demo/.media/
 videos/inboxpay-demo/.thumbnails/
 videos/inboxpay-demo/capture/
 videos/inboxpay-demo/renders/
+gha-creds-*.json

@@ -10,18 +10,24 @@ Configure these GitHub Actions secrets:
 | --- | --- |
 | `SUPABASE_DB_URL` | Production Postgres connection string used only by `pg_dump`; use the SSL session-pooler URI when the runner cannot reach the direct IPv6 endpoint. |
 | `BACKUP_ENCRYPTION_PASSPHRASE` | Dedicated high-entropy backup encryption secret. Do not reuse an application credential. |
-| `BACKUP_S3_URI` | Private bucket prefix such as `s3://company-inboxpay-backups/production`. |
-| `BACKUP_AWS_ACCESS_KEY_ID` | Write/read credential restricted to the backup prefix. |
-| `BACKUP_AWS_SECRET_ACCESS_KEY` | Matching restricted credential. |
-| `BACKUP_AWS_REGION` | Bucket region. |
 | `TELEGRAM_BOT_TOKEN` | Preferred Telegram bot credential for backup-failure alerts. |
 | `TELEGRAM_ALERT_CHAT_ID` | Telegram destination for backup-failure alerts. |
 | `OPERATIONS_ALERT_WEBHOOK_URL` | Optional failure-notification destination. |
 | `OPERATIONS_ALERT_WEBHOOK_SECRET` | Optional bearer secret for that destination. |
 
+Configure these GitHub Actions repository variables:
+
+| Variable | Purpose |
+| --- | --- |
+| `BACKUP_GCS_URI` | Private Google Cloud Storage prefix, currently `gs://inboxpay-prod-backups-tameion-ap-agent/production`. |
+| `GCP_WORKLOAD_IDENTITY_PROVIDER` | Full Google Workload Identity Provider resource name trusted only for `ShalyX/inboxpay`. |
+| `GCP_BACKUP_SERVICE_ACCOUNT` | Dedicated bucket-scoped service account used through short-lived impersonation. |
+
 The `Encrypted database backup` workflow runs daily at 02:17 UTC and can be dispatched manually. It creates a custom-format dump, encrypts it with AES-256 through GnuPG, uploads the encrypted file plus SHA-256 checksum, and deletes runner-local copies. Configure bucket versioning, server-side encryption, access logging, and a retention lifecycle of at least 35 daily copies plus monthly archives.
 
 The workflow fails closed when any required destination or encryption secret is absent. A workflow existing in GitHub is not evidence that backups are active: verify a successful run and the object in the private bucket.
+
+For Google Cloud Storage, use a private Standard bucket in an eligible region and a dedicated service account restricted to that bucket. GitHub authenticates through Workload Identity Federation using repository-scoped OIDC claims. The workflow stores no Google service-account key or HMAC secret; every run receives short-lived credentials. Keep the organisation policy that blocks external service-account keys enabled.
 
 Telegram is the preferred alert channel when both Telegram secrets are present. The generic webhook remains available as a fallback. Backup success stays quiet; only a failed run sends an alert.
 

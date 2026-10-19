@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
   group: inboxpay-database-backup
@@ -19,10 +20,7 @@ jobs:
     env:
       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
       BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
-      BACKUP_S3_URI: ${{ secrets.BACKUP_S3_URI }}
-      AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_AWS_SECRET_ACCESS_KEY }}
-      AWS_DEFAULT_REGION: ${{ secrets.BACKUP_AWS_REGION }}
+      BACKUP_GCS_URI: ${{ vars.BACKUP_GCS_URI }}
       OPERATIONS_ALERT_WEBHOOK_URL: ${{ secrets.OPERATIONS_ALERT_WEBHOOK_URL }}
       OPERATIONS_ALERT_WEBHOOK_SECRET: ${{ secrets.OPERATIONS_ALERT_WEBHOOK_SECRET }}
       TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -30,7 +28,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install PostgreSQL and S3 clients
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: tameion-ap-agent
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_BACKUP_SERVICE_ACCOUNT }}
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Install PostgreSQL client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
 
       - name: Create, encrypt, and upload backup
@@ -61,22 +69,18 @@ jobs:
           trap notify_failure ERR
           : "${SUPABASE_DB_URL:?Missing SUPABASE_DB_URL secret}"
           : "${BACKUP_ENCRYPTION_PASSPHRASE:?Missing BACKUP_ENCRYPTION_PASSPHRASE secret}"
-          : "${BACKUP_S3_URI:?Missing BACKUP_S3_URI secret}"
-          : "${AWS_ACCESS_KEY_ID:?Missing BACKUP_AWS_ACCESS_KEY_ID secret}"
-          : "${AWS_SECRET_ACCESS_KEY:?Missing BACKUP_AWS_SECRET_ACCESS_KEY secret}"
-          : "${AWS_DEFAULT_REGION:?Missing BACKUP_AWS_REGION secret}"
+          : "${BACKUP_GCS_URI:?Missing BACKUP_GCS_URI repository variable}"
 
           stamp="$(date -u +'%Y%m%dT%H%M%SZ')"
           dump="inboxpay-${stamp}.dump"
           encrypted="${dump}.gpg"
           checksum="${encrypted}.sha256"
-
           pg_dump "$SUPABASE_DB_URL" --format=custom --no-owner --no-privileges --file="$dump"
           printf '%s' "$BACKUP_ENCRYPTION_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback \
             --passphrase-fd 0 \
             --symmetric --cipher-algo AES256 --output "$encrypted" "$dump"
           rm -f "$dump"
           sha256sum "$encrypted" > "$checksum"
-          aws s3 cp "$encrypted" "${BACKUP_S3_URI%/}/$encrypted" --only-show-errors
-          aws s3 cp "$checksum" "${BACKUP_S3_URI%/}/$checksum" --only-show-errors
+          gcloud storage cp "$encrypted" "${BACKUP_GCS_URI%/}/$encrypted" --quiet
+          gcloud storage cp "$checksum" "${BACKUP_GCS_URI%/}/$checksum" --quiet
           rm -f "$encrypted" "$checksum"

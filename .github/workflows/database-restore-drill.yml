@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       backup_object_uri:
-        description: Exact private S3 URI of the encrypted .dump.gpg object
+        description: Exact private gs:// URI of the encrypted .dump.gpg object
         required: true
         type: string
       disposable_database_confirmation:
@@ -14,6 +14,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   restore:
@@ -23,13 +24,20 @@ jobs:
     env:
       RESTORE_DATABASE_URL: ${{ secrets.RESTORE_DATABASE_URL }}
       BACKUP_ENCRYPTION_PASSPHRASE: ${{ secrets.BACKUP_ENCRYPTION_PASSPHRASE }}
-      AWS_ACCESS_KEY_ID: ${{ secrets.BACKUP_AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.BACKUP_AWS_SECRET_ACCESS_KEY }}
-      AWS_DEFAULT_REGION: ${{ secrets.BACKUP_AWS_REGION }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install PostgreSQL and S3 clients
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: tameion-ap-agent
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_BACKUP_SERVICE_ACCOUNT }}
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Install PostgreSQL client
         run: sudo apt-get update && sudo apt-get install -y postgresql-client
 
       - name: Restore into disposable database and verify core tables
@@ -40,10 +48,10 @@ jobs:
           set -Eeuo pipefail
           : "${RESTORE_DATABASE_URL:?Missing RESTORE_DATABASE_URL secret}"
           : "${BACKUP_ENCRYPTION_PASSPHRASE:?Missing BACKUP_ENCRYPTION_PASSPHRASE secret}"
-          [[ "$BACKUP_OBJECT_URI" == s3://*.dump.gpg ]] || { echo "Expected an exact s3:// URI ending in .dump.gpg"; exit 1; }
+          [[ "$BACKUP_OBJECT_URI" == gs://*.dump.gpg ]] || { echo "Expected an exact gs:// URI ending in .dump.gpg"; exit 1; }
 
-          aws s3 cp "$BACKUP_OBJECT_URI" backup.dump.gpg --only-show-errors
-          aws s3 cp "${BACKUP_OBJECT_URI}.sha256" backup.dump.gpg.sha256 --only-show-errors
+          gcloud storage cp "$BACKUP_OBJECT_URI" backup.dump.gpg --quiet
+          gcloud storage cp "${BACKUP_OBJECT_URI}.sha256" backup.dump.gpg.sha256 --quiet
           expected_checksum="$(cut -d ' ' -f 1 backup.dump.gpg.sha256)"
           printf '%s  %s\n' "$expected_checksum" backup.dump.gpg | sha256sum --check
           printf '%s' "$BACKUP_ENCRYPTION_PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback \
