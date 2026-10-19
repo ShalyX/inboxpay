@@ -35,13 +35,13 @@ After changing either Telegram secret, manually run **Test Telegram operations a
 
 ## Quarterly restore drill
 
-1. Create an empty, disposable PostgreSQL database that is isolated from production.
-2. Store its direct connection string as the `RESTORE_DATABASE_URL` GitHub Actions secret.
-3. Copy the exact encrypted object URI from the private bucket.
-4. Dispatch `Database restore drill`, provide that URI, and type `RESTORE_TO_DISPOSABLE_DATABASE`.
-5. Confirm checksum verification, decryption, `pg_restore`, and the core-table assertion all pass.
-6. Perform business-level checks: tenant counts, invoice/payment references, audit-event continuity, policy rows, execution jobs, and withdrawal records.
-7. Destroy the disposable database and record the drill date, backup timestamp, duration, and operator in the private incident log.
+1. Copy the exact encrypted object URI from the private bucket.
+2. Dispatch `Database restore drill`, provide that URI, and type `RESTORE_TO_DISPOSABLE_DATABASE`.
+3. Confirm checksum verification, decryption, `pg_restore`, and the core-table assertion all pass.
+4. Review the recorded table counts and perform any additional business-level checks required by the incident: tenant counts, invoice/payment references, audit-event continuity, policy rows, execution jobs, and withdrawal records.
+5. Record the drill date, backup timestamp, duration, and operator in the private incident log.
+
+The workflow starts an isolated PostgreSQL 17 service inside the ephemeral GitHub runner, restores only the application-owned `public` schema, and destroys the database and plaintext dump automatically when the runner exits. It has no configurable production database target.
 
 The restore workflow never targets production automatically and does not use `--clean`. If the destination is not empty, the restore must fail rather than overwrite existing data.
 
