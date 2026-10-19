@@ -8,7 +8,7 @@ Configure these GitHub Actions secrets:
 
 | Secret | Purpose |
 | --- | --- |
-| `SUPABASE_DB_URL` | Production Postgres connection string used only by `pg_dump`; use the SSL session-pooler URI when the runner cannot reach the direct IPv6 endpoint. |
+| `SUPABASE_DB_PASSWORD` | Production Postgres password used only by `pg_dump`. The workflow fixes the session-pooler host, database, SSL mode, and project-scoped username so operators do not have to construct or URL-encode a connection URI. |
 | `BACKUP_ENCRYPTION_PASSPHRASE` | Dedicated high-entropy backup encryption secret. Do not reuse an application credential. |
 | `TELEGRAM_BOT_TOKEN` | Preferred Telegram bot credential for backup-failure alerts. |
 | `TELEGRAM_ALERT_CHAT_ID` | Telegram destination for backup-failure alerts. |
