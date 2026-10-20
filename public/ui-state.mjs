@@ -60,21 +60,11 @@ export function activateDestination(destination, sections, navItems, inboxConten
   if (inboxContent) inboxContent.inert = destination !== "inbox";
 }
 
-const WORKSPACE_DESTINATIONS = new Set(["inbox", "payments", "policy", "audit", "operations", "business", "vendors", "notifications"]);
+const WORKSPACE_DESTINATIONS = new Set(["inbox", "payments", "policy", "audit", "business", "vendors", "notifications"]);
 
 export function destinationFromHash(hash = "") {
   const destination = String(hash).replace(/^#\/?/, "").trim().toLowerCase();
   return WORKSPACE_DESTINATIONS.has(destination) ? destination : "inbox";
-}
-
-export function operationsStatusPresentation(status = "") {
-  const presentations = {
-    healthy: { label: "Healthy", tone: "ready" },
-    recovering: { label: "Recovering", tone: "recovering" },
-    attention: { label: "Needs attention", tone: "attention" },
-    degraded: { label: "Unavailable", tone: "degraded" }
-  };
-  return presentations[String(status).toLowerCase()] || presentations.degraded;
 }
 
 const AUDIT_EVENT_LABELS = {

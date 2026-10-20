@@ -26,7 +26,7 @@ flowchart LR
 
 | Area | Implementation | Responsibility |
 | --- | --- | --- |
-| Browser | `public/index.html`, `public/inboxpay.js`, `public/ui-state.mjs` | Authentication, business/network selection, invoice review, policy/vendor controls, payment confirmation, operations views. |
+| Browser | `public/index.html`, `public/inboxpay.js`, `public/ui-state.mjs` | Authentication, business/network selection, invoice review, policy/vendor controls, payment confirmation, business activity and notification connection. |
 | API | `api/*.mjs` | Authenticated orchestration. No browser receives Circle, Gmail, encryption, worker, or Supabase server secrets. |
 | Domain logic | `lib/*.mjs` | Invoice evaluation, Gmail/PDF parsing, wallet provisioning, policy synchronization, preflight, payment execution, scheduling, autonomy, reconciliation, and recovery. |
 | Durable state | Supabase Postgres | Business ownership, isolated network accounts, vendors, policies, integrations, invoices, audit events, execution jobs, and withdrawals. RLS scopes authenticated reads and writes. |
@@ -34,7 +34,7 @@ flowchart LR
 | Settlement | Arc Testnet / Arc Mainnet | USDC transfers execute through the business policy contract and are accepted only after receipt and event reconciliation. |
 | Policy | `contracts/BusinessPolicyVault.sol` | Registered vendor recipient, per-payment limit, daily limit, cash floor, pause state, and duplicate payment ID. |
 | Worker | `lib/autonomy.mjs` through `POST /api/invoices` | Claims durable jobs, re-runs all live gates, submits at most one payment attempt, and reconciles uncertain outcomes. |
-| Notifications | `api/activity.mjs`, `api/config.mjs`, `lib/*notifications*.mjs` | Links one encrypted Telegram destination per business with a short-lived code; delivers business service incidents independently of platform operator alerts. |
+| Notifications | `api/activity.mjs`, `api/config.mjs`, `lib/*notifications*.mjs` | Links one encrypted Telegram destination per business with a short-lived code. Customer delivery is limited to connection tests; provider incidents use the operator alert path. |
 
 ## Invoice and payment lifecycle
 
@@ -64,7 +64,7 @@ Application preflight enforces identity, evidence completeness, currency, active
 - Provider timeouts do not prove failure.
 - Circle transaction IDs and deterministic idempotency keys are stored before retry decisions.
 - Processing, retry, and reconciling states preserve the original attempt.
-- The Operations view performs read-only Gmail, Circle, Arc RPC, Supabase, and reconciliation checks.
+- The operator worker performs read-only Gmail, Circle, Arc RPC, Supabase, and reconciliation checks, persists state, and pages the operator destination. Internal diagnostics are not exposed through the business app.
 - Emergency control is layered: disable autonomy, pause the policy, revoke allowance, then stop the global scheduler if every business must stop.
 
 See [SECURITY.md](./SECURITY.md) and [the operations runbook](../AUTONOMY-RUNBOOK.md) for the detailed boundaries.

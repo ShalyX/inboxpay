@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import {
   formatTelegramAlert,
   isOperationsAlertDeliveryConfigured,
-  nextOperationsServiceState
+  nextOperationsServiceState,
+  persistOperationsHealth
 } from "../lib/operations-alerts.mjs";
 
 const firstFailure = nextOperationsServiceState(null, {
@@ -69,5 +70,44 @@ assert.match(telegramMessage, /InboxPay operations alert/);
 assert.match(telegramMessage, /InboxPay operations alert\nService: Circle/);
 assert.match(telegramMessage, /Caraxes Labs/);
 assert.match(telegramMessage, /Preserve transaction IDs/);
+
+process.env.SUPABASE_PUBLISHABLE_KEY = "operations-test-publishable-key";
+process.env.TELEGRAM_BOT_TOKEN = "operations-test-bot-token";
+process.env.TELEGRAM_ALERT_CHAT_ID = "operator-chat";
+const originalFetch = globalThis.fetch;
+let storedState = null;
+const operatorDeliveries = [];
+globalThis.fetch = async (url, options = {}) => {
+  if (String(url).includes("api.telegram.org")) {
+    operatorDeliveries.push(JSON.parse(options.body));
+    return new Response(JSON.stringify({ ok: true }), { status: 200 });
+  }
+  if (!String(url).includes("/rest/v1/operations_service_states")) throw new Error("Unexpected operations request");
+  const method = options.method || "GET";
+  if (method === "GET") return new Response(JSON.stringify(storedState ? [storedState] : []), { status: 200 });
+  const body = JSON.parse(options.body);
+  storedState = { ...storedState, ...body, id: "state-1" };
+  return new Response(JSON.stringify([storedState]), { status: 200 });
+};
+try {
+  const business = { id: "business-a", name: "Caraxes Labs", wallet_blockchain: "ARC-TESTNET" };
+  const service = { key: "circle", label: "Circle", status: "degraded", detail: "Circle is unavailable", action: "Inspect Circle" };
+  await persistOperationsHealth("user-token", business, "user-a", {
+    checkedAt: "2026-10-19T10:00:00.000Z", services: [service]
+  });
+  assert.equal(operatorDeliveries.length, 0, "First transient failure must not page");
+  await persistOperationsHealth("user-token", business, "user-a", {
+    checkedAt: "2026-10-19T10:05:00.000Z", services: [service]
+  });
+  assert.equal(operatorDeliveries.length, 1);
+  assert.equal(operatorDeliveries[0].chat_id, "operator-chat", "A business incident must use the operator destination");
+  assert.match(operatorDeliveries[0].text, /Business: Caraxes Labs/);
+  assert.match(operatorDeliveries[0].text, /Service: Circle/);
+} finally {
+  globalThis.fetch = originalFetch;
+  delete process.env.SUPABASE_PUBLISHABLE_KEY;
+  delete process.env.TELEGRAM_BOT_TOKEN;
+  delete process.env.TELEGRAM_ALERT_CHAT_ID;
+}
 
 console.log("Operations alert transition gate passed");

@@ -31,7 +31,7 @@ Node.js 20 or newer is required. The production repository is framework-light an
 | `INBOXPAY_WALLET_IDEMPOTENCY_SECRET` | Server | Deterministic wallet-operation idempotency. |
 | `AUTONOMY_CRON_SECRET` | Server/Supabase Vault | Dedicated worker bearer secret. |
 | `TELEGRAM_BOT_TOKEN` | Server | InboxPay-owned bot credential used for platform and opted-in business delivery. Businesses never provide this token. |
-| `TELEGRAM_ALERT_CHAT_ID` | Server | Platform operator destination for backup and system failures only. |
+| `TELEGRAM_ALERT_CHAT_ID` | Server | Platform operator destination for business-scoped provider incidents, backup, and system failures. |
 | `TELEGRAM_WEBHOOK_SECRET` | Server | Random 24+ character secret used to authenticate Telegram webhook requests. |
 | `INBOXPAY_PUBLIC_URL` | Server | Canonical HTTPS origin used when registering the Telegram webhook. |
 | `OPERATIONS_ALERT_WEBHOOK_URL` | Server | Optional incident and recovery notification destination. |
@@ -40,7 +40,7 @@ Node.js 20 or newer is required. The production repository is framework-light an
 
 `CIRCLE_API_KEY` and `CIRCLE_ENTITY_SECRET` remain supported as legacy Testnet fallbacks. Do not configure a global wallet ID or shared treasury address.
 
-Platform system alerts use `TELEGRAM_ALERT_CHAT_ID` and retain the generic webhook fallback. Business alerts never fall back to that operator destination: each business links its Telegram chat from **Business → Notifications** with a ten-minute, one-time Telegram deep link. Chat IDs are encrypted at rest, link tokens are stored only as SHA-256 hashes, and both notification tables are server-only under RLS. Never place the bot token or webhook secret in browser code or a public workflow variable.
+Provider, reconciliation, and platform system alerts use `TELEGRAM_ALERT_CHAT_ID` or the generic webhook fallback; they never use a customer chat. A business can link its own Telegram destination from **Business → Notifications** with a ten-minute, one-time deep link, then test or disconnect it. Automatic customer-event delivery is not active yet. Chat IDs are encrypted at rest, link tokens are stored only as SHA-256 hashes, and both notification tables are server-only under RLS. Never place the bot token or webhook secret in browser code or a public workflow variable.
 
 ## Database
 
@@ -95,7 +95,7 @@ Also run `forge test` when Foundry is available. A green unit/build pass does no
 3. Configure secrets in the target environment.
 4. Deploy to a preview environment and run signed-out, authenticated, mobile, and provider-failure checks.
 5. Deploy Production.
-6. Verify `/api/config`, authentication, Gmail connection, business/network isolation, wallet and policy reads, Operations health, and a read-only invoice refresh.
+6. Verify `/api/config`, authentication, Gmail connection, business/network isolation, wallet and policy reads, a read-only invoice refresh, and that the business app has no operator diagnostics route.
 7. Run one controlled Arc Testnet rejection case before any settlement proof.
 8. Enable the scheduler only after its secret and database job are verified.
 9. Keep Mainnet writes disabled unless the separate release gate is approved.
@@ -114,7 +114,7 @@ Also run `forge test` when Foundry is available. A green unit/build pass does no
 - Unauthenticated protected endpoints return `401`.
 - Arc RPC reports the expected chain ID for each environment.
 - The active business sees only its own network account and records.
-- Operations health reports Gmail, Circle, Arc RPC, Supabase, and reconciliation independently.
+- The operator monitor persists Gmail, Circle, Arc RPC, Supabase, and reconciliation health independently and pages the configured operator destination after its threshold. The business app must not expose those diagnostics or route incidents to customer Telegram chats.
 - No Mainnet financial write is performed merely as a health check.
 
 See [AUTONOMY-RUNBOOK.md](../AUTONOMY-RUNBOOK.md) for scheduler SQL and incident recovery, and [BACKUP-RECOVERY.md](./BACKUP-RECOVERY.md) for encrypted backups and restore drills.

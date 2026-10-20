@@ -14,7 +14,7 @@ child.stderr.on("data", (chunk) => { output += chunk.toString(); });
 
 try {
   await new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("Local server did not start")), 5000);
+    const timer = setTimeout(() => reject(new Error("Local server did not start: " + output)), 20000);
     const onData = () => {
       if (output.includes("InboxPay running on port")) {
         clearTimeout(timer);

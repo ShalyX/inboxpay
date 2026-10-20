@@ -8,7 +8,6 @@ import {
   inboxFailurePresentation,
   invoiceQueueCategory,
   networkLabel,
-  operationsStatusPresentation,
   paymentFlowStep,
   singleFlight
 } from "../public/ui-state.mjs";
@@ -16,7 +15,7 @@ import {
 assert.equal(destinationFromHash("#payments"), "payments");
 assert.equal(destinationFromHash("#/vendors"), "vendors");
 assert.equal(destinationFromHash("#unknown"), "inbox");
-assert.equal(destinationFromHash("#operations"), "operations");
+assert.equal(destinationFromHash("#operations"), "inbox", "Operator screens must not be reachable from the business workspace");
 assert.equal(destinationFromHash("#notifications"), "notifications");
 assert.equal(destinationFromHash(""), "inbox");
 assert.equal(auditEventLabel("payment_settled"), "Payment settled and reconciled");
@@ -53,7 +52,6 @@ const sections = {
   payments: activitySection,
   policy: fakeElement(),
   audit: activitySection,
-  operations: activitySection,
   business: fakeElement(),
   vendors: fakeElement(),
   notifications: fakeElement()
@@ -76,11 +74,6 @@ assert.throws(() => activateDestination("missing", sections, navItems), /Unknown
 assert.equal(networkLabel("ARC"), "Arc Mainnet");
 assert.equal(networkLabel("ARC-TESTNET"), "Arc Testnet");
 assert.equal(networkLabel("UNKNOWN"), "Arc");
-
-assert.deepEqual(operationsStatusPresentation("healthy"), { label: "Healthy", tone: "ready" });
-assert.deepEqual(operationsStatusPresentation("recovering"), { label: "Recovering", tone: "recovering" });
-assert.deepEqual(operationsStatusPresentation("attention"), { label: "Needs attention", tone: "attention" });
-assert.deepEqual(operationsStatusPresentation("degraded"), { label: "Unavailable", tone: "degraded" });
 
 assert.equal(paymentFlowStep({}), 0);
 assert.equal(paymentFlowStep({ selected: { invoiceNumber: "INV-1" } }), 1);
@@ -129,14 +122,17 @@ assert.equal(connectionStarts, 2);
 releaseConnection();
 await nextConnection;
 
-const [indexHtml, styles] = await Promise.all([
+const [indexHtml, styles, activitySource] = await Promise.all([
   readFile(new URL("../public/index.html", import.meta.url), "utf8"),
-  readFile(new URL("../public/styles.css", import.meta.url), "utf8")
+  readFile(new URL("../public/styles.css", import.meta.url), "utf8"),
+  readFile(new URL("../api/activity.mjs", import.meta.url), "utf8")
 ]);
 assert.match(indexHtml, /id="skip-link" class="skip-link" href="#main-content" hidden/);
 assert.match(indexHtml, /id="main-content" class="content" tabindex="-1"/);
 assert.match(indexHtml, /data-nav="notifications"/);
 assert.match(indexHtml, /id="notifications-modal"/);
+assert.doesNotMatch(indexHtml, /data-nav="operations"|id="open-operations"|notify-service-attention|notify-service-recovered/);
+assert.doesNotMatch(activitySource, /view === "operations"|probeBusinessOperations|operations_service_states/);
 assert.match(styles, /@media\(max-width:1180px\) and \(min-width:801px\)[\s\S]*?\.nav-groups nav\{display:grid;grid-template-columns:minmax\(0,1fr\)/);
 assert.match(styles, /@media\(max-width:1180px\) and \(min-width:801px\)[\s\S]*?\.workspace\{grid-template-columns:minmax\(0,1fr\)\}/);
 assert.match(styles, /@media\(max-width:800px\)[\s\S]*?\.shell,\.sidebar,\.content\{min-width:0;width:100%;max-width:100%\}/);

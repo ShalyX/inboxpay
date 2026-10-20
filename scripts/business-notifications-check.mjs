@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import {
   hashNotificationLinkToken,
-  normalizeNotificationPreferences,
   notificationChannelView,
   parseTelegramStart,
   sendBusinessNotification
@@ -17,12 +16,6 @@ assert.equal(parseTelegramStart(`/start@InboxPayBot ${token}`), token);
 assert.equal(parseTelegramStart("/start"), null);
 assert.equal(parseTelegramStart("hello"), null);
 
-assert.deepEqual(normalizeNotificationPreferences({}), { service_attention: true, service_recovered: true });
-assert.deepEqual(normalizeNotificationPreferences({ service_attention: false, service_recovered: false }), {
-  service_attention: false,
-  service_recovered: false
-});
-
 const view = notificationChannelView({
   destination_encrypted: "must-never-leave-server",
   destination_hint: "Telegram chat •••1234",
@@ -35,7 +28,7 @@ const view = notificationChannelView({
 assert.equal(view.status, "connected");
 assert.equal(view.destinationHint, "Telegram chat •••1234");
 assert.equal("destination_encrypted" in view, false);
-assert.equal(view.preferences.service_recovered, false);
+assert.equal("preferences" in view, false, "Retired operator incident rules must not appear in the business view");
 assert.equal(notificationChannelView(null).status, "not_connected");
 
 process.env.SUPABASE_SECRET_KEY = "notification-test-service-secret";
@@ -62,17 +55,22 @@ globalThis.fetch = async (url, options = {}) => {
   throw new Error("Unexpected notification test request");
 };
 try {
-  const absent = await sendBusinessNotification("business-b", "service_attention", "Incident B");
+  await assert.rejects(
+    sendBusinessNotification("business-a", "service_attention", "Incident A"),
+    /Unsupported customer notification event/,
+    "Provider incidents must never use the business Telegram path"
+  );
+  await assert.rejects(
+    sendBusinessNotification("business-a", "service_recovered", "Recovery A"),
+    /Unsupported customer notification event/
+  );
+  const absent = await sendBusinessNotification("business-b", "connection_test", "Connection test B");
   assert.equal(absent.configured, false);
   assert.equal(deliveries.length, 0, "A business without a linked chat must never use another destination");
 
-  const suppressed = await sendBusinessNotification("business-a", "service_recovered", "Recovery A");
-  assert.equal(suppressed.suppressed, true);
-  assert.equal(deliveries.length, 0);
-
-  const delivered = await sendBusinessNotification("business-a", "service_attention", "Incident A");
+  const delivered = await sendBusinessNotification("business-a", "connection_test", "Connection test A");
   assert.equal(delivered.delivered, true);
-  assert.deepEqual(deliveries, [{ chat_id: "1111", text: "Incident A", disable_web_page_preview: true }]);
+  assert.deepEqual(deliveries, [{ chat_id: "1111", text: "Connection test A", disable_web_page_preview: true }]);
   assert.ok(queries.some((url) => url.includes("business_id=eq.business-a")));
   assert.ok(queries.some((url) => url.includes("business_id=eq.business-b")));
 } finally {

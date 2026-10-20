@@ -97,7 +97,7 @@ Mocked/unit tests and a successful build are necessary but do not replace this T
 
 ### Operator view
 
-Open **Operations** in the production sidebar. The view performs read-only, business-scoped checks for:
+The server-side monitor performs read-only, business-scoped checks for:
 
 - Gmail authorization and profile reachability without scanning or storing message content;
 - the active environment's dedicated Circle wallet and USDC asset;
@@ -105,7 +105,7 @@ Open **Operations** in the production sidebar. The view performs read-only, busi
 - Supabase access to the business's durable payment, withdrawal, and reconciliation records;
 - unresolved reconciliation work, split into bounded automatic recovery and operator attention.
 
-The existing worker also records these service states every five minutes per business and environment. Two consecutive provider failures are required before a business notification, which suppresses transient noise. A stopped reconciliation record is immediately alertable. Recovery is notified once after a previously delivered incident, and repeat failure notifications are limited to one per 30 minutes. Concurrent workers conditionally claim each delivery to prevent duplicate pages. Each business must link its own encrypted Telegram destination from **Business → Notifications**; business alerts never fall back to the platform operator chat. `TELEGRAM_ALERT_CHAT_ID` and the generic webhook are reserved for platform-level system and backup failures. Without a linked business destination, persisted states remain visible in Operations but no customer page is sent.
+The worker records these service states every five minutes per business and environment. Two consecutive provider failures are required before an operator page, which suppresses transient noise. A stopped reconciliation record is immediately alertable. Recovery is paged once after a previously delivered incident, and repeat failure pages are limited to one per 30 minutes. Concurrent workers conditionally claim each delivery to prevent duplicates. `TELEGRAM_ALERT_CHAT_ID` or `OPERATIONS_ALERT_WEBHOOK_URL` is the operator destination for both business-scoped provider incidents and platform-wide failures. Customer Telegram destinations are never used for these incidents. If no operator destination is configured, the state remains persisted and delivery remains pending; this is an operational gap to correct, not a customer alert.
 
 The health request never creates a wallet, refreshes the invoice queue, submits a payment, registers a vendor, changes a policy, approves USDC, or switches the active environment. Gmail access-token refresh may occur when the saved short-lived token has expired; this preserves the existing read-only OAuth connection and does not broaden its scope.
 
@@ -116,7 +116,7 @@ Interpret the states as follows:
 - **Needs attention** — execution stopped safely, the recovery window expired, authorization needs renewal, or an operator decision is required.
 - **Unavailable** — the live dependency check failed or returned an unexpected chain. Treat payment authorization as blocked until the check recovers.
 
-Refresh the Operations view after correcting a dependency. A green service card is evidence of a fresh read only; it is not evidence that a payment was submitted or settled.
+After correcting a dependency, inspect the next worker result and `operations_service_states` for that business and network. A healthy monitor state is evidence of a fresh read only; it is not evidence that a payment was submitted or settled.
 
 Inspect scheduler runs:
 
@@ -143,7 +143,7 @@ Operator-visible recovery lives in `invoice_execution_jobs`, invoice settlement 
 
 **Gmail**
 
-1. If the card says authorization needs renewal, reconnect Gmail from the same business account.
+1. If the monitor reports authorization renewal, ask the affected business to reconnect Gmail from its own account.
 2. If Gmail is unavailable, do not broaden the search query or replace live ingestion with fixtures. Retry after the provider recovers.
 3. Confirm a fresh invoice evaluation and its audit evidence after recovery. Gmail failure does not change wallet or policy state.
 
