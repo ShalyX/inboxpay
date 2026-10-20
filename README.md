@@ -103,7 +103,7 @@ Set the infrastructure secrets in Vercel, including Circle credentials, Supabase
 
 The bounded-autonomy worker and business-wallet withdrawals additionally require the server-only `SUPABASE_SECRET_KEY`, `AUTONOMY_CRON_SECRET`, and `supabase/migrations/20261015010000_autonomy_and_withdrawals.sql`. The worker is invoked through the existing invoices function so the production build remains at 12 Vercel functions. Follow [AUTONOMY-RUNBOOK.md](./AUTONOMY-RUNBOOK.md) for the Supabase Cron trigger, Testnet proof, monitoring, recovery, and Mainnet release gate.
 
-The five-minute operator monitor checks Gmail, Circle, Arc RPC, Supabase, and reconciliation per business and network, persists recovery state, and pages the platform operator when a bounded alert threshold is met. Internal diagnostics and incident controls are not part of the business workspace. A linked business Telegram destination currently supports connection testing and disconnection; automatic customer-event notifications are not active yet.
+The five-minute operator monitor checks Gmail, Circle, Arc RPC, Supabase, and reconciliation per business and network, persists recovery state, and pages the platform operator when a bounded alert threshold is met. Internal diagnostics and incident controls are not part of the business workspace. Each business can link its own Telegram chat without code. After linking, durable customer alerts cover payment submission, confirmed Arc reconciliation, failure, and payment review; platform incidents never go to that chat. The Payments page and audit trail remain authoritative if Telegram delivery is delayed or unavailable.
 
 Do not commit Gmail tokens, Circle wallet exports, OAuth credentials, local invoice files, or evaluator output.
 

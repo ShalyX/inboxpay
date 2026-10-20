@@ -1,4 +1,4 @@
-import { requireUser, supabaseRest } from "../lib/supabase-server.mjs";
+import { getSupabaseServerSecret, requireUser, supabaseRest } from "../lib/supabase-server.mjs";
 import { getBusiness } from "../lib/businesses.mjs";
 import { readVendorRecipient, readVendorRevocationSupported, writePolicy } from "../lib/policy-sync.mjs";
 import { normalizeVendorEmails } from "../lib/gmail-live.mjs";
@@ -121,7 +121,7 @@ export default async function handler(req, res) {
             blockchain: business.wallet_blockchain
           });
           await supabaseRest("audit_events", {
-            token,
+            token: getSupabaseServerSecret(),
             method: "POST",
             body: {
               user_id: user.id,

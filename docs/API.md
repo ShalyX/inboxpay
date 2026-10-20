@@ -36,7 +36,7 @@ The server reloads business ownership and active network state for every protect
 | `/api/wallet` | `POST` | User | `fund_testnet` or `withdraw`. Withdrawals require `confirmWithdrawal: true`; Mainnet also requires `confirmMainnet: true`. |
 | `/api/activity?view=payments` | `GET` | User | Returns up to 100 payment records for the active business/network. |
 | `/api/activity?view=audit` | `GET` | User | Returns up to 100 business/network audit events. |
-| `/api/activity?view=notifications` | `GET`, `POST` | User | Reads or manages the active business's encrypted Telegram destination. POST actions are `begin_telegram_link`, `send_test`, and `disconnect`. No automatic customer-event delivery is active yet. |
+| `/api/activity?view=notifications` | `GET`, `POST` | User | Reads or manages the active business's encrypted Telegram destination. POST actions are `begin_telegram_link`, `send_test`, and `disconnect`. Linked chats receive queued payment-state alerts from the existing authenticated worker; this route does not submit payments. |
 | `/api/config?telegram=webhook` | `POST` | Telegram secret header | Consumes a short-lived one-time `/start` code and links the Telegram chat to exactly one business. |
 
 ## Financial response states

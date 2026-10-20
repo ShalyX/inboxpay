@@ -1,5 +1,5 @@
 import { parseAbi, formatUnits } from "viem";
-import { requireUser, supabaseRest } from "../lib/supabase-server.mjs";
+import { getSupabaseServerSecret, requireUser, supabaseRest } from "../lib/supabase-server.mjs";
 import { getBusiness } from "../lib/businesses.mjs";
 import { policyClient } from "../lib/policy-sync.mjs";
 import { requestBusinessTestnetFunds } from "../lib/circle-wallets.mjs";
@@ -72,7 +72,7 @@ export default async function handler(req, res) {
       let auditRecorded = true;
       try {
         await supabaseRest("audit_events", {
-          token,
+          token: getSupabaseServerSecret(),
           method: "POST",
           body: {
             user_id: user.id,

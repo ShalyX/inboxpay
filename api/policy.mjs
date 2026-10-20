@@ -32,7 +32,7 @@ async function getPolicy(token, businessId, network) {
 }
 
 async function audit(token, values) {
-  await supabaseRest("audit_events", { token, method: "POST", body: values });
+  await supabaseRest("audit_events", { token: getSupabaseServerSecret(), method: "POST", body: values });
 }
 
 async function assertAutonomyReady(token, user, business, policy) {

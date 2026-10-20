@@ -660,7 +660,7 @@ function renderNotifications() {
   $("notification-status").textContent = connected ? "Connected" : "Not connected";
   $("notification-status").className = connected ? "ready" : "";
   $("notification-description").textContent = connected
-    ? "Telegram is linked. Automatic customer notifications are not active yet; platform incidents are handled by InboxPay operators."
+    ? "Telegram is linked for this business's payment alerts. Platform incidents are handled by InboxPay operators."
     : "Link your Telegram chat without sharing a bot token with InboxPay.";
   $("notification-destination").hidden = !connected;
   $("notification-destination").textContent = connected

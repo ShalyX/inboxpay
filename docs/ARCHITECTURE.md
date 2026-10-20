@@ -29,12 +29,12 @@ flowchart LR
 | Browser | `public/index.html`, `public/inboxpay.js`, `public/ui-state.mjs` | Authentication, business/network selection, invoice review, policy/vendor controls, payment confirmation, business activity and notification connection. |
 | API | `api/*.mjs` | Authenticated orchestration. No browser receives Circle, Gmail, encryption, worker, or Supabase server secrets. |
 | Domain logic | `lib/*.mjs` | Invoice evaluation, Gmail/PDF parsing, wallet provisioning, policy synchronization, preflight, payment execution, scheduling, autonomy, reconciliation, and recovery. |
-| Durable state | Supabase Postgres | Business ownership, isolated network accounts, vendors, policies, integrations, invoices, audit events, execution jobs, and withdrawals. RLS scopes authenticated reads and writes. |
+| Durable state | Supabase Postgres | Business ownership, isolated network accounts, vendors, policies, integrations, invoices, audit events, execution jobs, and withdrawals. RLS scopes owner reads; invoice and audit mutations require the server credential after API authentication. Other business-configurable tables retain their separately scoped policies. |
 | Custody | Circle Developer-Controlled Wallets | One wallet per business and Arc environment. Circle signs submissions; wallet IDs and addresses are persisted against the isolated network account. |
 | Settlement | Arc Testnet / Arc Mainnet | USDC transfers execute through the business policy contract and are accepted only after receipt and event reconciliation. |
 | Policy | `contracts/BusinessPolicyVault.sol` | Registered vendor recipient, per-payment limit, daily limit, cash floor, pause state, and duplicate payment ID. |
 | Worker | `lib/autonomy.mjs` through `POST /api/invoices` | Claims durable jobs, re-runs all live gates, submits at most one payment attempt, and reconciles uncertain outcomes. |
-| Notifications | `api/activity.mjs`, `api/config.mjs`, `lib/*notifications*.mjs` | Links one encrypted Telegram destination per business with a short-lived code. Customer delivery is limited to connection tests; provider incidents use the operator alert path. |
+| Notifications | `api/activity.mjs`, `api/config.mjs`, `lib/*notifications*.mjs`, `business_payment_notification_jobs` | Links one encrypted Telegram destination per business with a short-lived code. Server-authenticated payment audit events enqueue business-scoped messages after the recorded settlement state is checked; the existing worker claims and delivers them with bounded retry. Provider incidents use the operator alert path. |
 
 ## Invoice and payment lifecycle
 

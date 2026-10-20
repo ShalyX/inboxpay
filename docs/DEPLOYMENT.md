@@ -40,7 +40,7 @@ Node.js 20 or newer is required. The production repository is framework-light an
 
 `CIRCLE_API_KEY` and `CIRCLE_ENTITY_SECRET` remain supported as legacy Testnet fallbacks. Do not configure a global wallet ID or shared treasury address.
 
-Provider, reconciliation, and platform system alerts use `TELEGRAM_ALERT_CHAT_ID` or the generic webhook fallback; they never use a customer chat. A business can link its own Telegram destination from **Business → Notifications** with a ten-minute, one-time deep link, then test or disconnect it. Automatic customer-event delivery is not active yet. Chat IDs are encrypted at rest, link tokens are stored only as SHA-256 hashes, and both notification tables are server-only under RLS. Never place the bot token or webhook secret in browser code or a public workflow variable.
+Provider, reconciliation, and platform system alerts use `TELEGRAM_ALERT_CHAT_ID` or the generic webhook fallback; they never use a customer chat. A business can link its own Telegram destination from **Business → Notifications** with a ten-minute, one-time deep link, then test or disconnect it. After migration `20261020000000_customer_payment_notifications` is applied, payment submission, confirmed reconciliation, failure, and payment-review transitions enqueue customer alerts only for linked businesses. The existing minute worker claims at most three per cycle, retries failed delivery at most five times, and records delivered, skipped, or terminal failure states. It checks the exact chat and link timestamp immediately before sending, skipping jobs for a disconnected or relinked destination; an already in-flight send can still race a disconnect. Chat IDs are encrypted at rest, link tokens are stored only as SHA-256 hashes, and notification tables are server-only under RLS. Telegram does not offer an idempotency key for `sendMessage`: an acknowledgement lost after successful delivery can cause a repeated message, identified by the same Alert ID. The ledger and audit trail—not Telegram—are authoritative. Never place the bot token or webhook secret in browser code or a public workflow variable.
 
 ## Database
 
@@ -54,10 +54,16 @@ Apply committed migrations in filename order:
 6. `supabase/migrations/20261015000000_vendor_aware_invoice_discovery.sql`
 7. `supabase/migrations/20261015010000_autonomy_and_withdrawals.sql`
 8. `supabase/migrations/20261017232500_operations_service_states.sql`
+9. `supabase/migrations/20261019000000_business_notification_channels.sql`
+10. `supabase/migrations/20261019000001_fix_telegram_link_conflict.sql`
+11. `supabase/migrations/20261020000000_customer_payment_notifications.sql`
+12. `supabase/migrations/20261020000001_financial_write_boundary.sql`
 
 The first four files are the exact foundational migrations already recorded by the production Supabase project. Do not squash, renumber, or replace them. They make clean-room deployment reproducible while preserving production migration identity.
 
-After migrations, verify RLS as an authenticated user from two separate accounts and verify that service-role claim functions reject authenticated callers.
+For an existing production deployment, release the server-credential invoice/audit writer code and wait until Vercel marks it Ready before applying migrations 11 and 12 together with the reviewed GitHub Actions workflow. The older application version still writes those tables as an authenticated owner and would fail after privilege revocation. The new worker tolerates an absent notification queue during this short release window, but customer payment messages will not start until the migrations are applied. Do not begin a payment in that window.
+
+After migrations, verify RLS as an authenticated user from two separate accounts, verify `authenticated` has SELECT but no INSERT, UPDATE, or DELETE privilege on `invoices` and `audit_events`, and verify that `service_role` retains INSERT and UPDATE privilege. Verify service-role claim functions reject authenticated callers. The migration workflow performs the grant/history checks; a separate session-level RLS smoke check is still required.
 
 ## Google configuration
 
@@ -91,7 +97,7 @@ Also run `forge test` when Foundry is available. A green unit/build pass does no
 ## Release sequence
 
 1. Review the diff for secrets, provider dumps, private invoice data, generated output, and unintended wallet identifiers.
-2. Apply database migrations before code that depends on them.
+2. Apply compatible database migrations before code that depends on them. For the `20261020000001` invoice/audit privilege revocation, deploy the server-writer code first, verify Ready, then apply `20261020000000` and `20261020000001` together before resuming payment operations.
 3. Configure secrets in the target environment.
 4. Deploy to a preview environment and run signed-out, authenticated, mobile, and provider-failure checks.
 5. Deploy Production.

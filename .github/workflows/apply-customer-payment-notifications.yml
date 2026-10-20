@@ -1,0 +1,47 @@
+name: Apply payment alert and financial write migrations
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inboxpay-production-schema
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pull PostgreSQL 17 client
+        run: docker pull postgres:17-alpine
+      - name: Apply reviewed migrations transactionally
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          : "${SUPABASE_DB_PASSWORD:?Missing SUPABASE_DB_PASSWORD secret}"
+          PGPASSWORD="$SUPABASE_DB_PASSWORD" docker run --rm \
+            -e PGPASSWORD --volume "$PWD:/work:ro" --workdir /work postgres:17-alpine \
+            psql \
+              --dbname="host=aws-0-eu-west-1.pooler.supabase.com port=5432 dbname=postgres user=postgres.ecportgmionyhlofyobc sslmode=require" \
+              --set=ON_ERROR_STOP=1 --single-transaction \
+              --file=supabase/migrations/20261020000000_customer_payment_notifications.sql \
+              --command="insert into supabase_migrations.schema_migrations (version, name, statements) values ('20261020000000', 'customer_payment_notifications', array[]::text[])" \
+              --file=supabase/migrations/20261020000001_financial_write_boundary.sql \
+              --command="insert into supabase_migrations.schema_migrations (version, name, statements) values ('20261020000001', 'financial_write_boundary', array[]::text[])"
+      - name: Verify queue isolation, write boundary, and migration history
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          result="$(PGPASSWORD="$SUPABASE_DB_PASSWORD" docker run --rm \
+            -e PGPASSWORD postgres:17-alpine psql \
+              --dbname="host=aws-0-eu-west-1.pooler.supabase.com port=5432 dbname=postgres user=postgres.ecportgmionyhlofyobc sslmode=require" \
+              --set=ON_ERROR_STOP=1 --tuples-only --no-align \
+              --command="select (select count(*) from supabase_migrations.schema_migrations where version in ('20261020000000', '20261020000001')), (select count(*) from public.business_payment_notification_jobs), (select relrowsecurity from pg_class where oid = 'public.business_payment_notification_jobs'::regclass), has_table_privilege('authenticated', 'public.business_payment_notification_jobs', 'SELECT'), (select count(*) from pg_trigger where tgrelid = 'public.audit_events'::regclass and tgname = 'queue_business_payment_audit' and not tgisinternal), has_table_privilege('authenticated', 'public.invoices', 'SELECT'), has_table_privilege('authenticated', 'public.invoices', 'INSERT, UPDATE, DELETE'), (select count(*) from pg_policies where schemaname = 'public' and tablename = 'invoices' and policyname = 'users own invoices' and cmd = 'SELECT'), has_table_privilege('authenticated', 'public.audit_events', 'SELECT'), has_table_privilege('authenticated', 'public.audit_events', 'INSERT, UPDATE, DELETE'), has_table_privilege('service_role', 'public.invoices', 'INSERT'), has_table_privilege('service_role', 'public.invoices', 'UPDATE'), has_table_privilege('service_role', 'public.audit_events', 'INSERT')")"
+          test "$result" = '2|0|t|f|1|t|f|1|t|f|t|t|t'
+          echo 'Payment alert queue and financial write boundary verified: both migrations recorded; owner SELECT retained; owner writes denied; service writes retained.'

@@ -1,4 +1,4 @@
-import { requireUser, supabaseRest } from "../lib/supabase-server.mjs";
+import { getSupabaseServerSecret, requireUser, supabaseRest } from "../lib/supabase-server.mjs";
 import { normalizeBusinessName } from "../lib/business-profile.mjs";
 import { assertSupportedNetwork } from "../lib/business-networks.mjs";
 import {
@@ -110,7 +110,7 @@ export default async function handler(req, res) {
       );
       const updatedBusiness = await getBusiness(token, user.id) || rows?.[0] || { ...business, name };
       await supabaseRest("audit_events", {
-        token,
+        token: getSupabaseServerSecret(),
         method: "POST",
         body: {
           user_id: user.id,
@@ -154,7 +154,7 @@ export default async function handler(req, res) {
         }
       );
       await supabaseRest("audit_events", {
-        token,
+        token: getSupabaseServerSecret(),
         method: "POST",
         body: {
           user_id: user.id,
