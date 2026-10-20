@@ -60,12 +60,12 @@ Use separate Testnet and live Circle credentials. Rotate the token-encryption ke
 | --- | --- | --- |
 | Cross-business or cross-network payment | Server-side ownership reload, network match, business-scoped records, dedicated wallets and vaults | Add multi-user role and approval controls before team access. |
 | Forged invoice sender | Verified sender list plus vendor registry; unmatched messages remain review-only | Add full vendor onboarding and recipient-change verification. |
-| Duplicate payment | Durable claim/idempotency plus onchain used-payment marker | Continue concurrency and recovery testing in CI. |
-| Provider timeout causing resubmission | Persist Circle ID and reconcile original attempt | Add external alerts for aged reconciliation states. |
+| Duplicate payment | Durable claim/idempotency plus onchain used-payment marker; concurrency and recovery regressions run in CI | Continue controlled live recovery drills. |
+| Provider timeout causing resubmission | Persist Circle ID and reconcile original attempt; operator Telegram alerts cover stopped reconciliation | Add measurable reconciliation-age thresholds and paging escalation. |
 | Compromised browser session | Server never trusts client wallet/policy identity | Add device/session management and step-up authentication for high-value actions. |
 | Malicious PDF or HTML | Text extraction, no HTML execution, parse failures become review events | Add file-size/page limits and malware scanning before broader upload support. |
 | Mainnet action by mistake | Explicit Mainnet confirmations and server write gate | Add organizational approval policy and release controls. |
-| Secret leakage | `.gitignore`, server-only variables, public-history scans | Add automated secret scanning in CI. |
+| Secret leakage | `.gitignore`, server-only variables, and a full-history Gitleaks CI scan | Rotate any exposed credential; scanning cannot make an already-published secret safe. |
 
 ## Incident response
 
@@ -83,8 +83,9 @@ The detailed provider and reconciliation procedures are in [AUTONOMY-RUNBOOK.md]
 ## Known security limitations
 
 - The current product is owner-operated; it does not yet implement team roles or maker-checker approval.
-- The repository does not yet contain a clean-room baseline database migration.
-- External alerting, automated secret scanning, dependency auditing, and application tests are not yet enforced by CI.
+- The repository contains an ordered clean-room database migration set. Production database privilege checks are automated, but a live two-owner RLS smoke test must also pass after financial-boundary changes.
+- Application regressions and production-dependency auditing run in CI; contract tests run in the policy-vault workflow. The full-history secret scan runs on pushes and pull requests. These checks do not replace a staging environment or live provider/reconciliation drills.
+- Operator Telegram alerts and encrypted off-site backups are active; customer payment alerts require a real event-delivery acceptance test before being described as proven end to end.
 - There is no published privacy policy, retention policy, or account-deletion workflow yet.
 
 ## Business notification isolation

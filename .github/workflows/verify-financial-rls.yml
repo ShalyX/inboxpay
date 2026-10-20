@@ -1,0 +1,34 @@
+name: Verify production financial RLS
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inboxpay-production-schema
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pull PostgreSQL 17 client
+        run: docker pull postgres:17-alpine
+      - name: Test two authenticated owner contexts without writes
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          : "${SUPABASE_DB_PASSWORD:?Missing SUPABASE_DB_PASSWORD secret}"
+          PGPASSWORD="$SUPABASE_DB_PASSWORD" docker run --rm \
+            -e PGPASSWORD --volume "$PWD:/work:ro" --workdir /work postgres:17-alpine \
+            psql \
+              --dbname="host=aws-0-eu-west-1.pooler.supabase.com port=5432 dbname=postgres user=postgres.ecportgmionyhlofyobc sslmode=require" \
+              --no-psqlrc --quiet --tuples-only --no-align --set=ON_ERROR_STOP=1 \
+              --file=scripts/verification/financial-rls-smoke.sql
+          echo 'Two existing business owners: own invoice/audit reads passed, cross-owner reads denied, and direct financial writes denied.'
