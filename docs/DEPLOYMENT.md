@@ -63,7 +63,7 @@ The first four files are the exact foundational migrations already recorded by t
 
 For an existing production deployment, release the server-credential invoice/audit writer code and wait until Vercel marks it Ready before applying migrations 11 and 12 together with the reviewed GitHub Actions workflow. The older application version still writes those tables as an authenticated owner and would fail after privilege revocation. The new worker tolerates an absent notification queue during this short release window, but customer payment messages will not start until the migrations are applied. Do not begin a payment in that window.
 
-After migrations, verify RLS as an authenticated user from two separate accounts, verify `authenticated` has SELECT but no INSERT, UPDATE, or DELETE privilege on `invoices` and `audit_events`, and verify that `service_role` retains INSERT and UPDATE privilege. Verify service-role claim functions reject authenticated callers. The migration workflow performs the grant/history checks; a separate session-level RLS smoke check is still required.
+After migrations, run the manual **Verify production financial RLS** workflow. It chooses two existing owners with invoice and audit rows, then uses read-only transactions with the `authenticated` database role and each owner's JWT-sub claim to verify own-row reads, cross-owner exclusion, and denied direct financial writes. The migration workflow separately checks grants, policy shape, and history. These database checks do not replace browser/API authentication tests or real payment-alert delivery. Verify service-role claim functions reject authenticated callers.
 
 ## Google configuration
 
