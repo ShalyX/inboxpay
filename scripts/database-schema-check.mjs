@@ -16,7 +16,8 @@ const requiredFiles = [
   "20261019000000_business_notification_channels.sql",
   "20261019000001_fix_telegram_link_conflict.sql",
   "20261020000000_customer_payment_notifications.sql",
-  "20261020000001_financial_write_boundary.sql"
+  "20261020000001_financial_write_boundary.sql",
+  "20261021000000_vendor_sender_audit_boundary.sql"
 ];
 
 assert.deepEqual(files, requiredFiles, "Migration inventory or ordering changed without updating the schema gate");
@@ -45,8 +46,16 @@ for (const table of ["business_network_accounts", "invoice_execution_jobs", "wal
 assert.match(combined, /revoke all on public\.business_notification_channels from anon, authenticated/i);
 assert.match(combined, /revoke all on public\.business_notification_link_tokens from anon, authenticated/i);
 
-assert.match(combined, /create policy[\s\S]*audit_events[\s\S]*for insert/i,
-  "Audit events must retain the owner-scoped insert policy");
+const senderUpdate = sql["20261015000000_vendor_aware_invoice_discovery.sql"];
+assert.match(senderUpdate, /and b\.owner_user_id = auth\.uid\(\)/i,
+  "The sender RPC must authenticate the owning business");
+assert.match(senderUpdate, /and v\.network = p_network/i,
+  "The sender RPC must be network-scoped");
+assert.match(senderUpdate, /set search_path = ''/i,
+  "The privileged sender RPC must use a fixed empty search path");
+const senderAuditBoundary = sql["20261021000000_vendor_sender_audit_boundary.sql"];
+assert.match(senderAuditBoundary, /alter function public\.update_vendor_invoice_senders\(uuid, text, text\[\], boolean\)\s+security definer/i);
+assert.match(senderAuditBoundary, /grant execute on function public\.update_vendor_invoice_senders\(uuid, text, text\[\], boolean\)\s+to authenticated/i);
 assert.match(combined, /claim_invoice_execution_jobs/i,
   "The durable autonomy queue claim function must remain in migrations");
 assert.match(combined, /create or replace function public\.consume_business_telegram_link/i);

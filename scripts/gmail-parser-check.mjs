@@ -10,6 +10,7 @@ import {
   getGmailAttachmentBytes,
   parseInvoiceText,
   scanGmailInvoices,
+  selectInvoiceBody,
 } from "../lib/gmail-live.mjs";
 import { evaluateInvoiceRecords } from "../lib/evaluator.mjs";
 
@@ -111,6 +112,48 @@ assert.equal(gmailRichTextAlternative.amount, 0.12);
 assert.equal(gmailRichTextAlternative.currency, "USDC");
 assert.equal(gmailRichTextAlternative.dueDate, "October 31, 2026");
 assert.equal(gmailRichTextAlternative.extraction.confidence, "high");
+
+const qaPlain = `Controlled Arc Testnet QA invoice only; no real commercial obligation.
+Vendor: Acme Test Hosting Invoice Number: IP-ALERT-20261020-01 Amount: 0.10
+USDC Due Date: 2026-10-20 Payment Recipient:
+0x0633Ac1776C934Df935C5eA40C37ede126b158FD This message is for InboxPay
+ingestion and payment-alert verification.`;
+const qaHtml = `<div dir="ltr">Controlled Arc Testnet QA invoice only; no real commercial obligation.
+
+Vendor: Acme Test Hosting
+Invoice Number: IP-ALERT-20261020-01
+Amount: 0.10 USDC
+Due Date: 2026-10-20
+Payment Recipient: 0x0633Ac1776C934Df935C5eA40C37ede126b158FD
+
+This message is for InboxPay ingestion and payment-alert verification.</div>`;
+const qaParts = [
+  { mimeType: "text/plain", body: { data: Buffer.from(qaPlain).toString("base64url") } },
+  { mimeType: "text/html", body: { data: Buffer.from(qaHtml).toString("base64url") } },
+];
+const qaBody = selectInvoiceBody(qaParts);
+assert.equal(qaBody.alternativesConflict, false);
+assert.match(qaBody.text, /Vendor: Acme Test Hosting\nInvoice Number:/);
+const qaFields = parseInvoiceText(qaBody.text, "John Gray");
+assert.equal(qaFields.vendor, "Acme Test Hosting");
+assert.equal(qaFields.invoiceNumber, "IP-ALERT-20261020-01");
+assert.equal(qaFields.amount, 0.1);
+assert.equal(qaFields.dueDate, "2026-10-20");
+
+const conflictingAlternative = selectInvoiceBody([
+  qaParts[0],
+  { mimeType: "text/html", body: { data: Buffer.from(qaHtml.replace("0.10 USDC", "1.00 USDC")).toString("base64url") } },
+]);
+assert.equal(conflictingAlternative.alternativesConflict, true);
+const conflictingMimeDecision = evaluateInvoiceRecords([{
+  ...parseInvoiceText(conflictingAlternative.text, "John Gray"),
+  messageId: "conflicting-mime",
+  senderEmail: "jgraycolee@gmail.com",
+  source: "gmail-email",
+  bodySignals: { alternativesConflict: true },
+}], { "Acme Test Hosting": { status: "verified", currency: "USDC", senderEmails: ["jgraycolee@gmail.com"] } });
+assert.equal(conflictingMimeDecision.invoices[0].agentDecision, "ESCALATE");
+assert.match(conflictingMimeDecision.invoices[0].decisionReasons[0], /conflicting.*email alternatives/i);
 
 assert.equal(
   extractEmailAddress('"Acme Billing" <Billing@Acme.example>'),

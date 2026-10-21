@@ -1,0 +1,45 @@
+name: Apply vendor sender audit boundary
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inboxpay-production-schema
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pull PostgreSQL 17 client
+        run: docker pull postgres:17-alpine
+      - name: Apply the reviewed migration
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          : "${SUPABASE_DB_PASSWORD:?Missing SUPABASE_DB_PASSWORD secret}"
+          PGPASSWORD="$SUPABASE_DB_PASSWORD" docker run --rm \
+            -e PGPASSWORD --volume "$PWD:/work:ro" --workdir /work postgres:17-alpine \
+            psql \
+              --dbname="host=aws-0-eu-west-1.pooler.supabase.com port=5432 dbname=postgres user=postgres.ecportgmionyhlofyobc sslmode=require" \
+              --set=ON_ERROR_STOP=1 --single-transaction \
+              --file=supabase/migrations/20261021000000_vendor_sender_audit_boundary.sql \
+              --command="insert into supabase_migrations.schema_migrations (version, name, statements) values ('20261021000000', 'vendor_sender_audit_boundary', array[]::text[]) on conflict (version) do nothing"
+      - name: Verify owner-scoped RPC and direct audit write denial
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          result="$(PGPASSWORD="$SUPABASE_DB_PASSWORD" docker run --rm \
+            -e PGPASSWORD postgres:17-alpine psql \
+              --dbname="host=aws-0-eu-west-1.pooler.supabase.com port=5432 dbname=postgres user=postgres.ecportgmionyhlofyobc sslmode=require" \
+              --set=ON_ERROR_STOP=1 --tuples-only --no-align \
+              --command="select (select count(*) from supabase_migrations.schema_migrations where version = '20261021000000'), (select prosecdef from pg_proc where oid = 'public.update_vendor_invoice_senders(uuid, text, text[], boolean)'::regprocedure), (select proconfig @> array['search_path=']::text[] from pg_proc where oid = 'public.update_vendor_invoice_senders(uuid, text, text[], boolean)'::regprocedure), has_function_privilege('authenticated', 'public.update_vendor_invoice_senders(uuid, text, text[], boolean)', 'EXECUTE'), has_function_privilege('anon', 'public.update_vendor_invoice_senders(uuid, text, text[], boolean)', 'EXECUTE'), has_table_privilege('authenticated', 'public.audit_events', 'INSERT'), has_table_privilege('authenticated', 'public.audit_events', 'SELECT')")"
+          test "$result" = '1|t|t|t|f|f|t'
+          echo 'Owner-checked sender RPC is privileged; direct authenticated audit writes remain denied.'
