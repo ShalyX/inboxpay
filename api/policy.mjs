@@ -1,3 +1,4 @@
+import { rejectPreviewRequest, isReadOnlyPreview } from "../lib/preview-boundary.mjs";
 import { formatUnits, parseAbi } from "viem";
 import { getSupabaseServerSecret, requireUser, supabaseRest } from "../lib/supabase-server.mjs";
 import { getBusiness, updateBusinessNetworkAccount } from "../lib/businesses.mjs";
@@ -206,6 +207,7 @@ async function statusHandler(token, user, business) {
 }
 
 export default async function handler(req, res) {
+  if (rejectPreviewRequest(req, res)) return;
   try {
     const { token, user } = await requireUser(req);
     const business = await getBusiness(token, user.id);
@@ -213,6 +215,7 @@ export default async function handler(req, res) {
 
     if (req.method === "GET") {
       if (req.query?.view === "status") {
+        if (isReadOnlyPreview()) return res.status(200).json({ business, status: business.policy_contract_status, contract: null, transaction: null, allowance: null, onchainPolicy: null, previewReadOnly: true });
         return res.status(200).json(await statusHandler(token, user, business));
       }
       const policy = await getPolicy(token, business.id, business.wallet_blockchain);

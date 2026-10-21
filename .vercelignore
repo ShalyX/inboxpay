@@ -1,0 +1,24 @@
+# Never upload personal/demo workspaces or local credentials.
+videos/
+output/
+out/
+cache/
+node_modules/
+.git/
+.env*
+AGENTHANDOFF.md
+credentials*.json
+gmail-token.json
+gha-creds-*.json
+circle-*.json
+gmail-inbox/
+agent-decisions.json
+gmail-scan-result.json
+live-run-result.json
+web-run-result.json
+gmail-payment-result.json
+invoice-email-inspection.json
+x402-mainnet-receipt.json
+.next/
+.vercel/
+reference-kina/

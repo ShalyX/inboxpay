@@ -1,3 +1,4 @@
+import { rejectPreviewRequest } from "../lib/preview-boundary.mjs";
 import { getSupabaseServerSecret, requireUser, supabaseRest } from "../lib/supabase-server.mjs";
 import { normalizeBusinessName } from "../lib/business-profile.mjs";
 import { assertSupportedNetwork } from "../lib/business-networks.mjs";
@@ -17,11 +18,12 @@ async function findBusiness(token, userId) {
   return getBusinessRecord(token, userId);
 }
 
-async function ensureBusiness(token, user) {
+async function ensureBusiness(token, user, requestedName) {
   const existing = await findBusiness(token, user.id);
   if (existing) return existing;
 
-  const name = String(user.user_metadata?.business_name || user.email?.split("@")[1] || "My Business").trim() || "My Business";
+  if (requestedName === undefined) return null;
+  const name = normalizeBusinessName(requestedName);
 
   try {
     const created = await supabaseRest("businesses", {
@@ -83,6 +85,7 @@ async function ensurePolicy(token, userId, businessId, network) {
 }
 
 export default async function handler(req, res) {
+  if (rejectPreviewRequest(req, res, { bootstrap: true })) return;
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     return res.status(405).json({ error: "Method Not Allowed" });
@@ -228,8 +231,14 @@ export default async function handler(req, res) {
       }
     }
 
-    const business = await ensureBusiness(token, user);
-    if (!business) throw new Error("Unable to create or load InboxPay business");
+    if (req.body?.action !== "approve") return res.status(400).json({ error: "Unknown onboarding action" });
+    let requestedName;
+    if (req.body?.businessName !== undefined) {
+      try { requestedName = normalizeBusinessName(req.body.businessName); }
+      catch (error) { return res.status(400).json({ error: error.message }); }
+    }
+    const business = await ensureBusiness(token, user, requestedName);
+    if (!business) return res.status(200).json({ business: null, onboarding: { businessNameRequired: true } });
 
     const network = assertSupportedNetwork(business.active_network || business.wallet_blockchain || "ARC-TESTNET");
     await ensureBusinessNetworkAccount(token, business, network);
@@ -243,6 +252,7 @@ export default async function handler(req, res) {
     return res.status(200).json({
       business: projectedBusiness,
       onboarding: {
+        businessNameRequired: false,
         walletRequired: !projectedBusiness?.wallet_id,
         gmailRequired: true,
         policyVaultRequired: !projectedBusiness?.policy_contract_address

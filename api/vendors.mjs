@@ -1,3 +1,4 @@
+import { rejectPreviewRequest } from "../lib/preview-boundary.mjs";
 import { getSupabaseServerSecret, requireUser, supabaseRest } from "../lib/supabase-server.mjs";
 import { getBusiness } from "../lib/businesses.mjs";
 import { readVendorRecipient, readVendorRevocationSupported, writePolicy } from "../lib/policy-sync.mjs";
@@ -7,6 +8,7 @@ import { keccak256 } from "viem";
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 export default async function handler(req, res) {
+  if (rejectPreviewRequest(req, res)) return;
   try {
     const { token, user } = await requireUser(req);
     const business = await getBusiness(token, user.id);

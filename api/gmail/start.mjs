@@ -1,3 +1,4 @@
+import { rejectPreviewRequest } from "../../lib/preview-boundary.mjs";
 import crypto from "node:crypto";
 import { requireUser } from "../../lib/supabase-server.mjs";
 import { encryptSecret } from "../../lib/secure-tokens.mjs";
@@ -12,6 +13,7 @@ const SCOPES = [
 ].join(" ");
 
 export default async function handler(req, res) {
+  if (rejectPreviewRequest(req, res, { blocked: true })) return;
   if (req.method !== "GET") {
     res.setHeader("Allow", "GET");
     return res.status(405).end();

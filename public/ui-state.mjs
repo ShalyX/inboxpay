@@ -142,3 +142,13 @@ export function inboxFailurePresentation(message = "") {
     feedMeta: "Invoice evaluation failed · retry in a moment"
   };
 }
+// Only suggest correcting legacy auto-generated names on unconfigured workspaces.
+// A configured business is never interrupted or renamed by this heuristic.
+export function businessNameNeedsReview(business, email) {
+  if (!business) return false;
+  const accounts = [business, ...(business.network_accounts || [])];
+  if (accounts.some((account) => account.wallet_id || account.wallet_address || account.policy_contract_address)) return false;
+  const name = String(business.name || "").trim().toLowerCase();
+  const domain = String(email || "").split("@")[1]?.toLowerCase();
+  return !name || name === "my business" || Boolean(domain && name === domain);
+}

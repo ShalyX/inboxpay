@@ -1,12 +1,18 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { activateDestination, auditEventCategory, auditEventLabel, destinationFromHash, inboxFailurePresentation, invoiceQueueCategory, networkLabel, paymentFlowStep, singleFlight } from "./ui-state.mjs";
+import { createDialog } from "./dialog.js";
+import { businessNameNeedsReview } from "./ui-state.mjs";
 
 const state = {
   supabase: null,
+  previewReadOnly: false,
+  businessNameRequired: false,
+  bootstrapError: false,
   session: null,
   user: null,
   business: null,
   invoices: [],
+  inboxStatus: "idle",
   selected: null,
   gmail: null,
   wallet: null,
@@ -17,6 +23,7 @@ const state = {
   policyStatusError: null,
   policyConfigError: null,
   vendors: [],
+  vendorsError: null,
   vendorRevocationSupported: null,
   preflight: null,
   preflightLoading: false,
@@ -45,6 +52,27 @@ async function readJsonResponse(response) {
 }
 
 const $ = (id) => document.getElementById(id);
+const invoiceDrawer = createDialog($("invoice-drawer"), {
+  resolveOpener: () => [...document.querySelectorAll("[data-invoice]")].find((row) =>
+    decodeURIComponent(row.dataset.invoice) === state.selected?.invoiceNumber
+  ) || $("queue-search")
+});
+const authDialog = createDialog($("auth-dialog"));
+document.querySelectorAll("[data-auth-open]").forEach((button) => button.addEventListener("click", () => authDialog.open(button)));
+$("auth-close").addEventListener("click", () => authDialog.close());
+$("close-invoice").addEventListener("click", () => invoiceDrawer.close());
+const navigationPaths = {
+  inbox: '<path d="M4 4h16v16H4zM4 13h5l2 3h2l2-3h5"/>',
+  payments: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M7 15h4"/>',
+  policy: '<path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="3"/><circle cx="15" cy="17" r="3"/>',
+  audit: '<path d="M8 5h12M8 12h12M8 19h12M3 5h1M3 12h1M3 19h1"/>',
+  business: '<path d="M5 21V5l7-2 7 2v16M3 21h18M9 8h1m4 0h1M9 12h1m4 0h1M10 21v-5h4v5"/>',
+  vendors: '<circle cx="9" cy="8" r="3"/><path d="M3 21v-3a6 6 0 0112 0v3M16 5a3 3 0 010 6M18 15a5 5 0 013 4v2"/>',
+  notifications: '<path d="M5 17h14l-2-3V9a5 5 0 00-10 0v5l-2 3ZM10 21h4"/>'
+};
+document.querySelectorAll("[data-icon]").forEach((node) => {
+  node.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + navigationPaths[node.dataset.icon] + '</svg>';
+});
 
 function escapeHtml(value) {
   return String(value ?? "")
@@ -85,13 +113,17 @@ function status(decision) {
 }
 
 function showAuth() {
+  invoiceDrawer.close();
   setDestination("inbox", false);
   $("skip-link").hidden = true;
   $("auth-gate").hidden = false;
   $("app-shell").hidden = true;
+  document.title = "InboxPay — Payments, straight from your inbox";
 }
 
 function showApp() {
+  authDialog.close();
+  for (const id of ["signed-in-email", "signed-in-email-mobile"]) $(id).textContent = state.user?.email || state.session?.user?.email || "Checking account…";
   $("auth-gate").hidden = true;
   $("app-shell").hidden = false;
   $("skip-link").hidden = false;
@@ -141,8 +173,7 @@ async function signup() {
       email,
       password,
       options: {
-        emailRedirectTo: window.location.origin + "/",
-        data: { business_name: email.split("@")[1] || "My Business" }
+        emailRedirectTo: window.location.origin + "/"
       }
     });
     if (error) throw error;
@@ -186,6 +217,10 @@ async function authHeader() {
 }
 
 async function apiFetch(path, options = {}) {
+  const body = options.body ? JSON.parse(options.body) : {};
+  if (state.previewReadOnly && options.method && options.method !== "GET" && !(path === "/api/onboarding" && options.method === "POST" && body.action === "approve" && body.businessName === undefined)) {
+    throw new Error("This QA preview cannot change account settings or move funds.");
+  }
   const headers = { ...(options.headers || {}), ...(await authHeader()) };
   return fetch(path, { ...options, headers });
 }
@@ -195,6 +230,8 @@ async function bootstrap() {
 
   bootstrapPromise = (async () => {
     showApp();
+    state.bootstrapError = false;
+    $("bootstrap-notice").hidden = true;
 
     const response = await apiFetch("/api/onboarding", {
       method: "POST",
@@ -204,6 +241,19 @@ async function bootstrap() {
     const data = await readJsonResponse(response);
     if (!response.ok) throw new Error(data.error || "Business onboarding failed");
     state.business = data.business;
+    state.businessNameRequired = data.onboarding?.businessNameRequired === true;
+    if (state.businessNameRequired) {
+      state.invoices = [];
+      state.inboxStatus = "idle";
+      renderAccount();
+      renderSetup();
+      $("feed-label").textContent = "Business setup needed";
+      $("feed-meta").textContent = "Choose your business name before connecting an inbox.";
+      $("queue-count").textContent = "Setup needed";
+      $("invoice-list").innerHTML = '<div class="empty queue-empty"><h3>Your inbox starts here</h3><p>Set up your business above. Then connect the Gmail inbox that receives your invoices.</p></div>';
+      $("stats").innerHTML = "";
+      return;
+    }
 
     const sessionResponse = await apiFetch("/api/session");
     const session = await readJsonResponse(sessionResponse);
@@ -222,9 +272,24 @@ async function bootstrap() {
 
   try {
     return await bootstrapPromise;
+  } catch (error) {
+    state.bootstrapError = true;
+    renderBootstrapFailure();
+    throw error;
   } finally {
     bootstrapPromise = null;
   }
+}
+
+function renderBootstrapFailure() {
+  $("bootstrap-notice").hidden = false;
+  $("setup-card").hidden = true;
+  $("stats").innerHTML = "";
+  for (const id of ["invoice-count", "payment-count"]) $(id).textContent = "—";
+  $("queue-count").textContent = "Unavailable";
+  $("feed-label").textContent = "Workspace unavailable";
+  $("feed-meta").textContent = "Business records could not be loaded. Use Retry workspace.";
+  $("invoice-list").innerHTML = '<div class="empty queue-empty"><h3>We couldn’t load your workspace</h3><p>This is not an empty-workspace result. Retry to load your saved business records.</p></div>';
 }
 
 function shortAddress(address) {
@@ -318,8 +383,13 @@ function renderPaymentFlow() {
 }
 
 function renderAccount() {
+  for (const id of ["signed-in-email", "signed-in-email-mobile"]) $(id).textContent = state.user?.email || "Account unavailable";
+  for (const id of ["open-payments", "open-policy", "open-audit", "nav-business", "nav-vendors", "nav-notifications", "refresh", "connect-gmail", "network-switch"]) {
+    $(id).disabled = state.businessNameRequired || (state.bootstrapError && !state.business) || (state.previewReadOnly && ["connect-gmail", "network-switch"].includes(id));
+  }
   renderExecutionRail();
   $("business-name").textContent = state.business?.name || "Business";
+  $("business-summary-name").textContent = state.business?.name || "Your business account";
   const activeNetwork = state.business?.active_network || state.business?.wallet_blockchain || "ARC-TESTNET";
   const activeNetworkLabel = networkLabel(activeNetwork);
   $("network-label").textContent = activeNetworkLabel;
@@ -357,11 +427,12 @@ function renderAccount() {
   const gmailNeedsReconnect = state.gmail?.status === "reauthorization_required";
   $("connect-gmail").textContent = gmailNeedsReconnect ? "Reconnect Gmail" : "Connect Gmail";
   $("connect-gmail").hidden = gmailConnected;
-  $("connect-gmail").disabled = false;
+  $("connect-gmail").disabled = state.businessNameRequired || state.previewReadOnly || state.bootstrapError;
   $("feed-label").textContent = gmailConnected ? "Gmail connected" : gmailNeedsReconnect ? "Reconnect required" : "Connect business Gmail";
   $("feed-state").dataset.state = gmailConnected ? "connected" : gmailNeedsReconnect ? "reauthorization" : "disconnected";
   $("feed-dot").textContent = gmailConnected ? "●" : "○";
   renderBusinessPage();
+  if (state.bootstrapError) renderBootstrapFailure();
 }
 
 function renderBusinessPage() {
@@ -376,7 +447,7 @@ function renderBusinessPage() {
     pageMetric("Environment", networkLabel(network), "Network-isolated account", network === "ARC" ? "mainnet" : "testnet"),
     pageMetric("Business wallet", walletReady ? "Ready" : "Setup needed", walletReady ? "Dedicated Circle wallet" : "No wallet for this environment", walletReady ? "ready" : "attention"),
     pageMetric("Policy vault", policyReady ? "Enforced" : "Setup needed", policyReady ? "Dedicated onchain guard" : "No active vault", policyReady ? "ready" : "attention"),
-    pageMetric("Invoice source", gmailReady ? "Connected" : "Disconnected", gmailReady ? "Live Gmail evaluation" : "Reconnect Gmail", gmailReady ? "ready" : "attention")
+    pageMetric("Invoice source", state.previewReadOnly ? "Saved records" : gmailReady ? "Connected" : "Disconnected", state.previewReadOnly ? "No new inbox scan in preview" : gmailReady ? "Live Gmail evaluation" : "Reconnect Gmail", gmailReady ? "ready" : "attention")
   ].join("");
   $("business-network-badge").textContent = networkLabel(network);
   const walletAddress = state.business?.wallet_address || "Not provisioned";
@@ -419,6 +490,15 @@ function renderBusinessPage() {
 
 function renderSetup() {
   const node = $("setup-card");
+  if (state.bootstrapError) { node.hidden = true; return; }
+  if (state.businessNameRequired || businessNameNeedsReview(state.business, state.user?.email)) {
+    node.hidden = false;
+    node.innerHTML = '<div class="setup-copy"><label>FIRST, YOUR BUSINESS</label><h3>What’s your business called?</h3><p>Use the name you want on your workspace and payment records. This does not create a wallet or authorize payments.</p></div>' +
+      '<form id="business-identity-form" class="identity-setup-form"><label for="initial-business-name">Business name</label><input id="initial-business-name" name="businessName" type="text" minlength="2" maxlength="80" required autocomplete="organization" placeholder="e.g. North Studio" aria-describedby="identity-setup-message"' + (state.previewReadOnly ? ' disabled' : '') + '>' +
+      '<button type="submit" class="primary"' + (state.previewReadOnly ? ' disabled' : '') + '>Save business name</button><p id="identity-setup-message" role="status" aria-live="polite">' + (state.previewReadOnly ? 'Naming is disabled in this read-only preview. Your saved business has not changed.' : 'You can update this later in Business account.') + '</p></form>';
+    $("business-identity-form").addEventListener("submit", saveInitialBusinessName);
+    return;
+  }
   const gmailReady = state.gmail?.status === "connected";
   const walletReady = state.business?.wallet_status === "ready";
   const walletFunded = Number(state.wallet?.balance || 0) > 0;
@@ -446,19 +526,19 @@ function renderSetup() {
         ? "Fund the Arc Testnet wallet so it can pay deployment gas."
         : policyUnavailable
           ? "InboxPay could not confirm the live policy vault. Review the policy status before taking any payment action."
-          : "Review and deploy the onchain policy guard before autonomous payments can run.";
+      : "Set your payment limits, then review and activate payments for this business.";
 
   node.hidden = false;
   node.innerHTML =
-    '<div class="setup-copy"><label>ACTIVATION CHECKLIST</label><h3>' + escapeHtml(setupTitle) + '</h3><p>' + escapeHtml(setupCopy) +
+    '<div class="setup-copy"><label>GETTING STARTED</label><h3>' + escapeHtml(setupTitle) + '</h3><p>' + escapeHtml(setupCopy) +
     '</p></div><div class="setup-status">' +
-    step("Dedicated Circle wallet", walletReady ? "done" : "pending") +
+    step("Business wallet", walletReady ? "done" : "pending") +
     (!walletReady
       ? '<span>Selected environment · ' + (state.business?.wallet_blockchain === "ARC" ? "Arc Mainnet" : "Arc Testnet") + '</span><button id="provision-wallet" class="ghost">Create dedicated wallet</button>'
       : '') +
     (testnetNeedsFunding ? '<button id="fund-test-wallet" class="ghost">Fund test wallet</button>' : '') +
     step("Business Gmail", gmailReady ? "done" : "pending") +
-    step(policyUnavailable ? "Policy status unavailable" : "Onchain payment policy", policyUnavailable ? "error" : policyReady ? "done" : "pending") +
+    step(policyUnavailable ? "Payment settings unavailable" : "Payment settings", policyUnavailable ? "error" : policyReady ? "done" : "pending") +
     (walletReady && (policyUnavailable || !policyReady)
       ? '<button id="setup-policy" class="ghost"' + (testnetNeedsFunding || state.business?.policy_contract_status === "deploying" ? ' disabled' : '') + '>' +
         (testnetNeedsFunding ? "Fund wallet first" : state.business?.policy_contract_status === "deploying" ? "Policy deployment running…" : policyUnavailable ? "Review policy status" : "Review policy & deploy") + '</button>'
@@ -473,6 +553,35 @@ function renderSetup() {
   if (testnetNeedsFunding) $("fund-test-wallet").addEventListener("click", fundTestWallet);
   if (walletReady && (policyUnavailable || !policyReady) && !testnetNeedsFunding && state.business?.policy_contract_status !== "deploying") {
     $("setup-policy").addEventListener("click", openPolicyModal);
+  }
+}
+
+async function saveInitialBusinessName(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  if (!form.reportValidity()) return;
+  const input = $("initial-business-name");
+  const button = form.querySelector('button[type="submit"]');
+  const message = $("identity-setup-message");
+  const businessName = input.value.trim();
+  button.disabled = true;
+  button.textContent = "Saving…";
+  message.textContent = "Saving your business name…";
+  try {
+    const response = await apiFetch("/api/onboarding", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(state.business ? { action: "rename_business", name: businessName } : { action: "approve", businessName })
+    });
+    const data = await readJsonResponse(response);
+    if (!response.ok || !data.business) throw new Error(data.error || "Business name could not be saved. Please try again.");
+    await bootstrap();
+    toast("Business name saved");
+  } catch (error) {
+    message.textContent = error.message || "Business name could not be saved. Please try again.";
+    input.focus();
+  } finally {
+    button.disabled = state.previewReadOnly;
+    button.textContent = "Save business name";
   }
 }
 
@@ -551,6 +660,8 @@ async function provisionWallet() {
 }
 
 function resetNetworkState() {
+  invoiceDrawer.close();
+  state.inboxStatus = "idle";
   state.invoices = [];
   state.selected = null;
   state.wallet = null;
@@ -655,6 +766,13 @@ function closeBusinessModal() {
 }
 
 function renderNotifications() {
+  if (state.previewReadOnly) {
+    $("notification-status").textContent = "Not checked in preview";
+    $("notification-status").className = "";
+    $("notification-description").textContent = "Your saved Telegram connection is unchanged. Connection status and delivery tests are available in the live app.";
+    for (const id of ["notification-destination", "notification-connect", "notification-test", "notification-disconnect", "notification-refresh"]) $(id).hidden = true;
+    return;
+  }
   const notification = state.notification || { status: "not_connected" };
   const connected = notification.status === "connected";
   $("notification-status").textContent = connected ? "Connected" : "Not connected";
@@ -672,6 +790,12 @@ function renderNotifications() {
 }
 
 async function loadNotifications() {
+  if (state.previewReadOnly) {
+    $("notifications-message").textContent = "Telegram settings are unavailable in this read-only preview.";
+    $("notifications-message").className = "auth-message";
+    renderNotifications();
+    return;
+  }
   $("notifications-message").textContent = "Checking Telegram connection…";
   $("notifications-message").className = "auth-message";
   const response = await apiFetch("/api/activity?view=notifications");
@@ -901,7 +1025,7 @@ function renderPolicyModal() {
   chainState.innerHTML = policyUnavailable
     ? '<div><strong>Live policy status unavailable</strong><span>' + escapeHtml(state.policyStatusError) + '</span></div><b class="paused">Unavailable</b>'
     : ready
-      ? '<div><strong>Live on ' + network + '</strong><span>' + state.business.policy_contract_address + '</span><button class="text-action copy-address" type="button" data-address="' + state.business.policy_contract_address + '" data-label="Policy vault address">Copy address</button></div><b class="' + (paused ? "paused" : "ready") + '">' + (paused ? "Payments paused" : "Enforced onchain") + '</b>'
+      ? '<div><strong>' + (state.previewReadOnly ? "Saved policy on " : "Live on ") + network + '</strong><span>' + state.business.policy_contract_address + '</span><button class="text-action copy-address" type="button" data-address="' + state.business.policy_contract_address + '" data-label="Policy vault address">Copy address</button></div><b class="' + (paused ? "paused" : "ready") + '">' + (state.previewReadOnly ? "Saved status · not reverified" : paused ? "Payments paused" : "Enforced onchain") + '</b>'
       : '<div><strong>Not deployed yet</strong><span>Review these values before creating this business\'s policy vault.</span></div><b>Draft</b>';
 
   const pauseButton = $("policy-pause");
@@ -1208,20 +1332,22 @@ function renderStats() {
     ["processing", "failed", "review"].includes(x.settlement?.status)
   ));
   const total = payable.reduce((sum, x) => sum + Number(x.amount || 0), 0);
-  const policyMetric = state.policyStatusError
-    ? ["Needs review", "Live status unavailable"]
-    : policyIsReady()
-      ? [state.onchainPolicy?.paused ? "Paused" : "Enforced", "onchain payment guard"]
-      : ["Setup required", "policy vault not active"];
   $("invoice-count").textContent = state.invoices.length;
   $("payment-count").textContent = settled.length;
   $("queue-count").textContent = state.invoices.length + (state.invoices.length === 1 ? " invoice" : " invoices");
-  $("stats").innerHTML = [
-    ["◎", "Ready to pay", total.toFixed(2) + " USDC", payable.length + " policy-eligible invoices"],
-    ["◷", "Needs attention", String(held.length), "held or escalated"],
-    ["✓", "Settled", String(settled.length), "reconciled on Arc"],
-    ["⌁", "Policy guard", policyMetric[0], policyMetric[1]]
-  ].map(([icon, label, value, meta]) =>
+  const metrics = [
+    ["◎", "Ready for payment", total.toFixed(2) + " USDC", payable.length + " invoices · final checks on open"],
+    ["◷", "Needs you", String(held.length), "invoices awaiting review"],
+    ["✓", "Paid", String(settled.length), "confirmed & reconciled"],
+    ["⌁", "Scheduled", String(state.invoices.filter((invoice) => !invoiceSettled(invoice) && (invoice.settlement?.status === "scheduled" || invoice.agentDecision === "SCHEDULE")).length), "queued or due later"]
+  ];
+  if (state.inboxStatus === "error") {
+    metrics.forEach((metric) => { metric[2] = "—"; metric[3] = "Inbox unavailable · refresh to update"; });
+    $("queue-count").textContent = "Unavailable";
+    $("invoice-count").textContent = "—";
+    $("payment-count").textContent = "—";
+  }
+  $("stats").innerHTML = metrics.map(([icon, label, value, meta]) =>
     '<div class="stat"><div class="stat-icon">' + icon + '</div><div><span>' + label +
     '</span><strong>' + value + '</strong><small>' + meta + '</small></div></div>'
   ).join("");
@@ -1265,7 +1391,7 @@ function renderQueueControls() {
 function renderList() {
   renderQueueControls();
   if (!state.invoices.length) {
-    $("invoice-list").innerHTML = '<div class="queue-list"><div class="empty queue-empty"><div class="empty-icon">✉</div><h3>No invoices found</h3><p>The live Gmail evaluation returned no invoice records for this business.</p></div></div>';
+    $("invoice-list").innerHTML = '<div class="queue-list"><div class="empty queue-empty"><div class="empty-icon">✉</div><h3>No invoices found</h3><p>' + (state.previewReadOnly ? "No saved invoices are available for this business. This preview does not scan Gmail." : "The live Gmail evaluation returned no invoice records for this business.") + '</p></div></div>';
     return;
   }
   const visibleInvoices = visibleQueueInvoices();
@@ -1309,6 +1435,7 @@ function renderList() {
       state.preflightLoading = true;
       renderList();
       renderDetail();
+      invoiceDrawer.open(button);
       loadPreflight(state.selected);
     });
   });
@@ -1335,7 +1462,7 @@ function renderDetail() {
   const vendorReady = vendor?.status === "verified" &&
     vendor?.onchain_status === "registered" &&
     (vendor?.invoice_sender_emails || []).length > 0;
-  const ready = Boolean(preflight?.eligible);
+  const ready = !state.previewReadOnly && Boolean(preflight?.eligible);
   const detailStatus = checking
     ? "CHECKING"
     : settled
@@ -1361,7 +1488,7 @@ function renderDetail() {
       ? ["Payment executed and reconciled on " + settlementNetwork + "."]
       : (invoice.decisionReasons?.length ? invoice.decisionReasons : ["No decision reason recorded."]);
   const reasonsHtml = '<ul>' + reasons.map((reason) => '<li>' + escapeHtml(reason) + '</li>').join("") + '</ul>';
-  const gateReasons = preflight?.reasons || ["Checking the live policy vault and payment state…"];
+  const gateReasons = state.previewReadOnly ? ["Payments are disabled in this QA preview.", ...(preflight?.reasons || [])] : preflight?.reasons || ["Checking the live policy vault and payment state…"];
   const gateHtml = '<div class="preflight"><div class="decision-head">● Payment readiness</div><ul>' + gateReasons.map((reason) => '<li>' + escapeHtml(reason) + '</li>').join("") + '</ul></div>';
   const checksHtml = preflight
     ? preflight.checks.map(checkRowState).join("")
@@ -1375,7 +1502,7 @@ function renderDetail() {
   const autonomyHtml = autonomy
     ? '<div class="schedule-card"><div><strong>Autonomous execution · ' + escapeHtml(autonomy.status) + '</strong><span>' +
       escapeHtml(autonomy.scheduled_for ? new Date(autonomy.scheduled_for).toLocaleString() : "Execution time pending") +
-      '</span><small>' + escapeHtml(autonomy.last_error || (autonomy.status === "reconciling" ? "Payment submitted; awaiting confirmed Arc reconciliation." : "The worker will recheck the latest business and onchain policy before any payment.")) + '</small></div></div>'
+      '</span><small>' + escapeHtml(autonomy.last_error || (autonomy.status === "completed" ? "Execution completed. See the payment record for its reconciliation details." : autonomy.status === "reconciling" ? "Payment submitted; awaiting confirmed Arc reconciliation." : "The worker will recheck the latest business and onchain policy before any payment.")) + '</small></div></div>'
     : autonomyEnabled && scheduleDecision
       ? '<div class="schedule-card"><div><strong>Bounded autonomy active</strong><span>This invoice will be queued for its due date by the background operator.</span><small>Execution still requires PAY_NOW at that time plus every live vendor, allowance, limit, cash-floor, duplicate, pause, and reconciliation check.</small></div></div>'
       : "";
@@ -1399,9 +1526,9 @@ function renderDetail() {
     reasonsHtml + '<div class="confidence"><span>Extraction confidence</span><b>' +
     escapeHtml(invoice.extraction?.confidence || "unknown") + '</b></div><div class="confidence"><span>Invoice evidence</span><b>' +
     Number(invoice.sourceCount || invoice.sources?.length || 0) + " source" + (Number(invoice.sourceCount || invoice.sources?.length || 0) === 1 ? "" : "s") + '</b></div></div>' +
-    gateHtml + scheduleHtml + '<div class="checks">' + checksHtml +
+    scheduleHtml + '<details class="payment-details"' + (ready || settled ? '' : ' open') + '><summary>Payment checks <span>' + (checking ? 'Checking…' : ready ? 'Ready' : settled ? 'Complete' : 'Needs attention') + '</span></summary>' + gateHtml + '<div class="checks">' + checksHtml +
     (processing ? checkRow("Payment recovery", "In progress") : reviewRequired ? checkRow("Payment recovery", "Manual review") : "") +
-    '</div>' + (settled ? '<div class="settlement" id="settlement-receipt"><span>Settlement receipt</span><b>Confirmed</b><small>Open Payments to view the transaction hash and reconciliation record.</small><button id="receipt-open-payments" class="ghost" type="button">View payment record ↗</button></div>' : "") +
+    '</div></details>' + (settled ? '<div class="settlement" id="settlement-receipt"><span>Payment receipt</span><b>Confirmed</b><small>Open Payments to view the transaction hash and reconciliation record.</small><button id="receipt-open-payments" class="ghost" type="button">View payment record ↗</button></div>' : "") +
     '<button id="pay-button" class="pay"' + (ready ? "" : " disabled") +
     '>' + (ready ? (invoice.settlement?.status === "failed" ? "Review & retry on Arc ↗" : "Review & settle on Arc ↗") : checking ? "Checking settlement state…" : settled ? "Settled on Arc ✓" : processing ? "Payment submitted · recovering…" : scheduled ? "Queued for review" : reviewRequired ? "Payment under review" : scheduleDecision ? "Schedule this invoice above" : preflight ? "Payment blocked" : "Checking payment gates…") + '</button></div>';
 
@@ -1577,16 +1704,26 @@ async function loadVendors() {
     const data = await readJsonResponse(response);
     if (!response.ok) throw new Error(data.error || "Unable to load vendors");
     state.vendors = data.vendors || [];
+    state.vendorsError = null;
     state.vendorRevocationSupported = data.vendorRevocationSupported ?? null;
     renderVendors();
   } catch (error) {
-    $("vendor-message").textContent = error.message;
+    state.vendorsError = error.message;
+    renderVendors();
+    $("vendor-message").textContent = "Vendor records could not be loaded. Reopen Vendors to retry; no registry changes were made.";
     $("vendor-message").className = "auth-message error";
   }
 }
 
 function renderVendors() {
   const node = $("vendor-list");
+  if (state.vendorsError) {
+    $("vendor-summary").innerHTML = pageMetric("Vendor records", "Unavailable", "Load failed; this is not an empty registry", "attention");
+    $("vendor-count-label").textContent = "Unavailable";
+    node.innerHTML = '<div class="vendor-empty"><strong>Vendor records unavailable</strong><span>Reopen Vendors to retry. Your saved recipients have not changed.</span></div>';
+    return;
+  }
+  $("vendor-message").textContent = "";
   const paymentReady = state.vendors.filter((vendor) =>
     vendor.status === "verified" &&
     vendor.onchain_status === "registered" &&
@@ -1827,7 +1964,9 @@ function setInboxBusy(busy) {
 }
 
 async function load() {
-  if (!state.gmail?.status || state.gmail.status !== "connected") {
+  if (state.businessNameRequired) { renderSetup(); return; }
+  if (!state.previewReadOnly && (!state.gmail?.status || state.gmail.status !== "connected")) {
+    state.inboxStatus = "disconnected";
     setInboxBusy(false);
     state.invoices = [];
     state.selected = null;
@@ -1835,7 +1974,8 @@ async function load() {
     state.preflightLoading = false;
     renderStats();
     renderList();
-    $("detail").innerHTML = '<div class="empty"><div class="empty-icon">✉</div><h3>Connect the business inbox</h3><p>InboxPay only evaluates invoices from a real connected Gmail account.</p><button id="empty-connect" class="pay">Connect Gmail</button></div>';
+    invoiceDrawer.close();
+    $("invoice-list").innerHTML = '<div class="empty"><div class="empty-icon">✉</div><h3>Your invoices start here.</h3><p>Connect the Gmail inbox where your business receives invoices. Your agent will find the invoices and bring them here for review.</p><button id="empty-connect" class="primary-button" type="button">Connect Gmail ↗</button><a href="/help.html#connect">What happens when I connect?</a></div>';
     $("empty-connect").addEventListener("click", connectGmail);
     return;
   }
@@ -1847,19 +1987,21 @@ async function load() {
     const data = await readJsonResponse(response);
     if (!response.ok) throw new Error(data.error || "Invoice data unavailable");
     state.invoices = data.invoices || [];
+    state.inboxStatus = "ready";
     state.liveGmail = data.liveGmail === true;
     state.evaluatedAt = data.evaluatedAt || null;
     const evaluatedLabel = state.evaluatedAt
       ? new Date(state.evaluatedAt).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })
       : "time unavailable";
-    $("feed-state").dataset.state = state.liveGmail ? "connected" : "warning";
-    $("feed-label").textContent = state.liveGmail ? "Live Gmail evaluated" : "Live Gmail read unavailable";
-    $("feed-meta").textContent = state.liveGmail
+    $("feed-state").dataset.state = state.previewReadOnly ? "preview" : state.liveGmail ? "connected" : "warning";
+    $("feed-label").textContent = state.previewReadOnly ? "Saved Gmail records" : state.liveGmail ? "Live Gmail evaluated" : "Live Gmail read unavailable";
+    $("feed-meta").textContent = state.previewReadOnly ? state.invoices.length + " saved invoices · no new inbox scan" : state.liveGmail
       ? state.invoices.length + " invoice" + (state.invoices.length === 1 ? "" : "s") + " · evaluated " + evaluatedLabel
       : "Inbox is connected, but this evaluation did not include a live Gmail read.";
     state.selected = state.selected
       ? state.invoices.find((x) => x.invoiceNumber === state.selected.invoiceNumber) || null
-      : state.invoices[0] || null;
+      : null;
+    if (!state.selected) invoiceDrawer.close();
     state.preflight = null;
     state.preflightLoading = Boolean(state.selected);
     renderStats();
@@ -1867,6 +2009,7 @@ async function load() {
     renderDetail();
     await loadPreflight(state.selected);
   } catch (error) {
+    state.inboxStatus = "error";
     state.invoices = [];
     state.selected = null;
     state.preflight = null;
@@ -1888,7 +2031,8 @@ async function load() {
     const action = authRevoked
       ? '<button id="empty-reconnect" class="pay">' + failure.actionLabel + '</button>'
       : '<button id="empty-refresh" class="pay">' + failure.actionLabel + '</button>';
-    $("detail").innerHTML = '<div class="empty"><div class="empty-icon">!</div><h3>' + escapeHtml(failure.title) + '</h3><p>' + escapeHtml(failure.message) + '</p>' + action + '</div>';
+    invoiceDrawer.close();
+    $("invoice-list").innerHTML = '<div class="empty"><div class="empty-icon">!</div><h3>' + escapeHtml(failure.title) + '</h3><p>' + escapeHtml(failure.message) + '</p>' + action + '</div>';
     if (authRevoked) $("empty-reconnect").addEventListener("click", connectGmail);
     else $("empty-refresh").addEventListener("click", load);
   } finally {
@@ -2024,6 +2168,7 @@ async function settle() {
 }
 
 function setDestination(destination, updateUrl = true) {
+  invoiceDrawer.close();
   const activity = $("activity-modal");
   activateDestination(destination, {
     inbox: null,
@@ -2038,10 +2183,10 @@ function setDestination(destination, updateUrl = true) {
   const titles = {
     inbox: "Invoice queue",
     payments: "Payments",
-    policy: "Payment policy",
+    policy: "Payment settings",
     audit: "Audit trail",
     business: "Business profile",
-    vendors: "Vendor registry",
+    vendors: "Vendors",
     notifications: "Notifications"
   };
   document.title = (titles[destination] || "InboxPay") + " — InboxPay";
@@ -2060,6 +2205,7 @@ function setDestination(destination, updateUrl = true) {
 }
 
 async function openDestination(destination, options = {}) {
+  if (state.businessNameRequired) { setDestination("inbox", options.updateUrl !== false); return; }
   if (destination === "payments" || destination === "audit") return openActivity(destination, options);
   if (destination === "policy") return openPolicyModal(options);
   if (destination === "business") return openBusinessModal(options);
@@ -2074,6 +2220,19 @@ async function init() {
     const configResponse = await fetch("/api/config");
     const config = await readJsonResponse(configResponse);
     if (!configResponse.ok) throw new Error(config.error || "InboxPay configuration unavailable");
+    state.previewReadOnly = config.previewReadOnly === true;
+    $("preview-notice").hidden = !state.previewReadOnly;
+    if (state.previewReadOnly) {
+      const lockPreviewControls = () => {
+        document.querySelectorAll('#app-shell form input, #app-shell form select, #app-shell form button, .verify-vendor, .revoke-vendor, #network-switch, #connect-gmail, #provision-wallet, #fund-test-wallet, #policy-pause, #policy-allowance, #policy-autonomy, #policy-migrate, #pay-button, #schedule-button, #reschedule-button, #cancel-schedule, #notification-connect, #notification-test, #notification-disconnect').forEach((node) => {
+          node.disabled = true;
+          node.title = "Disabled in the read-only QA preview";
+        });
+      };
+      new MutationObserver(lockPreviewControls).observe($("app-shell"), { childList: true, subtree: true });
+      new MutationObserver(lockPreviewControls).observe($("detail"), { childList: true, subtree: true });
+      lockPreviewControls();
+    }
 
     state.supabase = createClient(config.url, config.publishableKey, {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
@@ -2147,6 +2306,14 @@ async function init() {
       toast("Syncing the business inbox…");
       load();
     });
+    $("retry-bootstrap").addEventListener("click", async () => {
+      const button = $("retry-bootstrap");
+      button.disabled = true;
+      button.textContent = "Retrying…";
+      try { await bootstrap(); }
+      catch { /* Persistent notice remains visible; no automatic retry. */ }
+      finally { button.disabled = false; button.textContent = "Retry workspace"; }
+    });
     window.addEventListener("popstate", () => {
       if (!state.session || !state.business) return;
       openDestination(destinationFromHash(window.location.hash), { updateUrl: false }).catch((error) => toast(error.message));
@@ -2160,6 +2327,8 @@ async function init() {
       if (event === "SIGNED_OUT") {
         state.user = null;
         state.business = null;
+        state.businessNameRequired = false;
+        state.bootstrapError = false;
         state.gmail = null;
         state.wallet = null;
         state.policy = null;
@@ -2181,6 +2350,11 @@ async function init() {
 
     if (!state.session) {
       showAuth();
+      const authError = new URLSearchParams(window.location.search).get("error_description");
+      if (authError) {
+        authDialog.open();
+        setAuthMessage("Your sign-in link could not be completed. Please start a fresh sign-in. " + authError, true);
+      }
       return;
     }
 

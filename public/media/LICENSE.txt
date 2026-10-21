@@ -1,0 +1,9 @@
+Third-party photographic media — Ron Lach / Pexels
+
+studio-team.jpg: https://www.pexels.com/photo/a-team-of-fashion-designer-working-inside-the-office-9850411/
+studio-film.mp4 and studio-film-poster.jpg: https://www.pexels.com/video/people-working-at-a-fashion-studio-9850681/
+
+Use governed by the Pexels License, not the repository's Apache-2.0 license:
+https://www.pexels.com/license/
+
+Provenance checked 2026-10-21. Included as illustrative business context in the InboxPay website. No endorsement or customer relationship is claimed. See docs/MEDIA.md for source and web-rendition details.

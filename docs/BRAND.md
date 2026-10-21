@@ -2,14 +2,18 @@
 
 ## Identity idea
 
-The InboxPay mark is three invoice lines crossing an authority gate. It represents the product's core constraint: invoice evidence can request a payment, but it cannot bypass the business's explicit policy.
+InboxPay handles invoices and USDC payments from a business's Gmail. Lead with that job, not with the safeguards supporting it.
 
-The mark deliberately avoids wallets, coins, shields, locks, chain links, circuits, and generic payment arrows.
+The current frontend direction is Correspondence: blue and white, a restrained lemon accent, Manrope typography, and a folded-letter mark. It pairs a familiar invoice inbox with a right-hand detail sheet. The founder selected the direction; the mark remains subject to final refinement and collision review. No trademark clearance is claimed.
+
+`public/brand/inboxpay-mark.svg` and the favicon reflect this direction. The older lockup, monochrome, and social exports below are legacy assets and must not be described as the approved Correspondence brand kit or used for new material until regenerated. The app uses a text wordmark with the new mark rather than the legacy lockup.
 
 ## Asset inventory
 
 | Asset | Use |
 | --- | --- |
+| `public/brand/correspondence-og.svg` and `.png` | Current product-first social preview; exact vector export. |
+| `public/brand/correspondence-mark.png` | Current 512px mark export for review and application branding. |
 | `public/brand/inboxpay-mark.svg` | Primary app icon on light or dark surrounding surfaces. |
 | `public/brand/inboxpay-mark-mono.svg` | Single-color reproduction and documents. |
 | `public/brand/inboxpay-lockup.svg` | Horizontal product lockup. |
@@ -22,19 +26,22 @@ The mark deliberately avoids wallets, coins, shields, locks, chain links, circui
 
 ## Core colors
 
-- Ink: `#172033`
-- Signal lime: `#C9EF71`
-- Warm paper: `#F5F6F0`
-- Policy green: `#49702D`
-- Muted text: `#677064`
+- Blue: `#194CD9`
+- Lemon: `#DFEF9A`
+- Ink: `#182A49`
+- Paper: `#FFFFFF`
+- Canvas: `#F8F9FC`
+- Muted text: `#607089`
 
-Signal lime marks the authority seam, verified transition, or active control. It should not flood ordinary surfaces or imply approval before a gate has passed.
+Blue marks navigation and primary actions. Lemon adds warmth to selected storytelling and setup surfaces. Green and amber convey status with explicit text; brand color never implies a payment passed its checks. Manrope is self-hosted with its OFL license in `public/brand/fonts/`.
 
 ## Usage
+
+Regenerate current PNG exports with `node scripts/development/export-correspondence-assets.mjs`. The older `inboxpay-og` and X assets are retained as legacy files, not automatically changed on external profiles.
 
 - Preserve the clear space of at least one quarter of the mark's width.
 - Do not redraw the mark as a wallet, coin, lock, or shield.
 - Do not add glow, gradients, or blockchain decoration.
-- Do not place the lime mark on a similar yellow-green background without an ink keyline.
+- Keep the blue mark legible on white or a sufficiently light surface.
 - Use the monochrome mark where color reproduction is unreliable.
 - Payment, confirmation, and blocked states must remain explicit in text; brand color is never the only status signal.

@@ -1,371 +1,1239 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>InboxPay — Autonomous AP</title>
-  <meta name="description" content="Autonomous accounts payable with bounded USDC settlement on Arc.">
-  <meta name="theme-color" content="#151915">
-  <meta property="og:type" content="website">
-  <meta property="og:title" content="InboxPay — bounded accounts payable">
-  <meta property="og:description" content="From Gmail invoice evidence to policy-controlled USDC settlement on Arc.">
-  <meta property="og:url" content="https://inboxpay.vercel.app/">
-  <meta property="og:image" content="https://inboxpay.vercel.app/brand/inboxpay-og.png">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="InboxPay — bounded accounts payable">
-  <meta name="twitter:description" content="From Gmail invoice evidence to policy-controlled USDC settlement on Arc.">
-  <meta name="twitter:image" content="https://inboxpay.vercel.app/brand/inboxpay-og.png">
-  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-  <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="stylesheet" href="/styles.css">
-</head>
-<body>
-  <a id="skip-link" class="skip-link" href="#main-content" hidden>Skip to main content</a>
-  <section id="auth-gate" class="auth-gate">
-    <div class="auth-layout">
-      <div class="auth-story">
-        <div class="brand auth-brand">
-          <img class="brand-mark" src="/brand/inboxpay-mark.svg" width="38" height="38" alt="">
-          <div><strong>InboxPay</strong><span>Autonomous accounts payable</span></div>
-        </div>
-        <div class="auth-story-copy">
-          <div class="auth-kicker"><span></span> BOUNDED PAYMENT OPERATIONS</div>
-          <h1>Invoices in.<br>Guardrails checked.<br><em>Payments out.</em></h1>
-          <p>InboxPay reads the business inbox, explains every decision, and settles only what the onchain policy permits.</p>
-        </div>
-        <div class="auth-flow" aria-label="InboxPay payment flow">
-          <div><b>01</b><strong>Gmail evidence</strong><span>Real invoice source</span></div>
-          <div><b>02</b><strong>Policy decision</strong><span>Deterministic gates</span></div>
-          <div><b>03</b><strong>Arc settlement</strong><span>Reconciled receipt</span></div>
-        </div>
-      </div>
-      <div class="auth-card">
-        <div class="auth-card-head">
-          <span>BUSINESS ACCESS</span>
-          <b>Secure session</b>
-        </div>
-        <h2>Open your payment desk</h2>
-        <p>Sign in to the account that owns this business's inbox, wallet, vendors, and payment policy.</p>
-        <form id="auth-form">
-          <label for="auth-email">Work email</label>
-          <input id="auth-email" type="email" autocomplete="email" placeholder="you@company.com" required>
-          <label for="auth-password">Password</label>
-          <input id="auth-password" type="password" autocomplete="current-password" placeholder="At least 8 characters" minlength="8" required>
-          <button id="auth-submit" class="pay" type="submit">Sign in to InboxPay</button>
-        </form>
-        <div class="auth-divider"><span>or use your business identity</span></div>
-        <button id="auth-google" class="google-auth" type="button"><span class="google-dot" aria-hidden="true"></span>Continue with Google</button>
-        <p class="auth-helper">New here? Google creates the business account and keeps ownership isolated.</p>
-        <div class="auth-actions">
-          <button id="auth-signup" class="text-action" type="button">Create an account with email →</button>
-        </div>
-        <p id="auth-message" class="auth-message" aria-live="polite"></p>
-      </div>
-    </div>
-    <div class="landing-proof" aria-label="InboxPay control path">
-      <div><span>01</span><strong>Evidence arrives</strong><small>Gmail email and text-PDF sources</small></div>
-      <div><span>02</span><strong>The agent decides</strong><small>Pay, hold, escalate, or schedule</small></div>
-      <div><span>03</span><strong>Authority is checked</strong><small>Business wallet and onchain policy</small></div>
-      <div><span>04</span><strong>The receipt closes the loop</strong><small>Circle submission reconciled on Arc</small></div>
-    </div>
-    <section class="landing-section landing-mechanism" aria-labelledby="mechanism-title">
-      <div class="landing-copy">
-        <span class="landing-kicker">THE CONTROL LAYER</span>
-        <h2 id="mechanism-title">The invoice can ask.<br>The policy still decides.</h2>
-        <p>InboxPay gives an agent enough context to do useful work without giving it unlimited authority. Invoice evidence, business identity, vendor registration, live wallet state, and the policy vault must agree before USDC can move.</p>
-      </div>
-      <div class="authority-diagram" aria-label="Invoice evidence passes application checks before onchain settlement">
-        <div class="evidence-stack"><span>EMAIL BODY</span><span>PDF EVIDENCE</span><span>VERIFIED SENDER</span></div>
-        <div class="authority-seam"><b>AUTHORITY<br>GATE</b></div>
-        <div class="settlement-stack"><strong>PAYMENT POLICY</strong><span>recipient · limits · cash floor · pause · duplicate ID</span><b>RECONCILED USDC</b></div>
-      </div>
-    </section>
-    <section class="landing-section landing-evidence" aria-labelledby="evidence-title">
-      <div>
-        <span class="landing-kicker">PROVEN EXECUTION</span>
-        <h2 id="evidence-title">One invoice. One attempt. One receipt.</h2>
-      </div>
-      <div class="evidence-ledger">
-        <div><span>01</span><strong>Evaluation</strong><small>Gmail evidence classified once</small></div>
-        <div><span>02</span><strong>Durable job</strong><small>Business and network scoped</small></div>
-        <div><span>03</span><strong>Circle submission</strong><small>Original provider identity preserved</small></div>
-        <div><span>04</span><strong>Arc confirmation</strong><small>Receipt and policy event reconciled</small></div>
-        <div><span>05</span><strong>Duplicate rejected</strong><small>Payment ID cannot execute twice</small></div>
-      </div>
-      <p class="proof-note">The complete autonomous AP proof is on Arc Testnet. Mainnet infrastructure is live, but InboxPay does not claim a genuine Mainnet invoice settlement.</p>
-    </section>
-    <footer class="landing-footer">
-      <img src="/brand/inboxpay-lockup.svg" width="270" height="60" alt="InboxPay">
-      <p>Dedicated Circle wallets. Policy-controlled Arc settlement. Business-scoped evidence and receipts.</p>
-      <div><a href="https://github.com/ShalyX/inboxpay" target="_blank" rel="noreferrer">View source ↗</a><a href="#auth-form">Open your payment desk ↑</a></div>
-    </footer>
-  </section>
-
-  <main id="app-shell" class="shell" hidden>
-    <aside class="sidebar">
-      <div class="brand">
-        <img class="brand-mark" src="/brand/inboxpay-mark.svg" width="34" height="34" alt="">
-        <div><strong>InboxPay</strong><span>Payment operations</span></div>
-      </div>
-      <div class="nav-groups">
-        <div class="nav-group">
-          <div class="nav-label">Workspace</div>
-          <nav aria-label="Primary navigation">
-            <button class="nav active" data-nav="inbox" type="button"><span class="nav-icon">I</span><span>Invoice queue</span><b id="invoice-count">0</b></button>
-            <button id="open-payments" class="nav" data-nav="payments" type="button"><span class="nav-icon">P</span><span>Payments</span><b id="payment-count">0</b></button>
-            <button id="open-policy" class="nav" data-nav="policy" type="button"><span class="nav-icon">G</span><span>Payment policy</span></button>
-            <button id="open-audit" class="nav" data-nav="audit" type="button"><span class="nav-icon">A</span><span>Audit trail</span></button>
-          </nav>
-        </div>
-        <div class="nav-group nav-group-business">
-          <div class="nav-label">Business</div>
-          <nav aria-label="Business settings">
-            <button id="nav-business" class="nav" data-nav="business" type="button"><span class="nav-icon">B</span><span>Business profile</span></button>
-            <button id="nav-vendors" class="nav" data-nav="vendors" type="button"><span class="nav-icon">V</span><span>Vendor registry</span></button>
-            <button id="nav-notifications" class="nav" data-nav="notifications" type="button"><span class="nav-icon">N</span><span>Notifications</span></button>
-          </nav>
-        </div>
-      </div>
-      <div class="sidebar-foot">
-        <div class="rail-state"><i class="dot"></i><div><span>Settlement rail</span><strong id="network-label">Arc Mainnet</strong></div></div>
-        <small>USDC · Dedicated business wallet</small>
-      </div>
-    </aside>
-
-    <section id="main-content" class="content" tabindex="-1">
-      <header class="topbar">
-        <div class="topbar-row">
-          <div class="page-heading">
-            <div class="eyebrow">PAYMENT OPERATIONS / <span>INVOICE CONTROL</span></div>
-            <h1>Invoice queue</h1>
-            <p>Review what the agent found, inspect every gate, and act only when the evidence is complete.</p>
-          </div>
-        </div>
-        <div class="account-actions">
-          <label class="environment-control" for="network-switch"><span>Settlement environment</span><select id="network-switch" aria-label="Active settlement environment" aria-describedby="network-context-note"><option value="ARC-TESTNET">Arc Testnet</option><option value="ARC">Arc Mainnet</option></select><small id="network-context-note">Separate business account</small></label>
-          <section class="business-context" aria-label="Business wallet">
-            <div class="account-copy">
-              <div class="account-heading"><div><span class="account-kicker">BUSINESS ACCOUNT</span><div class="business-name-row"><strong id="business-name">Business</strong><button id="edit-business" class="text-action" type="button">Edit</button></div></div><span id="wallet-status" class="account-status" aria-live="polite">Checking wallet</span></div>
-              <div class="wallet-summary"><div class="wallet-address-group"><span id="wallet-network" class="wallet-label">Circle wallet</span><code id="wallet-address">Wallet provisioning…</code></div><button id="copy-wallet" class="copy-wallet-button" type="button" hidden>Copy full address</button><div class="wallet-balance"><span>USDC balance</span><strong id="wallet-balance">—</strong></div></div>
-            </div>
-          </section>
-          <div class="action-cluster" aria-label="Business controls">
-            <button id="open-payments-top" class="ghost" type="button">Payments</button>
-            <button id="open-audit-top" class="ghost" type="button">Audit</button>
-            <button id="open-policy-top" class="ghost" type="button">Policy</button>
-            <button id="add-vendor" class="ghost" type="button">Vendors</button>
-          </div>
-          <section class="gmail-context" aria-label="Business inbox">
-            <div class="context-label">INVOICE SOURCE</div>
-            <div class="feed-card" aria-live="polite">
-              <div class="feed-state" id="feed-state" data-state="loading"><span id="feed-dot" aria-hidden="true">○</span><strong id="feed-label">Checking Gmail connection</strong></div>
-              <div id="feed-meta" class="feed-meta">Waiting for live Gmail evaluation</div>
-            </div>
-            <div class="utility-actions" aria-label="Inbox controls">
-              <button id="connect-gmail" class="ghost" type="button">Connect Gmail</button>
-              <button id="refresh" class="ghost refresh-action" type="button">Refresh inbox</button>
-              <button id="sign-out" class="text-action sign-out" type="button">Sign out</button>
-            </div>
-          </section>
-        </div>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>InboxPay — Payments, straight from your inbox</title>
+    <meta
+      name="description"
+      content="Connect Gmail. Your AP agent finds invoices, handles USDC payments, and keeps the receipts together."
+    />
+    <meta name="theme-color" content="#194cd9" />
+    <meta property="og:type" content="website" />
+    <meta
+      property="og:title"
+      content="InboxPay — Payments, straight from your inbox"
+    />
+    <meta
+      property="og:description"
+      content="Your invoices arrive in Gmail. Let your AP agent take it from there."
+    />
+    <meta property="og:url" content="https://inboxpay.vercel.app/" />
+    <meta
+      property="og:image"
+      content="https://inboxpay.vercel.app/brand/correspondence-og.png"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="InboxPay — Payments, straight from your inbox"
+    />
+    <meta
+      name="twitter:description"
+      content="Your invoices arrive in Gmail. Let your AP agent take it from there."
+    />
+    <meta
+      name="twitter:image"
+      content="https://inboxpay.vercel.app/brand/correspondence-og.png"
+    />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="stylesheet" href="/styles.css" />
+    <link
+      rel="preload"
+      href="/brand/fonts/manrope.ttf"
+      as="font"
+      type="font/ttf"
+      crossorigin
+    />
+    <link rel="stylesheet" href="/correspondence.css" />
+  </head>
+  <body>
+  <aside id="preview-notice" class="preview-notice" role="status" hidden>QA preview · Saved business records. New inbox scans, setup changes, and payments are disabled. Sign-in may initialize draft settings for an existing business.</aside>
+    <a id="skip-link" class="skip-link" href="#main-content" hidden
+      >Skip to main content</a
+    >
+    <section id="auth-gate" class="auth-gate">
+      <header class="site-header">
+        <a class="wordmark" href="/" aria-label="InboxPay home"
+          ><img
+            src="/brand/inboxpay-mark.svg"
+            width="32"
+            height="32"
+            alt=""
+          />InboxPay</a
+        >
+        <nav aria-label="Website navigation">
+          <a href="#how-it-works">How it works</a
+          ><a href="/help.html">Business help</a
+          ><button class="text-action" data-auth-open type="button">
+            Sign in</button
+          ><button class="primary-button" data-auth-open type="button">
+            Connect Gmail <span aria-hidden="true">↗</span>
+          </button>
+        </nav>
       </header>
-
-      <section id="stats" class="stats" aria-live="polite"></section>
-      <section id="setup-card" class="setup-card" aria-live="polite" hidden></section>
-
-      <div class="workspace">
-        <section class="panel queue">
-          <div class="panel-head"><div><label>LIVE QUEUE</label><h2>Invoices from Gmail</h2></div><span id="queue-count" class="meta">0 invoices</span></div>
-          <div class="queue-toolbar">
-            <div id="queue-filters" class="filter-group" role="group" aria-label="Filter invoice queue"></div>
-            <label class="queue-search" for="queue-search"><span>Search invoices</span><input id="queue-search" type="search" placeholder="Vendor or invoice"></label>
+      <div class="site-main">
+        <section class="landing-hero" aria-labelledby="hero-title">
+          <div class="hero-copy">
+            <span class="overline"><i></i> YOUR ACCOUNTS PAYABLE AGENT</span>
+            <h1 id="hero-title">
+              The invoice arrives.<br />Your agent<br /><em
+                >takes it from here.</em
+              >
+            </h1>
+            <p>
+              Connect Gmail. Your AP agent handles invoices, USDC payments, and
+              receipts, so you can get back to running your business.
+            </p>
+            <button
+              class="primary-button hero-cta"
+              data-auth-open
+              type="button"
+            >
+              Connect your Gmail <span aria-hidden="true">↗</span></button
+            ><span class="cta-note"
+              >For businesses paying vendors in USDC.</span
+            >
           </div>
-          <div id="invoice-list" aria-live="polite"></div>
+          <figure
+            class="product-letter"
+            aria-label="Illustrative example of an invoice and its payment receipt"
+          >
+            <div class="sample-caption">
+              <span>FROM YOUR INBOX</span><span>Illustrative example</span>
+            </div>
+            <div class="sample-mail">
+              <div class="sample-mail-head">
+                <span class="sender-avatar">S</span>
+                <div>
+                  <strong>Studio North</strong
+                  ><small>Invoice for September</small>
+                </div>
+                <span class="sample-date">09:41</span>
+              </div>
+              <div class="sample-mail-body">
+                <span class="overline">INVOICE · SN-2048</span>
+                <h2>A little less admin.<br />A lot more done.</h2>
+                <p>Hi team,<br />Here’s this month’s design retainer.</p>
+                <div class="sample-attachment">
+                  <span aria-hidden="true">↳</span>
+                  <div>
+                    <strong>September-invoice.pdf</strong
+                    ><small>Invoice attachment</small>
+                  </div>
+                  <b>240.00 <small>USDC</small></b>
+                </div>
+              </div>
+            </div>
+            <div class="sample-receipt">
+              <span class="receipt-tick" aria-hidden="true">✓</span>
+              <div>
+                <strong>Payment handled.</strong
+                ><small>240.00 USDC · Receipt saved</small>
+              </div>
+              <span aria-hidden="true">↗</span>
+            </div>
+            <figcaption>
+              From an invoice in Gmail to a payment record in InboxPay.
+            </figcaption>
+          </figure>
         </section>
-        <section id="detail" class="panel detail">
-          <div class="empty"><div class="empty-icon">✉</div><h3>Select an invoice</h3><p>The detail view shows the extraction, decision, and policy gates before money can move.</p></div>
+        <section
+          id="how-it-works"
+          class="how-it-works"
+          aria-label="How InboxPay works"
+        >
+          <article>
+            <span>01 / FIND</span>
+            <h2>Invoices found.</h2>
+            <p>
+              Your agent finds invoices in connected Gmail, including supported
+              text-based PDFs.
+            </p>
+          </article>
+          <article>
+            <span>02 / PAY</span>
+            <h2>Payments handled.</h2>
+            <p>
+              Review a payment yourself, or let your agent handle eligible
+              invoices within the limits you set.
+            </p>
+          </article>
+          <article>
+            <span>03 / KEEP</span>
+            <h2>Receipts together.</h2>
+            <p>
+              See what was paid, what needs you, and the receipt for every
+              confirmed payment.
+            </p>
+          </article>
         </section>
-        <aside class="panel execution-rail" aria-label="Payment execution readiness">
-          <div class="panel-head"><div><label>PAYMENT CONTROL</label><h2>Execution readiness</h2></div><span class="meta">LIVE STATE</span></div>
-          <div class="execution-body">
-            <section class="rail-card payment-flow-card">
-              <h3>Payment flow</h3>
-              <ol class="payment-flow">
-                <li data-flow-step="1"><span>1</span><div><strong>Review invoice</strong><small>Inspect extracted details and evidence</small></div></li>
-                <li data-flow-step="2"><span>2</span><div><strong>Run policy checks</strong><small>Verify recipient, limits and balance</small></div></li>
-                <li data-flow-step="3"><span>3</span><div><strong>Confirm payment</strong><small>Execute only when eligible</small></div></li>
-                <li data-flow-step="4"><span>4</span><div><strong>Track settlement</strong><small>Reconcile transaction and receipt</small></div></li>
-              </ol>
-            </section>
-            <section class="rail-card">
-              <h3>Wallet &amp; network</h3>
-              <div class="execution-line"><span>Business wallet</span><strong id="rail-wallet-state">Loading wallet…</strong></div>
-              <div class="execution-line"><span>Network</span><strong id="network-label-rail">Arc Testnet</strong></div>
-              <div class="execution-line"><span>USDC balance</span><strong id="rail-wallet-balance">— USDC</strong></div>
-              <div class="execution-line"><span>Vault</span><strong id="rail-vault-state">Checking policy…</strong></div>
-              <div class="execution-line"><span>USDC authorization</span><strong id="rail-allowance-state">Checking…</strong></div>
-            </section>
-            <section class="rail-card">
-              <h3>Payment policy</h3>
-              <p class="execution-note">Vendor verification, duplicate protection, spending limits and the cash floor are checked before funds can move.</p>
-              <button id="rail-open-policy" class="text-action execution-link" type="button">Review full policy →</button>
-            </section>
-            <section class="rail-assurance"><span class="assurance-mark">✓</span><div><strong>Guardrails stay in control</strong><p>Every settlement is bounded by policy and recorded for audit.</p><button id="rail-open-payments" class="text-action execution-link" type="button">View payment records →</button></div></section>
+        <section class="story-section business-story" aria-labelledby="business-story-title">
+          <div class="business-story-heading">
+            <div><span class="overline">FOR THE BUSINESS BEHIND THE INBOX</span>
+            <h2 id="business-story-title">More time for the work<br />you started the business for.</h2></div>
+            <div>
+            <p>
+              Focus on your clients and your next project. Your agent handles
+              the invoice admin, without copied wallet addresses or receipts
+              to chase.
+            </p>
+            <a class="inline-link" href="/help.html#first-payment"
+              >See your first-payment guide
+              <span aria-hidden="true">↗</span></a
+            >
+            </div>
           </div>
-        </aside>
+          <div class="business-media">
+            <figure class="business-photo media-surface">
+              <img src="/media/studio-team.jpg" width="1400" height="933" loading="lazy" decoding="async" alt="A small design team working together around a cutting table in their studio.">
+              <span class="media-empty" hidden>Room for the work that matters.</span>
+            </figure>
+            <figure class="business-film media-surface">
+              <video id="studio-film" controls playsinline muted preload="none" poster="/media/studio-film-poster.jpg" width="540" height="1024" aria-label="Silent illustrative footage of designers at work in a studio">
+                <source src="/media/studio-film.mp4" type="video/mp4">
+                <a href="/media/studio-film.mp4">Watch the silent studio scene</a>.
+              </video>
+              <img class="film-poster-fallback" src="/media/studio-film-poster.jpg" width="800" height="1517" loading="lazy" alt="A designer reviewing a pattern at her worktable." hidden>
+              <span class="film-unavailable" hidden>Film unavailable · studio photograph shown</span>
+            </figure>
+          </div>
+          <p class="media-credit">Illustrative studio scenes, not customer endorsements. Photography and film by <a href="https://www.pexels.com/@ron-lach/" target="_blank" rel="noreferrer">Ron Lach / Pexels ↗</a></p>
+        </section>
+        <section class="exception-section">
+          <div class="review-example">
+            <span class="sample-caption">ILLUSTRATIVE REVIEW</span>
+            <div>
+              <span class="sender-avatar">N</span
+              ><strong>New vendor invoice</strong
+              ><span class="review-pill">Needs you</span>
+            </div>
+            <h3>Verify this vendor first.</h3>
+            <p>The invoice is ready to review. No payment has been sent.</p>
+            <span class="example-link"
+              >Review invoice <span aria-hidden="true">→</span></span
+            >
+          </div>
+          <div>
+            <span class="overline">WHEN SOMETHING NEEDS YOU</span>
+            <h2>An agent that handles the work.<br />And knows when to ask.</h2>
+            <p>
+              A new vendor or a payment outside your settings stays in review,
+              with a clear reason and a next step. You stay in charge without
+              chasing every invoice.
+            </p>
+            <a class="inline-link" href="/help.html#review"
+              >How review works <span aria-hidden="true">↗</span></a
+            >
+          </div>
+        </section>
+        <section class="closing-letter">
+          <span class="overline">YOUR INBOX HAS ENOUGH TO DO.</span>
+          <h2>Let it be where<br />payments get done.</h2>
+          <button class="primary-button" data-auth-open type="button">
+            Get started with InboxPay <span aria-hidden="true">↗</span>
+          </button>
+          <p>
+            Early access · Gmail access depends on Google authorization.<br />Payment
+            flow demonstrated on Arc Testnet. Mainnet setup is separate.
+          </p>
+        </section>
       </div>
-
-      <footer class="app-footer"><span>InboxPay <i>/</i> Bounded payment operations</span><span><b id="footer-network">Arc Testnet</b> <i>·</i> Business-scoped controls</span></footer>
-
-      <section class="proof">
-        <div class="proof-heading"><span>CONTROL SYSTEM</span><strong>Three independent layers before money moves</strong></div>
-        <article><span class="proof-index">01</span><div><strong>Explainable decision</strong><p>Every model output is wrapped in deterministic checks.</p></div></article>
-        <article><span class="proof-index">02</span><div><strong>Onchain guardrails</strong><p>Vendor, duplicate, daily-limit, and cash-floor rules are enforced by the vault.</p></div></article>
-        <article><span class="proof-index">03</span><div><strong>Reconciled receipt</strong><p>A payment is complete only after the Arc transaction and audit evidence agree.</p></div></article>
-      </section>
-    </section>
-    <div id="vendor-modal" class="vendor-modal" hidden>
-      <div class="vendor-card">
-        <div class="detail-top page-titlebar"><div><label>VENDOR CONTROL</label><h2>Vendor registry</h2><p>Approve exactly who this business can pay and verify the recipient registered in the active policy vault.</p></div><button id="close-vendor" class="ghost" type="button">Back to invoices</button></div>
-        <div id="vendor-summary" class="page-metrics" aria-live="polite"></div>
-        <div class="destination-grid vendor-workspace">
-          <section class="destination-card vendor-entry-card">
-            <div class="section-heading"><div><span>ADD VENDOR</span><h3>Register a settlement recipient</h3></div><b>Step 1 of 2</b></div>
-            <p>The address is saved for review first. Verification and onchain registration remain explicit actions.</p>
-            <form id="vendor-form">
-              <label for="vendor-name">Vendor name</label>
-              <input id="vendor-name" placeholder="e.g. Cloud infrastructure provider" required>
-              <label for="vendor-address">Arc / EVM recipient</label>
-              <input id="vendor-address" placeholder="0x…" pattern="0x[a-fA-F0-9]{40}" required>
-              <label for="vendor-email">Invoice sender email</label>
-              <input id="vendor-email" type="email" placeholder="billing@vendor.com" required>
-              <small>This email becomes the vendor identity InboxPay requires before a Gmail invoice can be payable.</small>
-              <button id="vendor-submit" class="pay" type="submit">Add vendor for review</button>
-            </form>
-            <div id="vendor-message" class="auth-message" aria-live="polite"></div>
-          </section>
-          <section class="destination-card vendor-directory-card">
-            <div class="section-heading"><div><span>PAYMENT DIRECTORY</span><h3>Registered vendors</h3></div><b id="vendor-count-label">0 vendors</b></div>
-            <div id="vendor-list" class="vendor-list"></div>
-          </section>
+      <footer class="site-footer">
+        <a class="wordmark" href="/" aria-label="InboxPay home"
+          ><img
+            src="/brand/inboxpay-mark.svg"
+            width="28"
+            height="28"
+            alt=""
+          />InboxPay</a
+        >
+        <p>Payments, straight from your inbox.</p>
+        <nav aria-label="Resources">
+          <a href="/help.html">Business help</a
+          ><a
+            href="https://github.com/ShalyX/inboxpay/tree/main/docs"
+            target="_blank"
+            rel="noreferrer"
+            >Developer docs ↗</a
+          ><a
+            href="https://github.com/ShalyX/inboxpay"
+            target="_blank"
+            rel="noreferrer"
+            >Source ↗</a
+          >
+        </nav>
+      </footer>
+      <dialog id="auth-dialog" class="auth-dialog" aria-labelledby="auth-title">
+        <button
+          id="auth-close"
+          class="icon-button dialog-close"
+          type="button"
+          aria-label="Close sign in"
+        >
+          ×
+        </button>
+        <div class="auth-card">
+          <div class="auth-card-head">
+            <span>BUSINESS ACCESS</span>
+            <b>Secure session</b>
+          </div>
+          <h2 id="auth-title">Your inbox. Less admin.</h2>
+          <p>
+            Sign in or create your business account. You’ll connect the Gmail
+            inbox you want InboxPay to work with next.
+          </p>
+          <form id="auth-form">
+            <label for="auth-email">Work email</label>
+            <input
+              id="auth-email"
+              type="email"
+              autocomplete="email"
+              placeholder="you@company.com"
+              required
+            />
+            <label for="auth-password">Password</label>
+            <input
+              id="auth-password"
+              type="password"
+              autocomplete="current-password"
+              placeholder="At least 8 characters"
+              minlength="8"
+              required
+            />
+            <button id="auth-submit" class="pay" type="submit">
+              Sign in to InboxPay
+            </button>
+          </form>
+          <div class="auth-divider">
+            <span>or use your business identity</span>
+          </div>
+          <button id="auth-google" class="google-auth" type="button">
+            <span class="google-dot" aria-hidden="true"></span>Continue with
+            Google
+          </button>
+          <p class="auth-helper">
+            Signing in and connecting Gmail are separate steps. External Gmail
+            access is subject to Google authorization during early access.
+          </p>
+          <div class="auth-actions">
+            <button id="auth-signup" class="text-action" type="button">
+              Create an account with email →
+            </button>
+          </div>
+          <p id="auth-message" class="auth-message" aria-live="polite"></p>
         </div>
-      </div>
-    </div>
-    <div id="policy-modal" class="vendor-modal" hidden>
-      <div class="vendor-card policy-card" role="region" aria-labelledby="policy-title">
-        <div class="detail-top page-titlebar"><div><label>PAYMENT CONTROL</label><h2 id="policy-title">Payment policy</h2><p id="policy-context">Set the financial boundaries enforced by this business's dedicated onchain policy vault.</p></div><button id="close-policy" class="ghost" type="button">Back to invoices</button></div>
-        <div id="policy-chain-state" class="policy-chain-state"></div>
-        <div class="policy-workspace">
-          <section class="destination-card policy-limits-card">
-            <div class="section-heading"><div><span>SPENDING LIMITS</span><h3>Bound the agent's authority</h3></div><b>USDC</b></div>
-            <form id="policy-form">
-              <div class="policy-grid">
-                <label for="policy-max"><span>Maximum single payment</span><div class="money-input"><input id="policy-max" type="number" min="0.000001" step="0.000001" required><b>USDC</b></div><small>No invoice above this amount can settle autonomously.</small></label>
-                <label for="policy-daily"><span>Daily spending limit</span><div class="money-input"><input id="policy-daily" type="number" min="0.000001" step="0.000001" required><b>USDC</b></div><small>Total settled payments cannot exceed this amount per UTC day.</small></label>
-                <label for="policy-floor"><span>Cash floor</span><div class="money-input"><input id="policy-floor" type="number" min="0" step="0.000001" required><b>USDC</b></div><small>The business wallet must retain at least this amount after payment.</small></label>
+      </dialog>
+    </section>
+
+    <main id="app-shell" class="shell" hidden>
+      <aside class="sidebar">
+        <div class="brand">
+          <img
+            class="brand-mark"
+            src="/brand/inboxpay-mark.svg"
+            width="34"
+            height="34"
+            alt=""
+          />
+          <div><strong>InboxPay</strong><span>Your AP agent</span></div>
+        </div>
+        <div class="nav-groups">
+          <div class="nav-group">
+            <div class="nav-label">Workspace</div>
+            <nav aria-label="Primary navigation">
+              <button class="nav active" data-nav="inbox" type="button">
+                <span class="nav-icon" data-icon="inbox"></span
+                ><span>Invoices</span><b id="invoice-count">0</b>
+              </button>
+              <button
+                id="open-payments"
+                class="nav"
+                data-nav="payments"
+                type="button"
+              >
+                <span class="nav-icon" data-icon="payments"></span
+                ><span>Payments</span><b id="payment-count">0</b>
+              </button>
+              <button
+                id="open-policy"
+                class="nav"
+                data-nav="policy"
+                type="button"
+              >
+                <span class="nav-icon" data-icon="policy"></span
+                ><span>Payment settings</span>
+              </button>
+              <button
+                id="open-audit"
+                class="nav"
+                data-nav="audit"
+                type="button"
+              >
+                <span class="nav-icon" data-icon="audit"></span
+                ><span>Activity</span>
+              </button>
+            </nav>
+          </div>
+          <div class="nav-group nav-group-business">
+            <div class="nav-label">Business</div>
+            <nav aria-label="Business settings">
+              <button
+                id="nav-business"
+                class="nav"
+                data-nav="business"
+                type="button"
+              >
+                <span class="nav-icon" data-icon="business"></span
+                ><span>Business account</span>
+              </button>
+              <button
+                id="nav-vendors"
+                class="nav"
+                data-nav="vendors"
+                type="button"
+              >
+                <span class="nav-icon" data-icon="vendors"></span
+                ><span>Vendors</span>
+              </button>
+              <button
+                id="nav-notifications"
+                class="nav"
+                data-nav="notifications"
+                type="button"
+              >
+                <span class="nav-icon" data-icon="notifications"></span
+                ><span>Notifications</span>
+              </button>
+            </nav>
+          </div>
+        </div>
+        <div class="sidebar-foot">
+          <div class="signed-in-account"><span>Signed in as</span><strong id="signed-in-email">Checking account…</strong></div>
+          <a
+            href="/help.html"
+            target="_blank"
+            rel="noreferrer"
+            class="help-link"
+            >Help &amp; getting started ↗</a
+          >
+          <div class="rail-state">
+            <i class="dot"></i>
+            <div>
+              <span>Settlement rail</span
+              ><strong id="network-label">Loading environment…</strong>
+            </div>
+          </div>
+          <small>USDC · Dedicated business wallet</small>
+        </div>
+      </aside>
+
+      <div class="mobile-account-identity"><span>Signed in as </span><strong id="signed-in-email-mobile">Checking account…</strong></div>
+      <section id="main-content" class="content" tabindex="-1">
+        <div id="bootstrap-notice" class="bootstrap-notice" role="alert" hidden><div><strong>Workspace temporarily unavailable</strong><p>We couldn’t load your business records. Retry before changing any setup.</p></div><button id="retry-bootstrap" class="ghost" type="button">Retry workspace</button></div>
+        <header class="topbar">
+          <div class="topbar-row">
+            <div class="page-heading">
+              <div class="eyebrow">YOUR WORKSPACE</div>
+              <h1>Invoices</h1>
+              <p>Your inbox, with the payment work taken care of.</p>
+            </div>
+          </div>
+          <div class="account-actions">
+            <label class="environment-control" for="network-switch"
+              ><span>Settlement environment</span
+              ><select
+                id="network-switch"
+                aria-label="Active settlement environment"
+                aria-describedby="network-context-note"
+              >
+                <option value="ARC-TESTNET">Arc Testnet</option>
+                <option value="ARC">Arc Mainnet</option></select
+              ><small id="network-context-note"
+                >Separate business account</small
+              ></label
+            >
+            <details class="business-context">
+              <summary>
+                <span id="business-summary-name">Your business account</span
+                ><span aria-hidden="true">⌄</span>
+              </summary>
+              <div class="account-copy">
+                <div class="account-heading">
+                  <div>
+                    <span class="account-kicker">BUSINESS ACCOUNT</span>
+                    <div class="business-name-row">
+                      <strong id="business-name">Business</strong
+                      ><button
+                        id="edit-business"
+                        class="text-action"
+                        type="button"
+                      >
+                        Edit
+                      </button>
+                    </div>
+                  </div>
+                  <span
+                    id="wallet-status"
+                    class="account-status"
+                    aria-live="polite"
+                    >Checking wallet</span
+                  >
+                </div>
+                <div class="wallet-summary">
+                  <div class="wallet-address-group">
+                    <span id="wallet-network" class="wallet-label"
+                      >Circle wallet</span
+                    ><code id="wallet-address">Wallet provisioning…</code>
+                  </div>
+                  <button
+                    id="copy-wallet"
+                    class="copy-wallet-button"
+                    type="button"
+                    hidden
+                  >
+                    Copy full address
+                  </button>
+                  <div class="wallet-balance">
+                    <span>USDC balance</span
+                    ><strong id="wallet-balance">—</strong>
+                  </div>
+                </div>
               </div>
-              <button id="policy-submit" class="pay" type="submit">Save policy</button>
-            </form>
+            </details>
+            <div class="action-cluster" aria-label="Business controls" hidden>
+              <button id="open-payments-top" class="ghost" type="button">
+                Payments
+              </button>
+              <button id="open-audit-top" class="ghost" type="button">
+                Audit
+              </button>
+              <button id="open-policy-top" class="ghost" type="button">
+                Policy
+              </button>
+              <button id="add-vendor" class="ghost" type="button">
+                Vendors
+              </button>
+            </div>
+            <section class="gmail-context" aria-label="Business inbox">
+              <div class="context-label">CONNECTED INBOX</div>
+              <div class="feed-card" aria-live="polite">
+                <div class="feed-state" id="feed-state" data-state="loading">
+                  <span id="feed-dot" aria-hidden="true">○</span
+                  ><strong id="feed-label">Checking Gmail connection</strong>
+                </div>
+                <div id="feed-meta" class="feed-meta">
+                  Waiting for live Gmail evaluation
+                </div>
+              </div>
+              <div class="utility-actions" aria-label="Inbox controls">
+                <button id="connect-gmail" class="ghost" type="button">
+                  Connect Gmail
+                </button>
+                <button id="refresh" class="ghost refresh-action" type="button">
+                  Refresh inbox
+                </button>
+                <button
+                  id="sign-out"
+                  class="text-action sign-out"
+                  type="button"
+                >
+                  Sign out
+                </button>
+              </div>
+            </section>
+          </div>
+        </header>
+
+        <section id="stats" class="stats" aria-live="polite"></section>
+        <section
+          id="setup-card"
+          class="setup-card"
+          aria-live="polite"
+          hidden
+        ></section>
+
+        <div class="workspace">
+          <section class="panel queue">
+            <div class="panel-head">
+              <div>
+                <label>YOUR INBOX</label>
+                <h2>Invoices from Gmail</h2>
+              </div>
+              <span id="queue-count" class="meta">0 invoices</span>
+            </div>
+            <div class="queue-toolbar">
+              <div
+                id="queue-filters"
+                class="filter-group"
+                role="group"
+                aria-label="Filter invoice queue"
+              ></div>
+              <label class="queue-search" for="queue-search"
+                ><span>Search invoices</span
+                ><input
+                  id="queue-search"
+                  type="search"
+                  placeholder="Vendor or invoice"
+              /></label>
+            </div>
+            <div id="invoice-list" aria-live="polite"></div>
           </section>
-          <aside class="policy-control-stack">
-            <section class="destination-card safeguard-card">
-              <div class="section-heading"><div><span>LOCKED SAFEGUARDS</span><h3>Always enforced</h3></div><b>2 controls</b></div>
-              <div class="policy-locks">
-                <div><strong>Verified vendors only</strong><span>Every recipient must be registered onchain.</span></div>
-                <div><strong>Duplicate protection</strong><span>Each payment ID can execute once.</span></div>
+          <aside
+            class="panel execution-rail"
+            aria-label="Payment execution readiness"
+            hidden
+          >
+            <div class="panel-head">
+              <div>
+                <label>PAYMENT CONTROL</label>
+                <h2>Execution readiness</h2>
               </div>
-            </section>
-            <section class="destination-card access-card">
-              <div class="section-heading"><div><span>EXECUTION ACCESS</span><h3>Operational controls</h3></div></div>
-              <div id="policy-migration-control" class="policy-secondary" hidden>
-                <button id="policy-migrate" class="ghost" type="button">Migrate policy vault</button>
-                <span id="policy-migrate-note">This vault cannot revoke vendors onchain. Migration deploys a replacement vault with the same limits; USDC access and vendor registrations must be authorized again.</span>
-              </div>
-              <div class="policy-secondary">
-                <button id="policy-pause" class="ghost" type="button" hidden>Pause all payments</button>
-                <span id="policy-pause-note">Emergency pause becomes available after the vault is deployed.</span>
-              </div>
-              <div id="policy-allowance-control" class="policy-allowance" hidden>
-                <div><strong id="policy-allowance-title">USDC access not authorized</strong><span id="policy-allowance-note">The vault cannot move funds until this business explicitly authorizes it.</span></div>
-                <button id="policy-allowance" class="ghost" type="button">Authorize vault</button>
-              </div>
-              <div id="policy-autonomy-control" class="policy-allowance" hidden>
-                <div><strong id="policy-autonomy-title">Autonomous execution disabled</strong><span id="policy-autonomy-note">Eligible invoices still require an individual payment action.</span></div>
-                <button id="policy-autonomy" class="ghost" type="button">Enable bounded autonomy</button>
-              </div>
-            </section>
+              <span class="meta">LIVE STATE</span>
+            </div>
+            <div class="execution-body">
+              <section class="rail-card payment-flow-card">
+                <h3>Payment flow</h3>
+                <ol class="payment-flow">
+                  <li data-flow-step="1">
+                    <span>1</span>
+                    <div>
+                      <strong>Review invoice</strong
+                      ><small>Inspect extracted details and evidence</small>
+                    </div>
+                  </li>
+                  <li data-flow-step="2">
+                    <span>2</span>
+                    <div>
+                      <strong>Run policy checks</strong
+                      ><small>Verify recipient, limits and balance</small>
+                    </div>
+                  </li>
+                  <li data-flow-step="3">
+                    <span>3</span>
+                    <div>
+                      <strong>Confirm payment</strong
+                      ><small>Execute only when eligible</small>
+                    </div>
+                  </li>
+                  <li data-flow-step="4">
+                    <span>4</span>
+                    <div>
+                      <strong>Track settlement</strong
+                      ><small>Reconcile transaction and receipt</small>
+                    </div>
+                  </li>
+                </ol>
+              </section>
+              <section class="rail-card">
+                <h3>Wallet &amp; network</h3>
+                <div class="execution-line">
+                  <span>Business wallet</span
+                  ><strong id="rail-wallet-state">Loading wallet…</strong>
+                </div>
+                <div class="execution-line">
+                  <span>Network</span
+                  ><strong id="network-label-rail">Arc Testnet</strong>
+                </div>
+                <div class="execution-line">
+                  <span>USDC balance</span
+                  ><strong id="rail-wallet-balance">— USDC</strong>
+                </div>
+                <div class="execution-line">
+                  <span>Vault</span
+                  ><strong id="rail-vault-state">Checking policy…</strong>
+                </div>
+                <div class="execution-line">
+                  <span>USDC authorization</span
+                  ><strong id="rail-allowance-state">Checking…</strong>
+                </div>
+              </section>
+              <section class="rail-card">
+                <h3>Payment policy</h3>
+                <p class="execution-note">
+                  Vendor verification, duplicate protection, spending limits and
+                  the cash floor are checked before funds can move.
+                </p>
+                <button
+                  id="rail-open-policy"
+                  class="text-action execution-link"
+                  type="button"
+                >
+                  Review full policy →
+                </button>
+              </section>
+              <section class="rail-assurance">
+                <span class="assurance-mark">✓</span>
+                <div>
+                  <strong>Guardrails stay in control</strong>
+                  <p>
+                    Every settlement is bounded by policy and recorded for
+                    audit.
+                  </p>
+                  <button
+                    id="rail-open-payments"
+                    class="text-action execution-link"
+                    type="button"
+                  >
+                    View payment records →
+                  </button>
+                </div>
+              </section>
+            </div>
           </aside>
         </div>
-        <div id="policy-message" class="auth-message" aria-live="polite"></div>
-      </div>
-    </div>
-    <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-    <div id="activity-modal" class="vendor-modal" hidden>
-      <div class="vendor-card activity-card" role="region" aria-labelledby="activity-title">
-        <div class="detail-top page-titlebar"><div><label id="activity-kicker">ACTIVITY</label><h2 id="activity-title">Payments</h2><p id="activity-context">A business-scoped view of real settlement state and receipts.</p></div><button id="close-activity" class="ghost" type="button">Back to invoices</button></div>
-        <div id="activity-message" class="auth-message" aria-live="polite"></div>
-        <div id="activity-summary" class="page-metrics" aria-live="polite"></div>
-        <div id="activity-toolbar" class="activity-toolbar">
-          <div id="activity-filters" class="filter-group" role="group" aria-label="Filter activity"></div>
-          <label class="activity-search" for="activity-search"><span>Search records</span><input id="activity-search" type="search" placeholder="Vendor, invoice or event"></label>
-        </div>
-        <div id="activity-list" class="activity-list" aria-live="polite"></div>
-      </div>
-    </div>
-    <div id="business-modal" class="vendor-modal" hidden>
-      <div class="vendor-card business-card" role="region" aria-labelledby="business-title">
-        <div class="detail-top page-titlebar"><div><label>BUSINESS PROFILE</label><h2 id="business-title">Business identity</h2><p>The operating identity attached to this business's inbox, dedicated wallets, policies, and audit history.</p></div><button id="close-business" class="ghost" type="button">Back to invoices</button></div>
-        <div id="business-snapshot" class="page-metrics" aria-live="polite"></div>
-        <div class="destination-grid business-workspace">
-          <section class="destination-card business-identity-card">
-            <div class="section-heading"><div><span>IDENTITY</span><h3>Business display name</h3></div><b>Owner controlled</b></div>
-            <p>Renaming the business does not change wallet ownership, policy limits, vendor permissions, or payment authorization.</p>
-            <form id="business-form"><label for="business-name-input">Business name</label><input id="business-name-input" maxlength="80" required><button id="business-submit" class="pay" type="submit">Save business name</button></form>
-            <div id="business-message" class="auth-message" aria-live="polite"></div>
-          </section>
-          <section class="destination-card business-rail-card">
-            <div class="section-heading"><div><span>SETTLEMENT RAIL</span><h3>Owned infrastructure</h3></div><b id="business-network-badge">Arc</b></div>
-            <div id="business-rail-details" class="business-rail-details"></div>
-          </section>
-          <section class="destination-card treasury-card">
-            <div class="section-heading"><div><span>BUSINESS FUNDS</span><h3>Withdraw available USDC</h3></div><b>Owner confirmed</b></div>
-            <p>Only funds above the cash floor and autonomous-payment reservations are withdrawable. Every transfer is submitted from this business's dedicated Circle wallet and reconciled on Arc.</p>
-            <div id="withdrawal-summary" class="withdrawal-summary" aria-live="polite"></div>
-            <form id="withdrawal-form" class="withdrawal-form">
-              <label for="withdrawal-recipient"><span>Recipient address</span><input id="withdrawal-recipient" autocomplete="off" spellcheck="false" placeholder="0x…" required></label>
-              <label for="withdrawal-amount"><span>Amount</span><div class="money-input"><input id="withdrawal-amount" type="number" min="0.000001" step="0.000001" required><b>USDC</b></div></label>
-              <button id="withdrawal-submit" class="pay" type="submit">Review withdrawal</button>
-            </form>
-            <div id="withdrawal-message" class="auth-message" aria-live="polite"></div>
-            <div id="withdrawal-history" class="withdrawal-history"></div>
-          </section>
-        </div>
-      </div>
-    </div>
-    <div id="notifications-modal" class="vendor-modal" hidden>
-      <div class="vendor-card notifications-card" role="region" aria-labelledby="notifications-title">
-        <div class="detail-top page-titlebar"><div><label>BUSINESS NOTIFICATIONS</label><h2 id="notifications-title">Telegram connection</h2><p>Manage this business's encrypted Telegram destination. Platform service incidents go to InboxPay operators, not this chat.</p></div><button id="close-notifications" class="ghost" type="button">Back to invoices</button></div>
-        <div id="notifications-message" class="auth-message" aria-live="polite"></div>
-        <div class="destination-grid notifications-workspace">
-          <section class="destination-card notification-status-card">
-            <div class="section-heading"><div><span>TELEGRAM</span><h3>Business destination</h3></div><b id="notification-status">Checking</b></div>
-            <p id="notification-description">Checking this business's Telegram connection…</p>
-            <div id="notification-destination" class="notification-destination" hidden></div>
-            <div class="notification-actions">
-              <button id="notification-connect" class="pay" type="button">Connect Telegram</button>
-              <button id="notification-refresh" class="ghost" type="button">Refresh status</button>
-              <button id="notification-test" class="ghost" type="button" hidden>Send test message</button>
-              <button id="notification-disconnect" class="ghost danger" type="button" hidden>Disconnect</button>
+
+        <footer class="app-footer">
+          <span>InboxPay <i>/</i> Payments, straight from your inbox.</span
+          ><span
+            ><b id="footer-network">Arc Testnet</b> <i>·</i> USDC payments</span
+          >
+        </footer>
+      </section>
+      <div id="vendor-modal" class="vendor-modal" hidden>
+        <div class="vendor-card">
+          <div class="detail-top page-titlebar">
+            <div>
+              <label>YOUR VENDORS</label>
+              <h2>Vendors</h2>
+              <p>
+                Approve exactly who this business can pay and verify the
+                recipient registered in the active policy vault.
+              </p>
             </div>
-          </section>
-          <section class="destination-card notification-preferences-card">
-            <div class="section-heading"><div><span>PAYMENT ALERTS</span><h3>Customer notifications</h3></div><b>On when connected</b></div>
-            <p>Get Telegram updates when a payment is submitted, confirmed and reconciled, fails, or needs review. Delivery may lag the recorded state; the Payments page and audit trail remain the source of truth. This chat will not receive platform service incidents.</p>
-          </section>
+            <button id="close-vendor" class="ghost" type="button">
+              Back to invoices
+            </button>
+          </div>
+          <div
+            id="vendor-summary"
+            class="page-metrics"
+            aria-live="polite"
+          ></div>
+          <div class="destination-grid vendor-workspace">
+            <section class="destination-card vendor-entry-card">
+              <div class="section-heading">
+                <div>
+                  <span>ADD VENDOR</span>
+                  <h3>Register a settlement recipient</h3>
+                </div>
+                <b>Step 1 of 2</b>
+              </div>
+              <p>
+                The address is saved for review first. Verification and onchain
+                registration remain explicit actions.
+              </p>
+              <form id="vendor-form">
+                <label for="vendor-name">Vendor name</label>
+                <input
+                  id="vendor-name"
+                  placeholder="e.g. Cloud infrastructure provider"
+                  required
+                />
+                <label for="vendor-address">Arc / EVM recipient</label>
+                <input
+                  id="vendor-address"
+                  placeholder="0x…"
+                  pattern="0x[a-fA-F0-9]{40}"
+                  required
+                />
+                <label for="vendor-email">Invoice sender email</label>
+                <input
+                  id="vendor-email"
+                  type="email"
+                  placeholder="billing@vendor.com"
+                  required
+                />
+                <small
+                  >This email becomes the vendor identity InboxPay requires
+                  before a Gmail invoice can be payable.</small
+                >
+                <button id="vendor-submit" class="pay" type="submit">
+                  Add vendor for review
+                </button>
+              </form>
+              <div
+                id="vendor-message"
+                class="auth-message"
+                aria-live="polite"
+              ></div>
+            </section>
+            <section class="destination-card vendor-directory-card">
+              <div class="section-heading">
+                <div>
+                  <span>PAYMENT DIRECTORY</span>
+                  <h3>Registered vendors</h3>
+                </div>
+                <b id="vendor-count-label">0 vendors</b>
+              </div>
+              <div id="vendor-list" class="vendor-list"></div>
+            </section>
+          </div>
         </div>
       </div>
-    </div>
-  </main>
-  <script type="module" src="/inboxpay.js"></script>
-</body>
+      <div id="policy-modal" class="vendor-modal" hidden>
+        <div
+          class="vendor-card policy-card"
+          role="region"
+          aria-labelledby="policy-title"
+        >
+          <div class="detail-top page-titlebar">
+            <div>
+              <label>PAYMENT CONTROL</label>
+              <h2 id="policy-title">Payment settings</h2>
+              <p id="policy-context">
+                Set the financial boundaries enforced by this business's
+                dedicated onchain policy vault.
+              </p>
+            </div>
+            <button id="close-policy" class="ghost" type="button">
+              Back to invoices
+            </button>
+          </div>
+          <div id="policy-chain-state" class="policy-chain-state"></div>
+          <div class="policy-workspace">
+            <section class="destination-card policy-limits-card">
+              <div class="section-heading">
+                <div>
+                  <span>SPENDING LIMITS</span>
+                  <h3>Set your spending limits</h3>
+                </div>
+                <b>USDC</b>
+              </div>
+              <form id="policy-form">
+                <div class="policy-grid">
+                  <label for="policy-max"
+                    ><span>Maximum single payment</span>
+                    <div class="money-input">
+                      <input
+                        id="policy-max"
+                        type="number"
+                        min="0.000001"
+                        step="0.000001"
+                        required
+                      /><b>USDC</b>
+                    </div>
+                    <small
+                      >No invoice above this amount can settle
+                      autonomously.</small
+                    ></label
+                  >
+                  <label for="policy-daily"
+                    ><span>Daily spending limit</span>
+                    <div class="money-input">
+                      <input
+                        id="policy-daily"
+                        type="number"
+                        min="0.000001"
+                        step="0.000001"
+                        required
+                      /><b>USDC</b>
+                    </div>
+                    <small
+                      >Total settled payments cannot exceed this amount per UTC
+                      day.</small
+                    ></label
+                  >
+                  <label for="policy-floor"
+                    ><span>Cash floor</span>
+                    <div class="money-input">
+                      <input
+                        id="policy-floor"
+                        type="number"
+                        min="0"
+                        step="0.000001"
+                        required
+                      /><b>USDC</b>
+                    </div>
+                    <small
+                      >The business wallet must retain at least this amount
+                      after payment.</small
+                    ></label
+                  >
+                </div>
+                <button id="policy-submit" class="pay" type="submit">
+                  Save policy
+                </button>
+              </form>
+            </section>
+            <aside class="policy-control-stack">
+              <section class="destination-card safeguard-card">
+                <div class="section-heading">
+                  <div>
+                    <span>LOCKED SAFEGUARDS</span>
+                    <h3>Always enforced</h3>
+                  </div>
+                  <b>2 controls</b>
+                </div>
+                <div class="policy-locks">
+                  <div>
+                    <strong>Verified vendors only</strong
+                    ><span>Every recipient must be registered onchain.</span>
+                  </div>
+                  <div>
+                    <strong>Duplicate protection</strong
+                    ><span>Each payment ID can execute once.</span>
+                  </div>
+                </div>
+              </section>
+              <section class="destination-card access-card">
+                <div class="section-heading">
+                  <div>
+                    <span>EXECUTION ACCESS</span>
+                    <h3>Payment access</h3>
+                  </div>
+                </div>
+                <div
+                  id="policy-migration-control"
+                  class="policy-secondary"
+                  hidden
+                >
+                  <button id="policy-migrate" class="ghost" type="button">
+                    Migrate policy vault
+                  </button>
+                  <span id="policy-migrate-note"
+                    >This vault cannot revoke vendors onchain. Migration deploys
+                    a replacement vault with the same limits; USDC access and
+                    vendor registrations must be authorized again.</span
+                  >
+                </div>
+                <div class="policy-secondary">
+                  <button id="policy-pause" class="ghost" type="button" hidden>
+                    Pause all payments
+                  </button>
+                  <span id="policy-pause-note"
+                    >Emergency pause becomes available after the vault is
+                    deployed.</span
+                  >
+                </div>
+                <div
+                  id="policy-allowance-control"
+                  class="policy-allowance"
+                  hidden
+                >
+                  <div>
+                    <strong id="policy-allowance-title"
+                      >USDC access not authorized</strong
+                    ><span id="policy-allowance-note"
+                      >The vault cannot move funds until this business
+                      explicitly authorizes it.</span
+                    >
+                  </div>
+                  <button id="policy-allowance" class="ghost" type="button">
+                    Authorize vault
+                  </button>
+                </div>
+                <div
+                  id="policy-autonomy-control"
+                  class="policy-allowance"
+                  hidden
+                >
+                  <div>
+                    <strong id="policy-autonomy-title"
+                      >Autonomous execution disabled</strong
+                    ><span id="policy-autonomy-note"
+                      >Eligible invoices still require an individual payment
+                      action.</span
+                    >
+                  </div>
+                  <button id="policy-autonomy" class="ghost" type="button">
+                    Enable bounded autonomy
+                  </button>
+                </div>
+              </section>
+            </aside>
+          </div>
+          <div
+            id="policy-message"
+            class="auth-message"
+            aria-live="polite"
+          ></div>
+        </div>
+      </div>
+      <div
+        id="toast"
+        class="toast"
+        role="status"
+        aria-live="polite"
+        hidden
+      ></div>
+      <div id="activity-modal" class="vendor-modal" hidden>
+        <div
+          class="vendor-card activity-card"
+          role="region"
+          aria-labelledby="activity-title"
+        >
+          <div class="detail-top page-titlebar">
+            <div>
+              <label id="activity-kicker">ACTIVITY</label>
+              <h2 id="activity-title">Payments</h2>
+              <p id="activity-context">
+                A business-scoped view of real settlement state and receipts.
+              </p>
+            </div>
+            <button id="close-activity" class="ghost" type="button">
+              Back to invoices
+            </button>
+          </div>
+          <div
+            id="activity-message"
+            class="auth-message"
+            aria-live="polite"
+          ></div>
+          <div
+            id="activity-summary"
+            class="page-metrics"
+            aria-live="polite"
+          ></div>
+          <div id="activity-toolbar" class="activity-toolbar">
+            <div
+              id="activity-filters"
+              class="filter-group"
+              role="group"
+              aria-label="Filter activity"
+            ></div>
+            <label class="activity-search" for="activity-search"
+              ><span>Search records</span
+              ><input
+                id="activity-search"
+                type="search"
+                placeholder="Vendor, invoice or event"
+            /></label>
+          </div>
+          <div
+            id="activity-list"
+            class="activity-list"
+            aria-live="polite"
+          ></div>
+        </div>
+      </div>
+      <div id="business-modal" class="vendor-modal" hidden>
+        <div
+          class="vendor-card business-card"
+          role="region"
+          aria-labelledby="business-title"
+        >
+          <div class="detail-top page-titlebar">
+            <div>
+              <label>BUSINESS PROFILE</label>
+              <h2 id="business-title">Business identity</h2>
+              <p>
+                The operating identity attached to this business's inbox,
+                dedicated wallets, policies, and audit history.
+              </p>
+            </div>
+            <button id="close-business" class="ghost" type="button">
+              Back to invoices
+            </button>
+          </div>
+          <div
+            id="business-snapshot"
+            class="page-metrics"
+            aria-live="polite"
+          ></div>
+          <div class="destination-grid business-workspace">
+            <section class="destination-card business-identity-card">
+              <div class="section-heading">
+                <div>
+                  <span>IDENTITY</span>
+                  <h3>Business display name</h3>
+                </div>
+                <b>Owner controlled</b>
+              </div>
+              <p>
+                Renaming the business does not change wallet ownership, policy
+                limits, vendor permissions, or payment authorization.
+              </p>
+              <form id="business-form">
+                <label for="business-name-input">Business name</label
+                ><input
+                  id="business-name-input"
+                  maxlength="80"
+                  required
+                /><button id="business-submit" class="pay" type="submit">
+                  Save business name
+                </button>
+              </form>
+              <div
+                id="business-message"
+                class="auth-message"
+                aria-live="polite"
+              ></div>
+            </section>
+            <section class="destination-card business-rail-card">
+              <div class="section-heading">
+                <div>
+                  <span>SETTLEMENT RAIL</span>
+                  <h3>Owned infrastructure</h3>
+                </div>
+                <b id="business-network-badge">Arc</b>
+              </div>
+              <div
+                id="business-rail-details"
+                class="business-rail-details"
+              ></div>
+            </section>
+            <section class="destination-card treasury-card">
+              <div class="section-heading">
+                <div>
+                  <span>BUSINESS FUNDS</span>
+                  <h3>Withdraw available USDC</h3>
+                </div>
+                <b>Owner confirmed</b>
+              </div>
+              <p>
+                Only funds above the cash floor and autonomous-payment
+                reservations are withdrawable. Every transfer is submitted from
+                this business's dedicated Circle wallet and reconciled on Arc.
+              </p>
+              <div
+                id="withdrawal-summary"
+                class="withdrawal-summary"
+                aria-live="polite"
+              ></div>
+              <form id="withdrawal-form" class="withdrawal-form">
+                <label for="withdrawal-recipient"
+                  ><span>Recipient address</span
+                  ><input
+                    id="withdrawal-recipient"
+                    autocomplete="off"
+                    spellcheck="false"
+                    placeholder="0x…"
+                    required
+                /></label>
+                <label for="withdrawal-amount"
+                  ><span>Amount</span>
+                  <div class="money-input">
+                    <input
+                      id="withdrawal-amount"
+                      type="number"
+                      min="0.000001"
+                      step="0.000001"
+                      required
+                    /><b>USDC</b>
+                  </div></label
+                >
+                <button id="withdrawal-submit" class="pay" type="submit">
+                  Review withdrawal
+                </button>
+              </form>
+              <div
+                id="withdrawal-message"
+                class="auth-message"
+                aria-live="polite"
+              ></div>
+              <div id="withdrawal-history" class="withdrawal-history"></div>
+            </section>
+          </div>
+        </div>
+      </div>
+      <div id="notifications-modal" class="vendor-modal" hidden>
+        <div
+          class="vendor-card notifications-card"
+          role="region"
+          aria-labelledby="notifications-title"
+        >
+          <div class="detail-top page-titlebar">
+            <div>
+              <label>BUSINESS NOTIFICATIONS</label>
+              <h2 id="notifications-title">Telegram connection</h2>
+              <p>
+                Manage this business's encrypted Telegram destination. Platform
+                service incidents go to InboxPay operators, not this chat.
+              </p>
+            </div>
+            <button id="close-notifications" class="ghost" type="button">
+              Back to invoices
+            </button>
+          </div>
+          <div
+            id="notifications-message"
+            class="auth-message"
+            aria-live="polite"
+          ></div>
+          <div class="destination-grid notifications-workspace">
+            <section class="destination-card notification-status-card">
+              <div class="section-heading">
+                <div>
+                  <span>TELEGRAM</span>
+                  <h3>Business destination</h3>
+                </div>
+                <b id="notification-status">Checking</b>
+              </div>
+              <p id="notification-description">
+                Checking this business's Telegram connection…
+              </p>
+              <div
+                id="notification-destination"
+                class="notification-destination"
+                hidden
+              ></div>
+              <div class="notification-actions">
+                <button id="notification-connect" class="pay" type="button">
+                  Connect Telegram
+                </button>
+                <button id="notification-refresh" class="ghost" type="button">
+                  Refresh status
+                </button>
+                <button
+                  id="notification-test"
+                  class="ghost"
+                  type="button"
+                  hidden
+                >
+                  Send test message
+                </button>
+                <button
+                  id="notification-disconnect"
+                  class="ghost danger"
+                  type="button"
+                  hidden
+                >
+                  Disconnect
+                </button>
+              </div>
+            </section>
+            <section class="destination-card notification-preferences-card">
+              <div class="section-heading">
+                <div>
+                  <span>PAYMENT ALERTS</span>
+                  <h3>Customer notifications</h3>
+                </div>
+                <b>On when connected</b>
+              </div>
+              <p>
+                Get Telegram updates when a payment is submitted, confirmed and
+                reconciled, fails, or needs review. Delivery may lag the
+                recorded state; the Payments page and audit trail remain the
+                source of truth. This chat will not receive platform service
+                incidents.
+              </p>
+            </section>
+          </div>
+        </div>
+      </div>
+    </main>
+    <dialog
+      id="invoice-drawer"
+      class="invoice-drawer"
+      aria-labelledby="invoice-drawer-title"
+    >
+      <header class="drawer-header">
+        <span id="invoice-drawer-title">Invoice details</span
+        ><button
+          id="close-invoice"
+          class="icon-button"
+          type="button"
+          aria-label="Close invoice details"
+          autofocus
+        >
+          ×
+        </button>
+      </header>
+      <section id="detail" class="detail" aria-live="polite"></section>
+    </dialog>
+    <script type="module" src="/inboxpay.js"></script>
+  <script type="module" src="/landing-media.js"></script>
+  </body>
 </html>

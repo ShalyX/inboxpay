@@ -17,7 +17,7 @@ The server reloads business ownership and active network state for every protect
 | --- | --- | --- | --- |
 | `/api/config` | `GET` | Public | Returns the public Supabase URL and publishable key required by the browser. |
 | `/api/session` | `GET` | User | Returns the authenticated user, active business/network projection, and Gmail integration metadata. |
-| `/api/onboarding` | `POST` | User | Creates the business/policy or performs `rename_business`, `select_network`, and `provision_wallet`. Mainnet selection and wallet creation require `confirmMainnet: true`. |
+| `/api/onboarding` | `POST` | User | `approve` loads an existing business. For a new owner, it returns `business: null` and `onboarding.businessNameRequired: true` until an explicit `businessName` is supplied. It then creates the owner-scoped business, network account and draft policy. Other actions are `rename_business`, `select_network`, and `provision_wallet`. Mainnet selection and wallet creation require `confirmMainnet: true`. |
 | `/api/gmail/start` | `GET` | User | Starts Gmail OAuth with signed, expiring state bound to the user and business. |
 | `/api/gmail/callback` | `GET` | OAuth state | Exchanges the Google code, encrypts tokens, binds the Gmail identity, and redirects to the product. |
 | `/api/invoices` | `GET` | User | Runs bounded Gmail discovery, persists/evaluates invoice evidence, advances recovery, and returns the active network's queue. |
@@ -40,6 +40,8 @@ The server reloads business ownership and active network state for every protect
 | `/api/config?telegram=webhook` | `POST` | Telegram secret header | Consumes a short-lived one-time `/start` code and links the Telegram chat to exactly one business. |
 
 ## Financial response states
+
+Business-name setup accepts 2–80 characters, collapses repeated whitespace and rejects control characters. A name is not a legal-entity verification or payment authorization. Repeated `approve` requests never rename an existing business. Preview deployments reject named creation and profile changes; they permit only ordinary unnamed sign-in bootstrap and read-only records.
 
 - `200 OK`: read succeeded, mutation completed, or a prior idempotent result was restored.
 - `201 Created`: a new durable schedule or resource was created.

@@ -36,6 +36,23 @@ try {
   const script = await fetch("http://127.0.0.1:" + port + "/inboxpay.js");
   assert.equal(script.status, 200);
   assert.match(await script.text(), /function bootstrap/);
+  for (const [file, type] of [
+    ["/dialog.js", "text/javascript"],
+    ["/ui-state.mjs", "text/javascript"],
+    ["/correspondence.css", "text/css"],
+    ["/help.html", "text/html"],
+    ["/brand/fonts/manrope.ttf", "font/ttf"],
+    ["/brand/correspondence-og.png", "image/png"],
+    ["/manifest.webmanifest", "application/manifest+json"],
+    ["/media/studio-team.jpg", "image/jpeg"],
+    ["/media/studio-film.mp4", "video/mp4"],
+    ["/landing-media.js", "text/javascript"]
+  ]) {
+    const asset = await fetch("http://127.0.0.1:" + port + file);
+    assert.equal(asset.status, 200, file + " must be served");
+    assert.ok(asset.headers.get("content-type").startsWith(type), file + " must have a browser-compatible content type");
+    await asset.arrayBuffer();
+  }
 
   const head = await fetch("http://127.0.0.1:" + port + "/", { method: "HEAD" });
   assert.equal(head.status, 200);

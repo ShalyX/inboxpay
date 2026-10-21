@@ -1,8 +1,10 @@
+import { rejectPreviewRequest } from "../lib/preview-boundary.mjs";
 import { requireUser } from "../lib/supabase-server.mjs";
 import { settleBusinessInvoice } from "../lib/business-payment.mjs";
 import { getBusiness } from "../lib/businesses.mjs";
 
 export default async function handler(req, res) {
+  if (rejectPreviewRequest(req, res)) return;
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     return res.status(405).json({ error: "Method Not Allowed" });

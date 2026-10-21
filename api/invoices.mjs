@@ -1,3 +1,4 @@
+import { rejectPreviewRequest, isReadOnlyPreview } from "../lib/preview-boundary.mjs";
 import { requireUser } from "../lib/supabase-server.mjs";
 import { listBusinessInvoices, syncBusinessInvoices } from "../lib/business-data.mjs";
 import { recoverPendingBusinessInvoices } from "../lib/business-payment.mjs";
@@ -7,6 +8,7 @@ import { autonomyJobStates, runAutonomyCycle } from "../lib/autonomy.mjs";
 import { requireAutonomyWorker } from "../lib/worker-auth.mjs";
 
 export default async function handler(req, res) {
+  if (rejectPreviewRequest(req, res)) return;
   if (!["GET", "PATCH", "POST"].includes(req.method)) {
     res.setHeader("Allow", "GET, PATCH, POST");
     return res.status(405).json({ error: "Method Not Allowed" });
@@ -46,8 +48,9 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, business: current.business, ...result });
     }
 
-    const result = await syncBusinessInvoices(token, user.id);
-    const recoveredInvoices = await recoverPendingBusinessInvoices(
+    const preview = isReadOnlyPreview();
+    const result = preview ? await listBusinessInvoices(token, user.id) : await syncBusinessInvoices(token, user.id);
+    const recoveredInvoices = preview ? result.invoices || [] : await recoverPendingBusinessInvoices(
       token,
       user.id,
       result.business,
@@ -97,8 +100,9 @@ export default async function handler(req, res) {
     return res.status(200).json({
       evaluatedAt: result.scannedAt,
       count: invoices.length,
-      source: "gmail-live",
-      liveGmail: true,
+      source: preview ? "saved-records-preview" : "gmail-live",
+      liveGmail: !preview,
+      previewReadOnly: preview,
       business: result.business,
       gmail: result.gmail,
       invoices

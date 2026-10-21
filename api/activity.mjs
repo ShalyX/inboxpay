@@ -1,8 +1,10 @@
+import { rejectPreviewRequest } from "../lib/preview-boundary.mjs";
 import { requireUser, supabaseRest } from "../lib/supabase-server.mjs";
 import { getBusiness } from "../lib/businesses.mjs";
 import notificationsHandler from "../lib/notifications-route.mjs";
 
 export default async function handler(req, res) {
+  if (rejectPreviewRequest(req, res, { blocked: String(req.query?.view || "").toLowerCase() === "notifications" })) return;
   if (String(req.query?.view || "").toLowerCase() === "notifications") {
     return notificationsHandler(req, res);
   }

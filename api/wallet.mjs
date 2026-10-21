@@ -1,3 +1,4 @@
+import { rejectPreviewRequest, isReadOnlyPreview } from "../lib/preview-boundary.mjs";
 import { parseAbi, formatUnits } from "viem";
 import { getSupabaseServerSecret, requireUser, supabaseRest } from "../lib/supabase-server.mjs";
 import { getBusiness } from "../lib/businesses.mjs";
@@ -8,6 +9,7 @@ import { requestWalletWithdrawal, walletWithdrawalState } from "../lib/wallet-wi
 const USDC = "0x3600000000000000000000000000000000000000";
 
 export default async function handler(req, res) {
+  if (rejectPreviewRequest(req, res)) return;
   if (!['GET', 'POST'].includes(req.method)) {
     res.setHeader("Allow", "GET, POST");
     return res.status(405).json({ error: "Method Not Allowed" });
@@ -93,7 +95,7 @@ export default async function handler(req, res) {
       return res.status(202).json({ ok: true, status: "requested", auditRecorded });
     }
 
-    const state = await walletWithdrawalState(token, user.id, business);
+    const state = await walletWithdrawalState(token, user.id, business, { reconcile: !isReadOnlyPreview() });
     const balance = state.balance;
 
     let policyVaultBalance = null;

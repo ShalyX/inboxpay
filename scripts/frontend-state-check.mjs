@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { runInNewContext } from "node:vm";
+import { createDialog } from "../public/dialog.js";
 import {
   activateDestination,
   auditEventCategory,
@@ -11,6 +13,13 @@ import {
   paymentFlowStep,
   singleFlight
 } from "../public/ui-state.mjs";
+import { businessNameNeedsReview } from "../public/ui-state.mjs";
+
+assert.equal(businessNameNeedsReview({ name: "gmail.com" }, "person@gmail.com"), true);
+assert.equal(businessNameNeedsReview({ name: "My Business" }, "person@example.com"), true);
+assert.equal(businessNameNeedsReview({ name: "Caraxes Labs", wallet_id: "wallet-a" }, "person@gmail.com"), false);
+assert.equal(businessNameNeedsReview({ name: "gmail.com", network_accounts: [{ wallet_address: "0x123" }] }, "person@gmail.com"), false, "never interrupt an established business with legacy-name inference");
+assert.equal(businessNameNeedsReview({ name: "North Studio" }, "person@gmail.com"), false);
 
 assert.equal(destinationFromHash("#payments"), "payments");
 assert.equal(destinationFromHash("#/vendors"), "vendors");
@@ -127,8 +136,8 @@ const [indexHtml, styles, activitySource] = await Promise.all([
   readFile(new URL("../public/styles.css", import.meta.url), "utf8"),
   readFile(new URL("../api/activity.mjs", import.meta.url), "utf8")
 ]);
-assert.match(indexHtml, /id="skip-link" class="skip-link" href="#main-content" hidden/);
-assert.match(indexHtml, /id="main-content" class="content" tabindex="-1"/);
+assert.match(indexHtml, /id="skip-link"\s+class="skip-link"\s+href="#main-content"\s+hidden/);
+assert.match(indexHtml, /id="main-content"\s+class="content"\s+tabindex="-1"/);
 assert.match(indexHtml, /data-nav="notifications"/);
 assert.match(indexHtml, /id="notifications-modal"/);
 assert.doesNotMatch(indexHtml, /data-nav="operations"|id="open-operations"|notify-service-attention|notify-service-recovered/);
@@ -138,4 +147,144 @@ assert.match(styles, /@media\(max-width:1180px\) and \(min-width:801px\)[\s\S]*?
 assert.match(styles, /@media\(max-width:800px\)[\s\S]*?\.shell,\.sidebar,\.content\{min-width:0;width:100%;max-width:100%\}/);
 assert.match(styles, /@media\(max-width:800px\)[\s\S]*?\.workspace>\.queue,\.workspace>\.detail,\.workspace>\.execution-rail\{grid-column:auto;grid-row:auto\}/);
 
-console.log("frontend state checks passed");
+assert.match(indexHtml, /<dialog\s+id="invoice-drawer"[^>]+aria-labelledby="invoice-drawer-title"/);
+assert.match(indexHtml, /id="close-invoice"[^>]+aria-label="Close invoice details"/);
+assert.match(indexHtml, /<dialog\s+id="auth-dialog"/);
+assert.match(indexHtml, /Illustrative example/);
+assert.match(indexHtml, /<video[^>]+controls[^>]+preload="none"/);
+assert.doesNotMatch(indexHtml, /<video[^>]+autoplay/);
+assert.match(indexHtml, /Illustrative studio scenes, not customer endorsements/);
+assert.doesNotMatch(indexHtml, /BOUNDED PAYMENT OPERATIONS|THE CONTROL LAYER/);
+const allIds = [...indexHtml.matchAll(/\bid="([^"]+)"/g)].map((match) => match[1]);
+assert.equal(new Set(allIds).size, allIds.length, "frontend IDs must be unique");
+
+// Lifecycle checks supplement the native-browser focus/Escape verification.
+const handlers = new Map();
+let focused = "";
+const originalOpener = { isConnected: true, focus: () => { focused = "original"; } };
+const replacementOpener = { focus: () => { focused = "replacement"; } };
+const fakeDialog = {
+  open: false,
+  ownerDocument: { body: { style: { overflow: "auto" } }, activeElement: originalOpener },
+  addEventListener: (name, handler) => handlers.set(name, handler),
+  showModal() { this.open = true; },
+  close() { this.open = false; handlers.get("close")(); },
+  getBoundingClientRect: () => ({ left: 500, right: 1000, top: 0, bottom: 800 })
+};
+const drawer = createDialog(fakeDialog, { resolveOpener: () => replacementOpener });
+fakeDialog.scrollTop = 480;
+drawer.open(originalOpener);
+assert.equal(fakeDialog.scrollTop, 0, "reopened drawer starts at its invoice heading");
+assert.equal(drawer.isOpen, true);
+assert.equal(fakeDialog.ownerDocument.body.style.overflow, "hidden");
+drawer.open(originalOpener); // repeated opens must not overwrite the previous scroll mode
+handlers.get("click")({ target: fakeDialog, clientX: 700, clientY: 300 });
+assert.equal(drawer.isOpen, true, "clicking inside dialog must not dismiss it");
+drawer.close();
+assert.equal(focused, "original");
+assert.equal(fakeDialog.ownerDocument.body.style.overflow, "auto");
+drawer.open(originalOpener);
+originalOpener.isConnected = false; // row replaced by a live preflight render
+handlers.get("click")({ target: fakeDialog, clientX: 400, clientY: 300 });
+assert.equal(drawer.isOpen, false);
+assert.equal(focused, "replacement");
+assert.equal(fakeDialog.ownerDocument.body.style.overflow, "auto");
+drawer.close();
+
+const mediaSource = await readFile(new URL("../public/landing-media.js", import.meta.url), "utf8");
+const filmEvents = new Map();
+const sourceEvents = new Map();
+const imageEvents = new Map();
+const documentEvents = new Map();
+const posterFallback = { hidden: true };
+const unavailableNotice = { hidden: true };
+const photoFallback = { hidden: true };
+let intersectionCallback;
+let pauseCount = 0;
+const film = {
+  paused: false, hidden: false,
+  pause() { this.paused = true; pauseCount += 1; },
+  addEventListener: (event, handler) => filmEvents.set(event, handler),
+  querySelector: () => ({ addEventListener: (event, handler) => sourceEvents.set(event, handler) }),
+  parentElement: { querySelector: (selector) => selector === ".film-poster-fallback" ? posterFallback : unavailableNotice }
+};
+const photo = {
+  complete: true, naturalWidth: 1400, hidden: false,
+  addEventListener: (event, handler) => imageEvents.set(event, handler),
+  parentElement: { querySelector: () => photoFallback }
+};
+const mediaDocument = {
+  hidden: false,
+  getElementById: () => film,
+  querySelectorAll: () => [photo],
+  addEventListener: (event, handler) => documentEvents.set(event, handler)
+};
+runInNewContext(mediaSource, {
+  document: mediaDocument,
+  IntersectionObserver: class { constructor(handler) { intersectionCallback = handler; } observe() {} }
+});
+intersectionCallback([{ isIntersecting: false }]);
+assert.equal(pauseCount, 1, "offscreen film pauses");
+film.paused = false;
+mediaDocument.hidden = true;
+documentEvents.get("visibilitychange")();
+assert.equal(pauseCount, 2, "background-tab film pauses");
+sourceEvents.get("error")();
+assert.equal(film.hidden, true);
+assert.equal(posterFallback.hidden, false);
+assert.equal(unavailableNotice.hidden, false);
+imageEvents.get("error")();
+assert.equal(photo.hidden, true);
+assert.equal(photoFallback.hidden, false);
+assert.ok((await readFile(new URL("../public/media/studio-film.mp4", import.meta.url))).length < 3_000_000, "landing film stays below its 3 MB budget");
+
+// Exercise real render functions: unavailable data must not look disconnected/empty.
+const appSource = await readFile(new URL("../public/inboxpay.js", import.meta.url), "utf8");
+const qaNodes = new Map();
+const qaNode = (id) => {
+  if (!qaNodes.has(id)) qaNodes.set(id, { textContent: "", innerHTML: "", className: "", hidden: false });
+  return qaNodes.get(id);
+};
+const qaState = { previewReadOnly: true, notification: null, vendorsError: "fetch failed", vendors: [] };
+for (const name of ["renderNotifications", "renderVendors"]) {
+  const start = appSource.indexOf("function " + name + "() {");
+  const end = appSource.indexOf("\n}", start) + 2;
+  assert.ok(start >= 0 && end > start);
+  runInNewContext(appSource.slice(start, end) + "\n" + name + "();", {
+    state: qaState, $: qaNode, pageMetric: (...values) => values.join(" | ")
+  });
+}
+assert.equal(qaNode("notification-status").textContent, "Not checked in preview");
+assert.equal(qaNode("notification-connect").hidden, true);
+assert.equal(qaNode("notification-refresh").hidden, true);
+assert.equal(qaNode("vendor-count-label").textContent, "Unavailable");
+assert.match(qaNode("vendor-list").innerHTML, /Vendor records unavailable/);
+assert.doesNotMatch(qaNode("vendor-list").innerHTML, /No vendors registered/);
+assert.match(appSource, /autonomy.status === "completed" \? "Execution completed/);
+assert.match(appSource, /querySelectorAll\('[^']*\.verify-vendor, \.revoke-vendor/, "preview locks dynamically rendered vendor actions");
+assert.match(indexHtml, /id="signed-in-email"/);
+assert.match(indexHtml, /id="signed-in-email-mobile"/);
+qaState.businessNameRequired = true;
+qaState.business = null;
+qaNodes.clear();
+qaNode("business-identity-form").addEventListener = () => {};
+const setupStart = appSource.indexOf("function renderSetup() {");
+const setupEnd = appSource.indexOf("\n}", setupStart) + 2;
+runInNewContext(appSource.slice(setupStart, setupEnd) + "\nrenderSetup();", {
+  state: qaState, $: qaNode, businessNameNeedsReview, saveInitialBusinessName() {}
+});
+assert.match(qaNode("setup-card").innerHTML, /What’s your business called/);
+assert.match(qaNode("setup-card").innerHTML, /autocomplete="organization"/);
+assert.match(qaNode("setup-card").innerHTML, /Naming is disabled in this read-only preview/);
+assert.doesNotMatch(qaNode("setup-card").innerHTML, /id="provision-wallet"/, "naming comes before wallet setup");
+assert.match(appSource, /function renderBootstrapFailure\(/, "startup failure must not masquerade as an unconfigured business");
+const failureStart = appSource.indexOf("function renderBootstrapFailure() {");
+const failureEnd = appSource.indexOf("\n}", failureStart) + 2;
+runInNewContext(appSource.slice(failureStart, failureEnd) + "\nrenderBootstrapFailure();", { $: qaNode });
+assert.equal(qaNode("bootstrap-notice").hidden, false);
+assert.equal(qaNode("setup-card").hidden, true);
+assert.equal(qaNode("invoice-count").textContent, "—");
+assert.equal(qaNode("queue-count").textContent, "Unavailable");
+assert.match(qaNode("invoice-list").innerHTML, /not an empty-workspace result/);
+
+console.log("frontend state, dialog lifecycle, and media checks passed");

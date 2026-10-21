@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Getting started — InboxPay</title>
+    <meta
+      name="description"
+      content="Connect your business inbox, set up USDC payments, and understand invoices that need your review."
+    />
+    <meta name="theme-color" content="#194cd9" />
+    <link rel="icon" href="/favicon.svg" />
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/correspondence.css" />
+    <link rel="stylesheet" href="/help.css" />
+  </head>
+  <body class="help-page">
+    <a class="skip-link" href="#help-content">Skip to guide</a>
+    <header class="site-header">
+      <a class="wordmark" href="/"
+        ><img
+          src="/brand/inboxpay-mark.svg"
+          width="32"
+          height="32"
+          alt=""
+        />InboxPay</a
+      ><a class="inline-link" href="/">Open InboxPay ↗</a>
+    </header>
+    <main id="help-content" class="help-layout">
+      <aside>
+        <span class="overline">BUSINESS HELP</span>
+        <nav aria-label="Guide contents">
+          <a href="#start">Getting started</a
+          ><a href="#connect">Connect Gmail</a
+          ><a href="#first-payment">Your first payment</a
+          ><a href="#review">Invoices needing review</a
+          ><a href="#receipts">Payments &amp; receipts</a
+          ><a href="#notifications">Telegram alerts</a
+          ><a href="#networks">Testnet &amp; Mainnet</a>
+        </nav>
+        <a
+          class="developer-link"
+          href="https://github.com/ShalyX/inboxpay/tree/main/docs"
+          target="_blank"
+          rel="noreferrer"
+          >Building on InboxPay?<br />Developer documentation ↗</a
+        >
+      </aside>
+      <article class="help-content">
+        <span class="overline">A LITTLE HELP GETTING GOING</span>
+        <h1>From your first connection<br />to your first receipt.</h1>
+        <p class="help-intro">
+          InboxPay helps your business handle invoices received in Gmail and pay
+          vendors in USDC. Here’s what to expect.
+        </p>
+        <section id="start">
+          <h2>01. Create your business account</h2>
+          <p>
+            Sign in with Google, or create an email and password account.
+            Signing in to InboxPay does not yet give it access to your mail.
+            That connection is a separate step.
+          </p>
+          <p>
+            Your business has its own wallet, vendors, payment settings, and
+            records. Check the business name and active network before setting
+            up payments.
+          </p>
+          <div class="help-note">
+            InboxPay is in early access. External Gmail connections depend on
+            the Google authorization configuration; signing in does not
+            guarantee Gmail access is available to your account.
+          </div>
+        </section>
+        <section id="connect">
+          <h2>02. Connect the right inbox</h2>
+          <p>
+            In Invoices, choose <strong>Connect Gmail</strong> and authorize the
+            Google account that receives your business invoices. After
+            connecting, refresh the inbox to see the invoices the agent found.
+          </p>
+          <p>
+            Supported sources include email text and text-based PDF invoices.
+            Image-only or scanned PDFs are not supported as a reliable
+            extraction source. An empty queue does not mean a payment was made.
+          </p>
+          <p>
+            If the connection expires or access is revoked, InboxPay asks you to
+            reconnect. Start a new connection rather than reusing an expired
+            Google sign-in link.
+          </p>
+        </section>
+        <section id="first-payment">
+          <h2>03. Set up payments</h2>
+          <ol>
+            <li>
+              <strong>Choose your environment.</strong> Start on Arc Testnet for
+              testing. Mainnet uses real funds and has a separate setup.
+            </li>
+            <li>
+              <strong>Create and fund your business wallet.</strong> Follow the
+              setup checklist. The full address is available in your business
+              account; copy it instead of retyping it.
+            </li>
+            <li>
+              <strong>Add and verify your vendor.</strong> Check the recipient
+              address and invoice sender. Saving a vendor is not the same as
+              verifying them for payment.
+            </li>
+            <li>
+              <strong>Configure payment settings.</strong> Review your limits,
+              cash floor, vendor registration, and USDC access before
+              authorizing them. Deployment and authorizations are explicit
+              actions.
+            </li>
+            <li>
+              <strong>Review an invoice.</strong> Open it from the queue. Read
+              the amount, due date, agent explanation, and live payment checks.
+              Only an eligible invoice offers payment.
+            </li>
+          </ol>
+          <p>
+            Automatic payments are optional and require explicit activation in
+            Payment settings. Enabling them lets the agent execute eligible
+            invoices within your active settings. Turning them off does not undo
+            an already submitted payment.
+          </p>
+        </section>
+        <section id="review">
+          <h2>What “Needs review” means</h2>
+          <p>
+            The agent hasn’t been able to proceed. Open the invoice to see why:
+            a vendor may need verification, a required field may be missing, a
+            payment limit may be reached, or a live check may be unavailable.
+          </p>
+          <p>
+            Do not work around a failed check by changing a wallet address or
+            duplicating the invoice. Correct the underlying issue, refresh, and
+            review the current result.
+          </p>
+          <p>
+            A queued review is not a submitted payment. A future invoice can
+            wait for its due date; payment still depends on the current vendor,
+            balance, and payment checks.
+          </p>
+        </section>
+        <section id="receipts">
+          <h2>Know when a payment is complete</h2>
+          <p>
+            <strong>Submitted</strong> means the payment has been sent for
+            execution. It does not mean the recipient has received confirmed
+            funds. <strong>Confirmed and reconciled</strong> means InboxPay has
+            matched the Arc transaction and recorded its receipt.
+          </p>
+          <p>
+            Open Payments for the transaction hash and reconciliation record. If
+            a payment is still processing, let InboxPay recover the original
+            submission; don’t send it again manually. Activity shows the
+            recorded actions for your business.
+          </p>
+        </section>
+        <section id="notifications">
+          <h2>Keep up in Telegram</h2>
+          <p>
+            Open Notifications, select Connect Telegram, and start the InboxPay
+            bot using the generated connection link. Return to InboxPay and
+            refresh the connection status. Send a connection test to check the
+            destination.
+          </p>
+          <p>
+            Connected businesses can receive recorded payment and review alerts.
+            A connection test proves the destination works; it is not a payment
+            receipt. No bot code or API token is needed from your business.
+          </p>
+        </section>
+        <section id="networks">
+          <h2>Test money and real money stay separate</h2>
+          <p>
+            Arc Testnet is for testing with test USDC. Arc Mainnet uses real
+            USDC. Switching environments changes the active business wallet,
+            vendor registration, and payment setup. Check the environment before
+            funding or authorizing anything.
+          </p>
+          <p>
+            The end-to-end autonomous payment flow has been demonstrated on Arc
+            Testnet. A genuine third-party Mainnet business invoice settlement
+            is not yet claimed as verified usage.
+          </p>
+        </section>
+        <footer>
+          <p>
+            Technical details belong in the
+            <a
+              href="https://github.com/ShalyX/inboxpay/tree/main/docs"
+              target="_blank"
+              rel="noreferrer"
+              >developer documentation ↗</a
+            >.
+          </p>
+          <a class="primary-button" href="/">Back to InboxPay ↗</a>
+        </footer>
+      </article>
+    </main>
+  </body>
+</html>

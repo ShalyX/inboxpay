@@ -1,3 +1,4 @@
+import { rejectPreviewRequest } from "../../lib/preview-boundary.mjs";
 import { decryptSecret, encryptSecret } from "../../lib/secure-tokens.mjs";
 import { supabaseRest } from "../../lib/supabase-server.mjs";
 
@@ -15,6 +16,7 @@ function cookies(req) {
 }
 
 export default async function handler(req, res) {
+  if (rejectPreviewRequest(req, res, { blocked: true })) return;
   if (req.method !== "GET") {
     res.setHeader("Allow", "GET");
     return res.status(405).end();

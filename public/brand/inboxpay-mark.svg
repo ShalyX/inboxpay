@@ -1,8 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
-  <title id="title">InboxPay</title>
-  <desc id="desc">Three invoice lines crossing a payment authority gate.</desc>
-  <rect width="64" height="64" rx="16" fill="#c9ef71"/>
-  <path d="M13 18h19M13 31h14M13 44h19" fill="none" stroke="#172033" stroke-width="5" stroke-linecap="round"/>
-  <path d="M37 13v38" fill="none" stroke="#172033" stroke-width="4" stroke-linecap="round"/>
-  <path d="M43 18h8M43 31h8M43 44h8" fill="none" stroke="#172033" stroke-width="5" stroke-linecap="round"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" fill="none"><title>InboxPay</title><path d="M6 8h26l10 10v22H6V8Z" fill="#194cd9"/><path d="M6 8l18 15L42 8v10L24 33 6 18V8Z" fill="#fff"/><path d="M32 8v10h10L32 8Z" fill="#dfef9a"/></svg>

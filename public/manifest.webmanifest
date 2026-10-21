@@ -1,11 +1,11 @@
 {
   "name": "InboxPay",
   "short_name": "InboxPay",
-  "description": "Bounded accounts payable from Gmail evidence to reconciled USDC settlement on Arc.",
+  "description": "Payments, straight from your inbox. Your AP agent for Gmail invoices and USDC payments.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#f5f6f0",
-  "theme_color": "#172033",
+  "background_color": "#ffffff",
+  "theme_color": "#194cd9",
   "icons": [
     {
       "src": "/brand/inboxpay-mark.svg",
