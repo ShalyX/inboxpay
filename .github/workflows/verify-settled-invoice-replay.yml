@@ -1,0 +1,54 @@
+name: Verify settled invoice replay rejection
+
+on:
+  workflow_dispatch:
+    inputs:
+      invoiceNumber:
+        description: Exact settled Arc Testnet invoice number
+        required: true
+        type: string
+      transactionHash:
+        description: Exact reconciled Arc Testnet transaction hash
+        required: true
+        type: string
+      paymentId:
+        description: Exact onchain payment ID
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inboxpay-production-schema
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      INVOICE_NUMBER: ${{ inputs.invoiceNumber }}
+      TX_HASH: ${{ inputs.transactionHash }}
+      PAYMENT_ID: ${{ inputs.paymentId }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pull PostgreSQL 17 client
+        run: docker pull postgres:17-alpine
+      - name: Replay the settled invoice claim and roll back
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          : "${SUPABASE_DB_PASSWORD:?Missing SUPABASE_DB_PASSWORD secret}"
+          [[ "$INVOICE_NUMBER" =~ ^[A-Za-z0-9_-]{1,100}$ ]]
+          [[ "$TX_HASH" =~ ^0x[0-9a-fA-F]{64}$ ]]
+          [[ "$PAYMENT_ID" =~ ^0x[0-9a-fA-F]{64}$ ]]
+          PGPASSWORD="$SUPABASE_DB_PASSWORD" docker run --rm \
+            -e PGPASSWORD --volume "$PWD:/work:ro" --workdir /work postgres:17-alpine \
+            psql \
+              --dbname="host=aws-0-eu-west-1.pooler.supabase.com port=5432 dbname=postgres user=postgres.ecportgmionyhlofyobc sslmode=require" \
+              --no-psqlrc --quiet --tuples-only --no-align --set=ON_ERROR_STOP=1 \
+              --set=invoice_number="$INVOICE_NUMBER" --set=tx_hash="$TX_HASH" --set=expected_payment_id="$PAYMENT_ID" \
+              --file=scripts/verification/settled-invoice-replay-smoke.sql
+          echo 'Settled invoice claim returned zero rows; original settlement remained confirmed. No Circle transaction was requested.'
