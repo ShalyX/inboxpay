@@ -26,6 +26,10 @@ jobs:
         run: |
           npm run test:profile
           npm run test:gmail-parser
+          npm run test:gmail-oauth
+          npm run test:gmail-disconnect
+          npm run test:onboarding
+          npm run test:preview
           npm run test:local
           npm run test:scheduling
           npm run test:preflight

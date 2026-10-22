@@ -17,6 +17,7 @@ The server reloads business ownership and active network state for every protect
 | --- | --- | --- | --- |
 | `/api/config` | `GET` | Public | Returns the public Supabase URL and publishable key required by the browser. |
 | `/api/session` | `GET` | User | Returns the authenticated user, active business/network projection, and Gmail integration metadata. |
+| `/api/session` | `POST` | User | `{action:"disconnect_gmail",confirm:true}` clears stored Gmail tokens and account metadata for the authenticated owner's business across networks. Retains the integration row and invoice references. Does not revoke Google's grant or alter payment authority. Preview writes are rejected. |
 | `/api/onboarding` | `POST` | User | `approve` loads an existing business. For a new owner, it returns `business: null` and `onboarding.businessNameRequired: true` until an explicit `businessName` is supplied. It then creates the owner-scoped business, network account and draft policy. Other actions are `rename_business`, `select_network`, and `provision_wallet`. Mainnet selection and wallet creation require `confirmMainnet: true`. |
 | `/api/gmail/start` | `GET` | User | Starts Gmail OAuth with signed, expiring state bound to the user and business. |
 | `/api/gmail/callback` | `GET` | OAuth state | Exchanges the Google code, encrypts tokens, binds the Gmail identity, and redirects to the product. |
@@ -53,6 +54,8 @@ Business-name setup accepts 2–80 characters, collapses repeated whitespace and
 - `500/503`: provider or server failure. Financial clients must not interpret this as permission to resubmit with a new idempotency key.
 
 ## Idempotency and retries
+
+Gmail disconnection is repeatable. A successful response includes `storedTokensRemoved: true`, `googleGrantRevoked: false`, `recordsDeleted: false`, and `paymentAuthorityChanged: false`. `auditRecorded: false` means credential removal succeeded but the separate audit write failed. A 503 or lost response does not confirm removal: retry the same disconnect action. No tokens are returned. Refresh writes and OAuth callbacks use conditional updates so an older request cannot silently restore removed credentials. An already-started provider request can finish; this is not cancellation of in-flight scans or payments. Removing Google consent is a separate user action.
 
 Payment and withdrawal retries reuse their original business-scoped request identity. A client should refresh the invoice, payment, or withdrawal record after a timeout. It must not create a replacement operation merely because the HTTP response was lost.
 

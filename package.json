@@ -17,6 +17,8 @@
     "test:profile": "node scripts/business-profile-check.mjs",
     "test:onboarding": "node scripts/business-onboarding-check.mjs",
     "test:gmail-parser": "node scripts/gmail-parser-check.mjs",
+    "test:gmail-oauth": "node scripts/gmail-oauth-origin-check.mjs",
+    "test:gmail-disconnect": "node scripts/gmail-disconnect-check.mjs",
     "test:local": "node scripts/local-server-check.mjs",
     "test:scheduling": "node scripts/invoice-scheduling-check.mjs",
     "test:preflight": "node scripts/payment-preflight-check.mjs",

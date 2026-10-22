@@ -424,6 +424,9 @@ function renderAccount() {
     : "Unavailable";
   $("copy-wallet").hidden = !walletAddress;
   const gmailConnected = state.gmail?.status === "connected";
+  $("disconnect-gmail").hidden = !state.gmail || state.gmail.status === "revoked";
+  $("disconnect-gmail").disabled = state.previewReadOnly || state.bootstrapError || state.disconnectingGmail === true;
+  $("gmail-connection-status").textContent = state.previewReadOnly ? "Saved connection status; changes are disabled in preview." : gmailConnected ? "Gmail is connected." : "Gmail is not connected for new scans.";
   const gmailNeedsReconnect = state.gmail?.status === "reauthorization_required";
   $("connect-gmail").textContent = gmailNeedsReconnect ? "Reconnect Gmail" : "Connect Gmail";
   $("connect-gmail").hidden = gmailConnected;
@@ -1946,6 +1949,39 @@ async function startGmailConnection() {
 
 const connectGmail = singleFlight(startGmailConnection);
 
+async function disconnectGmail() {
+  if (state.previewReadOnly || state.disconnectingGmail) return;
+  if (!window.confirm("Disconnect this business's Gmail across Testnet and Mainnet?\n\nInboxPay will remove its stored Gmail tokens. Existing invoices and payment records stay. A scan in progress may finish. Queued payments, autonomy and wallet payment authority are NOT cancelled. Manage those in Payment settings. The Google grant itself is not revoked.")) return;
+  state.disconnectingGmail = true;
+  const button = $("disconnect-gmail");
+  button.disabled = true;
+  button.textContent = "Disconnecting…";
+  const message = $("gmail-disconnect-message");
+  message.textContent = "Removing stored Gmail tokens…";
+  try {
+    const response = await apiFetch("/api/session", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "disconnect_gmail", confirm: true })
+    });
+    const data = await readJsonResponse(response);
+    if (!response.ok || !data.storedTokensRemoved) throw new Error(data.error || "Disconnection was not confirmed. Please retry.");
+    state.gmail = null;
+    state.liveGmail = false;
+    renderAccount();
+    $("feed-meta").textContent = "Gmail disconnected. Existing records are retained; no new scan will start.";
+    message.textContent = "Gmail disconnected. Stored tokens removed. Existing records and payment settings are unchanged." + (data.auditRecorded ? "" : " The activity entry could not be recorded; contact support if needed.");
+    message.className = "auth-message success";
+    $("gmail-connection-title").focus();
+  } catch (error) {
+    message.textContent = error.message;
+    message.className = "auth-message error";
+  } finally {
+    state.disconnectingGmail = false;
+    button.disabled = state.previewReadOnly;
+    button.textContent = "Disconnect Gmail";
+  }
+}
+
 function renderInboxLoading() {
   $("queue-count").textContent = "Syncing…";
   $("stats").innerHTML = Array.from({ length: 4 }, () =>
@@ -2245,6 +2281,7 @@ async function init() {
     $("auth-signup").addEventListener("click", signup);
     $("auth-google").addEventListener("click", signInWithGoogle);
     $("connect-gmail").addEventListener("click", connectGmail);
+    $("disconnect-gmail").addEventListener("click", disconnectGmail);
     $("network-switch").addEventListener("change", switchNetwork);
     $("edit-business").addEventListener("click", openBusinessModal);
     $("close-business").addEventListener("click", closeBusinessModal);

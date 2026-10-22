@@ -22,6 +22,7 @@ Node.js 20 or newer is required. The production repository is framework-light an
 | `GMAIL_CLIENT_ID` | Server | Google Web OAuth client. |
 | `GMAIL_CLIENT_SECRET` | Server | Google Web OAuth secret. |
 | `INBOXPAY_TOKEN_ENCRYPTION_KEY` | Server | Encrypts stored Gmail provider tokens. |
+| `GMAIL_OAUTH_ALLOWED_ORIGINS` | Server | Optional exact HTTPS-origin list replacing the built-in canonical/legacy origins. Register each origin's `/api/gmail/callback` on the Google Web client before deployment; never use wildcard preview origins. |
 | `CIRCLE_TEST_API_KEY` | Server | Circle Testnet API access. |
 | `CIRCLE_TEST_ENTITY_SECRET` | Server | Circle Testnet signing entity secret. |
 | `CIRCLE_LIVE_API_KEY` | Server | Circle live API access. |

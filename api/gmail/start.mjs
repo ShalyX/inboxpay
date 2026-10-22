@@ -2,9 +2,10 @@ import { rejectPreviewRequest } from "../../lib/preview-boundary.mjs";
 import crypto from "node:crypto";
 import { requireUser } from "../../lib/supabase-server.mjs";
 import { encryptSecret } from "../../lib/secure-tokens.mjs";
+import { gmailCallbackUri } from "../../lib/gmail-oauth-origin.mjs";
+import { getGmailIntegration } from "../../lib/gmail-account.mjs";
 
 const GOOGLE_AUTH = "https://accounts.google.com/o/oauth2/v2/auth";
-const CALLBACK = "https://tameion-ap-agent-live.vercel.app/api/gmail/callback";
 const SCOPES = [
   "openid",
   "email",
@@ -20,7 +21,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { token } = await requireUser(req);
+    const redirectUri = gmailCallbackUri(req);
+    const { token, user } = await requireUser(req);
+    const integration = await getGmailIntegration(token, user.id);
     if (!process.env.GMAIL_CLIENT_ID || !process.env.GMAIL_CLIENT_SECRET) {
       throw new Error("Gmail integration is not configured");
     }
@@ -29,12 +32,15 @@ export default async function handler(req, res) {
     const payload = encryptSecret(JSON.stringify({
       state,
       userToken: token,
+      redirectUri,
+      clientId: process.env.GMAIL_CLIENT_ID,
+      integrationVersion: integration ? { id: integration.id, updatedAt: integration.updated_at } : null,
       expiresAt: Date.now() + 10 * 60 * 1000
     }));
 
     const query = new URLSearchParams({
       client_id: process.env.GMAIL_CLIENT_ID,
-      redirect_uri: CALLBACK,
+      redirect_uri: redirectUri,
       response_type: "code",
       scope: SCOPES,
       access_type: "offline",

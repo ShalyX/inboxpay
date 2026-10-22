@@ -1061,6 +1061,17 @@
                 aria-live="polite"
               ></div>
             </section>
+            <section class="destination-card gmail-connection-card" aria-labelledby="gmail-connection-title">
+              <div class="section-heading"><div><span>CONNECTED INBOX</span><h3 id="gmail-connection-title" tabindex="-1">Gmail connection</h3></div></div>
+              <div class="gmail-connection-body">
+              <p id="gmail-connection-status">Checking connection…</p>
+              <p>Disconnect removes the Gmail tokens stored by InboxPay and stops future inbox scans across this business's environments. Existing invoices and payment records stay. A scan already in progress may finish.</p>
+              <p>Disconnecting does not cancel queued payments, turn off autonomy, or revoke the wallet's payment authority. Use Payment settings to manage those separately.</p>
+              <button id="disconnect-gmail" class="ghost" type="button" hidden>Disconnect Gmail</button>
+              <p>You can also <a href="https://myaccount.google.com/connections" target="_blank" rel="noopener noreferrer">remove the Google grant in your Google Account</a>. InboxPay does not revoke that grant automatically; removing it may affect related access in the same Google project.</p>
+              <div id="gmail-disconnect-message" class="auth-message" role="status" aria-live="polite"></div>
+              </div>
+            </section>
             <section class="destination-card business-rail-card">
               <div class="section-heading">
                 <div>

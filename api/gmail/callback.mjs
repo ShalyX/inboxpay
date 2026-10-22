@@ -1,6 +1,7 @@
 import { rejectPreviewRequest } from "../../lib/preview-boundary.mjs";
 import { decryptSecret, encryptSecret } from "../../lib/secure-tokens.mjs";
 import { supabaseRest } from "../../lib/supabase-server.mjs";
+import { gmailStateCallbackUri } from "../../lib/gmail-oauth-origin.mjs";
 
 const GOOGLE_TOKEN = "https://oauth2.googleapis.com/token";
 const GOOGLE_USERINFO = "https://www.googleapis.com/oauth2/v3/userinfo";
@@ -29,15 +30,16 @@ export default async function handler(req, res) {
     if (!raw) throw new Error("Gmail connection state expired. Please try again.");
 
     const session = JSON.parse(decryptSecret(raw));
-    if (Date.now() > session.expiresAt || session.state !== req.query?.state || !session.userToken) {
+    if (!Number.isFinite(session.expiresAt) || Date.now() >= session.expiresAt || session.state !== req.query?.state || !session.userToken) {
       throw new Error("Invalid Gmail connection state");
     }
+    const redirectUri = gmailStateCallbackUri(req, session);
 
     const body = new URLSearchParams({
       code: String(req.query.code || ""),
       client_id: process.env.GMAIL_CLIENT_ID,
       client_secret: process.env.GMAIL_CLIENT_SECRET,
-      redirect_uri: "https://tameion-ap-agent-live.vercel.app/api/gmail/callback",
+      redirect_uri: redirectUri,
       grant_type: "authorization_code"
     });
 
@@ -78,18 +80,33 @@ export default async function handler(req, res) {
     const businessId = businesses?.[0]?.id;
 
     const existing = await supabaseRest(
-      "integrations?select=id,refresh_token_encrypted&user_id=eq." + encodeURIComponent(inboxUser.id) + "&provider=eq.google_gmail&limit=1",
+      "integrations?select=id,provider_account_id,refresh_token_encrypted,status,updated_at&user_id=eq." + encodeURIComponent(inboxUser.id) + "&provider=eq.google_gmail&limit=1",
       { token: session.userToken }
     );
+
+    const previous = existing?.[0];
+    if (Object.hasOwn(session, "integrationVersion")) {
+      const expected = session.integrationVersion;
+      if ((previous?.id || null) !== (expected?.id || null) ||
+          (previous && previous.updated_at !== expected.updatedAt)) {
+        throw new Error("Gmail connection changed. Start a fresh connection.");
+      }
+    } else if (previous?.status === "revoked") {
+      throw new Error("Gmail was disconnected. Start a fresh connection.");
+    }
+
+    // Google can omit a refresh token on repeat consent. Never carry one across mailboxes.
+    const refreshTokenEncrypted = tokens.refresh_token ? encryptSecret(tokens.refresh_token)
+      : previous?.status === "connected" && previous.provider_account_id === googleUser.sub
+        ? previous.refresh_token_encrypted : null;
+    if (!refreshTokenEncrypted) throw new Error("Google did not return offline Gmail access. Start a fresh connection and authorize access again.");
 
     const record = {
       user_id: inboxUser.id,
       provider: "google_gmail",
       provider_account_id: googleUser.sub,
       access_token_encrypted: encryptSecret(tokens.access_token),
-      refresh_token_encrypted: tokens.refresh_token
-        ? encryptSecret(tokens.refresh_token)
-        : existing?.[0]?.refresh_token_encrypted || "",
+      refresh_token_encrypted: refreshTokenEncrypted,
       token_expires_at: new Date(Date.now() + Number(tokens.expires_in || 3600) * 1000).toISOString(),
       scopes: String(tokens.scope || "").split(" ").filter(Boolean),
       status: "connected",
@@ -98,10 +115,13 @@ export default async function handler(req, res) {
     };
 
     if (existing?.[0]?.id) {
-      await supabaseRest(
-        "integrations?id=eq." + encodeURIComponent(existing[0].id),
+      const saved = await supabaseRest(
+        "integrations?id=eq." + encodeURIComponent(existing[0].id) +
+          "&user_id=eq." + encodeURIComponent(inboxUser.id) +
+          "&updated_at=eq." + encodeURIComponent(existing[0].updated_at),
         { token: session.userToken, method: "PATCH", body: record }
       );
+      if (!saved?.[0]) throw new Error("Gmail connection changed. Start a fresh connection.");
     } else {
       await supabaseRest("integrations", {
         token: session.userToken,

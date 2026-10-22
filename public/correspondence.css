@@ -1421,6 +1421,11 @@ dialog::backdrop {
   color: var(--muted);
   letter-spacing: 0.06em;
 }
+.gmail-connection-body { padding: 20px; }
+.gmail-connection-body p { margin: 0 0 16px; line-height: 1.6; overflow-wrap: anywhere; }
+.gmail-connection-body button { margin-bottom: 20px; }
+.gmail-connection-body a { color: var(--blue, #194cd9); text-decoration: underline; }
+
 .destination-card,
 .page-metrics,
 .activity-list,

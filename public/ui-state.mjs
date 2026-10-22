@@ -70,6 +70,7 @@ export function destinationFromHash(hash = "") {
 const AUDIT_EVENT_LABELS = {
   business_network_selected: "Settlement environment selected",
   business_profile_updated: "Business profile updated",
+  gmail_disconnected: "Gmail disconnected; stored tokens removed",
   invoice_scheduled: "Invoice queued for review",
   invoice_schedule_rescheduled: "Invoice review rescheduled",
   invoice_schedule_cancelled: "Scheduled review cancelled",
