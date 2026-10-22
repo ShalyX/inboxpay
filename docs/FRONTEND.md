@@ -53,7 +53,11 @@ npm run test:local
 
 The frontend check covers destination isolation, query categories, single-flight connections, unique IDs, dialog scroll/focus lifecycle, and refreshed-row focus fallback. The server check verifies static modules, font/image/manifest MIME types, help assets, and unauthenticated API rejection. Run the other `test:*` suites before release as well.
 
-## Review status — 2026-10-21
+## Payment-access follow-up — 2026-10-22
+
+The current local follow-up stacks payment-access copy and buttons at desktop and phone widths, correcting the emergency-pause overlap seen in the hosted preview. Read-only previews label USDC allowance as not checked rather than unauthorized; live authorized/unauthorized labels and financial actions remain unchanged. The frontend regression check exercises those three states. All 19 regression scripts passed, and the corrected interface was inspected at 1304px and 390px using the explicitly labelled local fixture (`/?fixture=preview#policy`). This verifies presentation only, not real provider calls. These follow-up fixes are not yet committed or deployed.
+
+## Earlier review status — 2026-10-21
 
 All 19 repository regression scripts passed, including the new business-name onboarding checks, preview write boundary and saved-record invoice-query path. Browser inspection covered the real local public landing, sign-in dialog Escape/focus restoration, business help, phone-width layout, and isolated-fixture invoice/search/drawer/error/disconnected/navigation states. The inspected drawer prevented background interaction and retained the filtered queue on close.
 

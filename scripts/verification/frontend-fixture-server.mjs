@@ -92,6 +92,7 @@ http
           return json(res, 200, {
             url: "https://example.invalid",
             publishableKey: "fixture-only",
+            previewReadOnly: scenario === "preview",
           });
       if (url.pathname === "/api/session")
         return json(res, 200, { gmail: { status: scenario === "disconnected" ? "disconnected" : "connected" } });

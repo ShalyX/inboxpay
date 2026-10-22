@@ -1045,13 +1045,16 @@ function renderPolicyModal() {
 
   const allowanceControl = $("policy-allowance-control");
   allowanceControl.hidden = !ready || policyUnavailable;
-  $("policy-allowance-title").textContent = state.policyAllowance ? "USDC access authorized" : "USDC access not authorized";
-  $("policy-allowance-note").textContent = state.policyAllowance
+  $("policy-allowance-title").textContent = state.previewReadOnly ? "USDC access not checked in preview" : state.policyAllowance ? "USDC access authorized" : "USDC access not authorized";
+  $("policy-allowance-note").textContent = state.previewReadOnly
+    ? "This preview does not verify wallet authorization. Your saved USDC access has not changed."
+    : state.policyAllowance
     ? "The vault can move this wallet's USDC only through the enforced policy checks."
     : "The vault cannot move funds until this business explicitly authorizes it.";
   const allowanceButton = $("policy-allowance");
-  allowanceButton.dataset.authorized = String(state.policyAllowance);
-  allowanceButton.textContent = state.policyAllowance ? "Revoke USDC access" : "Authorize vault";
+  allowanceButton.dataset.authorized = state.previewReadOnly ? "unknown" : String(state.policyAllowance);
+  allowanceButton.textContent = state.previewReadOnly ? "Not checked in preview" : state.policyAllowance ? "Revoke USDC access" : "Authorize vault";
+  allowanceButton.disabled = state.previewReadOnly;
 
   const autonomyEnabled = Boolean(state.policyConfig?.autonomy_enabled);
   const autonomyControl = $("policy-autonomy-control");

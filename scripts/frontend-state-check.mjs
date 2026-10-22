@@ -287,4 +287,32 @@ assert.equal(qaNode("invoice-count").textContent, "—");
 assert.equal(qaNode("queue-count").textContent, "Unavailable");
 assert.match(qaNode("invoice-list").innerHTML, /not an empty-workspace result/);
 
+// A preview never reads allowance: false must not become an authorization claim.
+const policyStart = appSource.indexOf("function renderPolicyModal() {");
+const policyEnd = appSource.indexOf("\n}", policyStart) + 2;
+const policyNodes = new Map();
+const policyNode = (id) => {
+  if (!policyNodes.has(id)) policyNodes.set(id, { textContent: "", innerHTML: "", dataset: {}, hidden: false });
+  return policyNodes.get(id);
+};
+const policyState = { previewReadOnly: true, business: { wallet_blockchain: "ARC-TESTNET", policy_contract_address: "0x1" }, policyConfig: {}, policyAllowance: false };
+const renderPolicy = () => runInNewContext(appSource.slice(policyStart, policyEnd) + "\nrenderPolicyModal();", {
+  state: policyState, $: policyNode, policyIsReady: () => true, policyAmount: String,
+  document: { querySelectorAll: () => [] }, escapeHtml: String
+});
+renderPolicy();
+assert.equal(policyNode("policy-allowance-title").textContent, "USDC access not checked in preview");
+assert.doesNotMatch(policyNode("policy-allowance-note").textContent, /cannot move funds|not authorized/);
+assert.equal(policyNode("policy-allowance").disabled, true);
+assert.equal(policyNode("policy-allowance").dataset.authorized, "unknown");
+policyState.previewReadOnly = false;
+renderPolicy();
+assert.equal(policyNode("policy-allowance-title").textContent, "USDC access not authorized");
+policyState.policyAllowance = true;
+renderPolicy();
+assert.equal(policyNode("policy-allowance-title").textContent, "USDC access authorized");
+assert.equal(policyNode("policy-allowance").disabled, false);
+const correspondenceCss = await readFile(new URL("../public/correspondence.css", import.meta.url), "utf8");
+assert.match(correspondenceCss, /\.access-card \.policy-secondary,[\s\S]*?\.access-card \.policy-allowance\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*1fr\);/, "access controls stack at every width, not just on phones");
+
 console.log("frontend state, dialog lifecycle, and media checks passed");

@@ -1451,6 +1451,26 @@ dialog::backdrop {
   background: var(--blue);
   box-shadow: none;
 }
+/* Payment access sits in a narrow sidebar: stack copy and controls at every width. */
+.access-card .policy-secondary,
+.access-card .policy-allowance {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  min-width: 0;
+}
+.access-card .policy-secondary > *,
+.access-card .policy-allowance > * {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.access-card .ghost {
+  width: 100%;
+  min-width: 0;
+  white-space: normal;
+  line-height: 1.5;
+}
 /* A real modal invoice sheet: inbox stays mounted, with native focus isolation. */
 .invoice-drawer {
   position: fixed;
