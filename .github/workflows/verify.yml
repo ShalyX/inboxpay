@@ -28,6 +28,7 @@ jobs:
           npm run test:gmail-parser
           npm run test:gmail-oauth
           npm run test:gmail-disconnect
+          npm run test:restore-credentials
           npm run test:onboarding
           npm run test:preview
           npm run test:local
