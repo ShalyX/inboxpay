@@ -1,139 +1,94 @@
 # InboxPay
 
-InboxPay is an autonomous accounts-payable operator built for Tameion.
+**Payments, straight from your inbox.**
 
-![InboxPay — bounded accounts payable on Arc](./public/brand/inboxpay-og.svg)
+Connect the Gmail inbox where your business receives invoices. InboxPay finds invoice emails and supported PDFs, handles USDC payments, and keeps the payment record and receipt with each invoice. Review payments yourself or let your AP agent handle eligible invoices automatically within the settings you choose.
 
-[Live product](https://inboxpay.vercel.app/) · [Documentation](./docs/) · [Brand assets](./docs/BRAND.md) · [Operations runbook](./AUTONOMY-RUNBOOK.md) · [Apache-2.0 license](./LICENSE)
+![InboxPay — payments, straight from your inbox](./public/brand/correspondence-og.png)
 
-Each business gets its own InboxPay account, Gmail integration, AP policy, vendor registry, and isolated Circle developer-controlled wallet for each enabled Arc environment. The agent reads the business's real invoice inbox, makes a bounded payment decision, and can settle approved USDC invoices from that business wallet on Arc. Mainnet financial writes remain explicitly gated.
+[Open InboxPay](https://inboxpay.vercel.app/) · [Watch the demo · 2:21](https://x.com/ShalyX_04/status/2111570265369104446) · [Business guide](https://inboxpay.vercel.app/help.html) · [Technical documentation](./docs/) · [Apache-2.0](./LICENSE)
 
-## The product
+## The business workflow
 
-Gmail / PDF invoice
-→ extraction
-→ duplicate + currency + vendor checks
-→ agent decision
-→ policy vault
-→ Circle transaction signing
-→ Arc USDC settlement
-→ reconciliation + receipt
+1. **Connect your invoice inbox.** Sign into InboxPay, name your business, and separately connect the Gmail account that receives invoices.
+2. **See what needs paying.** The agent extracts the invoice details from email and text-based PDFs, checks the evidence, and explains anything that needs your attention.
+3. **Pay from your business wallet.** Review an eligible payment or enable automatic payments using your verified vendors and payment settings. Each business has a dedicated Circle wallet for each enabled Arc environment.
+4. **Keep the receipt.** InboxPay tracks the Circle submission, checks the Arc transaction, and records the reconciled payment against the invoice. Optional Telegram alerts keep you informed.
 
-The key design choice is that the model does not get to invent its own spending authority. The execution path is bounded by a smart-contract vault with vendor allowlisting, per-transaction limits, daily limits, a cash floor, pause control, and onchain duplicate-payment protection.
+The aim is to remove the repeated work of copying vendor addresses, switching to a wallet, tracking a transfer, and matching its receipt back to an invoice.
 
-## Local setup
+## Recorded working proof
 
-Use Node.js 20+.
+InboxPay was built during Tameion. The complete Gmail → automatic payment → reconciled receipt flow has been demonstrated on **Arc Testnet** in the builder-operated Caraxes Labs workspace. These are controlled integration tests, not independent customer traction or Mainnet invoice payments.
 
-Install dependencies:
+| Invoice | Amount | Recorded outcome | Arc Testnet receipt |
+| --- | ---: | --- | --- |
+| `AUTONOMY-TEST-002` | 0.10 USDC | One evaluation, queued job, execution attempt and Circle submission; confirmed payment and one reconciled receipt. | [Transaction](https://explorer.testnet.arc.io/tx/0x77f9bd481c33497a13c256198bea277f21cb3232c47b6cbf0f6fda2345369564) |
+| `IP-ALERT-20261020-01` | 0.10 USDC | Automatic payment completed; the linked business Telegram chat received submitted and confirmed/reconciled alerts. | [Transaction](https://explorer.testnet.arc.io/tx/0x6e974d1fffa8c5e77baae429060d293e6e6cc59682d6e517353bac332598c592) |
 
-```bash
-npm install
+The second invoice's replay checks found its payment ID already used, rejected onchain execution in a read-only simulation, and returned no database payment claim. The [recorded database replay workflow](https://github.com/ShalyX/inboxpay/actions/runs/39521638031) ran inside a rollback-only transaction. This was not another transfer or a full authenticated HTTP payment replay.
+
+Public Testnet addresses for these controlled proofs:
+
+- Dedicated business wallet: `0xca32c823b85c2b5de03c7626b42293b4fe18d5e2`
+- Business policy vault: `0x59ceead805ef96fc2839388cafe937150412383a`
+
+### Separate Mainnet evidence
+
+The [recorded policy-vault deployment](./deployments/arc-mainnet-policy-vault.json) is at `0xa1dafca93784eeeecd081662435a5943eba73c66` on Arc Mainnet. A Circle developer-controlled wallet also completed a separate [0.001 USDC x402 purchase](https://explorer.arc.io/tx/0x0957a0febac2b4d5757148aa8e9d36861167ef4139c20bfd5105a4b404ac0186).
+
+These demonstrate the Mainnet rail separately. A genuine external-vendor Mainnet invoice settlement is not claimed.
+
+## How the payment flow works
+
+```text
+Gmail email / text PDF → invoice queue → payment decision
+→ dedicated business wallet → Circle submission → Arc settlement → reconciled receipt
 ```
 
-Authenticate the Canteen Arc CLI and export the unique Canteen RPC:
+The current invoice parser and payment evaluator use deterministic rules; this repository does not claim an LLM performs the production decision. Decisions expose reasons to pay, wait, hold or request review. Eligible automatic payments enter a durable job queue; uncertain submissions are reconciled before a retry can proceed.
+
+Gmail provides invoice evidence, Circle provides developer-controlled wallet and transaction services, and Arc provides USDC settlement. Supabase stores business records and execution state. Vercel hosts the static frontend and Node functions.
+
+### Business separation and payment controls
+
+Each business and Arc environment has its own wallet, vendor registry, payment settings, invoices and audit records. Switching Testnet/Mainnet changes the active context; it does not move funds. The application never substitutes a shared treasury wallet.
+
+The **application** checks invoice evidence, required fields, sender verification, currency, business ownership, network and current payment readiness. The **business policy vault** enforces registered recipients, per-payment and daily limits, the owner wallet's cash floor, pause state and one-time payment IDs. These are different enforcement layers. Reconciliation matches the submitted payment to the Arc receipt before marking it confirmed.
+
+See [architecture](./docs/ARCHITECTURE.md), [security](./docs/SECURITY.md) and the [operations runbook](./AUTONOMY-RUNBOOK.md) for the implementation and recovery procedures.
+
+## Access and current limits
+
+- InboxPay is in early access. Public Gmail OAuth verification is not complete; signing into the app does not guarantee an external account can connect Gmail.
+- Email text and text-based PDF invoices are supported. Reliable OCR for scanned invoices is not implemented.
+- The workspace currently supports an owner-operated business, not team roles or multi-person approvals.
+- Full vendor onboarding and independent external-business acceptance remain unfinished.
+- Mainnet financial writes require server enablement and explicit confirmation. Testnet receipts are not Mainnet customer usage.
+
+Example payloads in [`examples/`](./examples/) are redacted reference shapes; they are not the hosted product's invoice source. Local visual fixtures are explicitly labelled and cannot exercise real integrations or payments.
+
+## Run locally
+
+Use Node.js 20 or newer. The application has no frontend compilation step.
 
 ```bash
-uv tool install arc-canteen
-arc-canteen login
-arc-canteen rpc-url --export
+npm ci
+cp .env.example .env.local
 ```
 
-The app expects the resulting RPC as ARC_RPC_URL or the exported RPC value.
-
-Circle credentials are read from the existing local environment. Production uses separate Testnet and live Circle credentials plus the Arc RPC settings. Wallet IDs, wallet addresses, and policy-vault addresses are created and persisted per business and network; do not configure a shared runtime wallet or treasury address.
-
-### Gmail integration
-
-Users do not enter Gmail client IDs, client secrets, or refresh tokens. After signing into InboxPay, they click **Connect Gmail** and complete a Google OAuth consent flow for the Gmail account that actually carries the business's invoices.
-
-The OAuth callback binds the Google connection to the authenticated InboxPay user, encrypts the provider tokens before persistence, and stores only the minimum integration metadata in Supabase. Invoice bodies and PDF contents are never written to Git.
-
-Google refresh tokens are used only server-side to refresh short-lived access tokens when InboxPay syncs the user's inbox.
-
-Start the product:
+Fill the required values using the [deployment guide](./docs/DEPLOYMENT.md), apply the committed [Supabase migrations](./supabase/migrations/) in filename order, and configure [authentication and Gmail](./GMAIL-SETUP.md). Then start the server with the private environment file:
 
 ```bash
-npm start
+node --env-file=.env.local dev-server.mjs
 ```
 
-Then open http://localhost:3000.
+Open `http://localhost:3000`. Local APIs use the real handlers and still require provider configuration and authentication. Live Gmail consent requires a registered HTTPS callback; see the Gmail guide. Business users connect through OAuth and never provide client secrets or paste provider tokens.
 
-## Multi-business, multi-network execution
+Keep credentials, mailbox content, local invoice files and provider exports out of Git. Use separate Testnet and live Circle credentials; wallet and vault identities belong to the business/network records, not a global environment wallet ID.
 
-Every business owns separate Arc Testnet and Arc Mainnet account contexts. Each context has its own Circle wallet, policy vault, vendor registry, invoices, scheduling state, and audit trail. The product's environment selector changes which isolated account is active; switching environments does not move funds or submit a transaction. The agent never selects a global treasury wallet at runtime.
+## Documentation and license
 
-The execution route refuses invoices unless the evaluator has marked them PAY_NOW, the currency is USDC, the business is not paused, the vendor is verified, the payment is inside the business's per-transaction and daily limits, and the business wallet remains above its configured cash floor.
+[Documentation index](./docs/) · [API](./docs/API.md) · [Deployment](./docs/DEPLOYMENT.md) · [Backup and recovery](./docs/BACKUP-RECOVERY.md) · [Brand assets](./docs/BRAND.md)
 
-Before settlement, the contract is checked for:
-- duplicate payment ID
-- vendor recipient
-- vault balance + cash floor
-- per-transaction limit
-- daily spending limit
-- paused state
-
-The payment receipt is reconciled against the vendor balance after the Arc transaction confirms.
-
-## Authentication and Google setup
-
-InboxPay uses Supabase Auth for business account authentication. Email/password signup and Google sign-in both land on the production Vercel origin. The hosted Supabase project must have Google enabled with a **Web application** OAuth client.
-
-Configure the production Supabase URL settings with:
-
-`https://tameion-ap-agent-live.vercel.app/`
-
-In Google Cloud, the Web OAuth client should authorize the production origin:
-
-`https://tameion-ap-agent-live.vercel.app`
-
-and the Supabase Auth callback:
-
-`https://ecportgmionyhlofyobc.supabase.co/auth/v1/callback`
-
-The Gmail connector is a separate Google OAuth flow. Its callback is:
-
-`https://tameion-ap-agent-live.vercel.app/api/gmail/callback`
-
-## Deployment
-
-This repo is intentionally framework-light: static HTML/CSS/JS in `public/` plus native Vercel Node functions under `api/`. There is no frontend build step. `dev-server.mjs` is for local development only, but it dispatches to the same production-shaped API handlers rather than a mock invoice/payment layer; local API calls still require the configured environment and an authenticated session. Production traffic goes directly to the Vercel functions. The canonical public product URL is [inboxpay.vercel.app](https://inboxpay.vercel.app/); the longer Vercel project alias remains in use for registered OAuth callbacks.
-
-Set the infrastructure secrets in Vercel, including Circle credentials, Supabase configuration, Gmail OAuth client credentials, and token-encryption secrets. Users supply their own OAuth consent through the product; they never configure infrastructure secrets.
-
-The bounded-autonomy worker and business-wallet withdrawals additionally require the server-only `SUPABASE_SECRET_KEY`, `AUTONOMY_CRON_SECRET`, and `supabase/migrations/20261015010000_autonomy_and_withdrawals.sql`. The worker is invoked through the existing invoices function so the production build remains at 12 Vercel functions. Follow [AUTONOMY-RUNBOOK.md](./AUTONOMY-RUNBOOK.md) for the Supabase Cron trigger, Testnet proof, monitoring, recovery, and Mainnet release gate.
-
-The five-minute operator monitor checks Gmail, Circle, Arc RPC, Supabase, and reconciliation per business and network, persists recovery state, and pages the platform operator when a bounded alert threshold is met. Internal diagnostics and incident controls are not part of the business workspace. Each business can link its own Telegram chat without code. After linking, durable customer alerts cover payment submission, confirmed Arc reconciliation, failure, and payment review; platform incidents never go to that chat. The Payments page and audit trail remain authoritative if Telegram delivery is delayed or unavailable.
-
-Do not commit Gmail tokens, Circle wallet exports, OAuth credentials, local invoice files, or evaluator output.
-
-## Hackathon proof
-
-The project includes a real Gmail-derived evaluator, email and PDF evidence ingestion, dedicated Circle developer-controlled wallets, onchain payment policy enforcement, durable autonomous execution, reconciliation, a live x402 purchase on Arc Mainnet, and an Arc Mainnet PaymentPolicyVault deployment. Private Gmail, OAuth, Circle, and invoice artifacts stay local.
-
-The complete autonomous AP proof is on **Arc Testnet**. Invoice `AUTONOMY-TEST-002` settled exactly once for `0.10 USDC` from the dedicated Caraxes Labs wallet and reconciled in InboxPay. Its transaction is `0x77f9bd481c33497a13c256198bea277f21cb3232c47b6cbf0f6fda2345369564`.
-
-Public deployment evidence is kept in [`deployments/`](./deployments/). Redacted response shapes are kept in [`examples/`](./examples/) and are not used by the hosted product.
-
-## Arc mainnet proof
-
-The production PaymentPolicyVault is deployed on Arc Mainnet at `0xa1dafca93784eeeecd081662435a5943eba73c66`.
-
-InboxPay also completed a real x402 purchase on Arc Mainnet through Circle's developer-controlled wallet. The 0.001 USDC settlement transaction is `0x0957a0febac2b4d5757148aa8e9d36861167ef4139c20bfd5105a4b404ac0186`.
-
-The Mainnet policy deployment and x402 purchase prove the live Arc/Circle rail separately; they are not presented as a Mainnet invoice settlement. A genuine third-party vendor Mainnet AP payment remains a release gate.
-
-## License
-
-InboxPay is licensed under the [Apache License 2.0](./LICENSE).
-
-## Product onboarding
-
-1. A business creates or signs into an InboxPay account.
-2. The business selects Arc Testnet or Arc Mainnet, then explicitly provisions the dedicated Circle developer-controlled wallet for that environment. Entering Mainnet and creating its wallet both require explicit confirmation.
-3. The business connects the Gmail account used for invoices through the InboxPay OAuth flow.
-4. The business registers vendor settlement addresses and configures AP limits.
-5. The business deploys and funds the policy guard required for autonomous settlement.
-6. InboxPay continuously evaluates real invoice evidence and settles approved USDC payments from that business wallet.
-
-The hackathon evaluates genuine business usage and real USDC activity during the event window, so the production path intentionally requires a real connected business inbox rather than a synthetic invoice dataset.
+InboxPay is licensed under [Apache License 2.0](./LICENSE).

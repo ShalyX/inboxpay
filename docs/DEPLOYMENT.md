@@ -59,6 +59,7 @@ Apply committed migrations in filename order:
 10. `supabase/migrations/20261019000001_fix_telegram_link_conflict.sql`
 11. `supabase/migrations/20261020000000_customer_payment_notifications.sql`
 12. `supabase/migrations/20261020000001_financial_write_boundary.sql`
+13. `supabase/migrations/20261021000000_vendor_sender_audit_boundary.sql`
 
 The first four files are the exact foundational migrations already recorded by the production Supabase project. Do not squash, renumber, or replace them. They make clean-room deployment reproducible while preserving production migration identity.
 

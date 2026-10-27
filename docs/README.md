@@ -1,6 +1,6 @@
 # InboxPay documentation
 
-InboxPay is a production-oriented accounts-payable operator. These documents describe the shipped system and its operating boundaries.
+InboxPay helps businesses handle invoices and USDC payments from Gmail. This index covers the technical implementation. Start with the [business guide](https://inboxpay.vercel.app/help.html) for the customer workflow, or the [repository README](../README.md) for recorded payment proof and current availability.
 
 - [Architecture](./ARCHITECTURE.md) — components, data flow, trust boundaries, and settlement lifecycle.
 - [Security](./SECURITY.md) — authority model, threat model, secrets, and incident controls.
@@ -17,6 +17,6 @@ InboxPay is a production-oriented accounts-payable operator. These documents des
 
 The complete autonomous AP loop has been proven on Arc Testnet. Arc Mainnet has a deployed policy vault and a separate x402 transaction, but InboxPay does not claim a genuine Mainnet invoice settlement.
 
-## Known infrastructure limitation
+## Database setup
 
-The committed Supabase migrations are incremental and assume that the foundational `businesses`, `policies`, `vendors`, `integrations`, `invoices`, and `audit_events` tables already exist. A canonical clean-room baseline migration is still required before an independent deployment can be reproduced from an empty Supabase project. Do not infer or improvise that schema from API calls in a production deployment.
+The repository contains the foundational migrations and subsequent changes under [`supabase/migrations`](../supabase/migrations/). Apply them in filename order using the [deployment guide](./DEPLOYMENT.md). Preserve the production migration identities; do not squash or replace the historical baseline when updating an existing installation. Database reproducibility checks do not establish live provider configuration or Google verification.
