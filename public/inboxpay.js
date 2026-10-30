@@ -2276,6 +2276,7 @@ async function init() {
     state.supabase = createClient(config.url, config.publishableKey, {
       auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
     });
+    $("data-controls-link").hidden = config.dataControlsEnabled !== true;
 
     $("auth-form").addEventListener("submit", authSubmit);
     $("auth-signup").addEventListener("click", signup);

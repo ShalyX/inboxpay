@@ -23,7 +23,9 @@ Configure these GitHub Actions repository variables:
 | `GCP_WORKLOAD_IDENTITY_PROVIDER` | Full Google Workload Identity Provider resource name trusted only for `ShalyX/inboxpay`. |
 | `GCP_BACKUP_SERVICE_ACCOUNT` | Dedicated bucket-scoped service account used through short-lived impersonation. |
 
-The `Encrypted database backup` workflow runs daily at 02:17 UTC and can be dispatched manually. It creates a custom-format dump, encrypts it with AES-256 through GnuPG, uploads the encrypted file plus SHA-256 checksum, and deletes runner-local copies. Keep the bucket private and review versioning, server-side encryption and access logging. The earlier suggestion of 35 daily copies plus monthly archives is not an approved customer-data retention policy or proof of the bucket's actual lifecycle. Confirm expiry for current objects, noncurrent versions and soft-deleted objects before promising a deletion window. Do not enable indefinite monthly archives by default.
+The `Encrypted database backup` workflow runs daily at 02:17 UTC and can be dispatched manually. It creates a custom-format dump, encrypts it with AES-256 through GnuPG, uploads the encrypted file plus SHA-256 checksum, and deletes runner-local copies. Keep the bucket private and review versioning, server-side encryption and access logging.
+
+On 23 October 2026, the operator approved and saved a GCS lifecycle rule that deletes objects aged 35+ days only when their names start with `production/`. It covers encrypted dumps and checksums, including existing matching objects. The saved rule and the unchanged seven-day soft-delete period were verified in Cloud Console; versioning remains off. The console warns that rule changes can take up to 24 hours to take effect. Actual object expiry and permanent purge have not yet been observed. This is a 35-day active recovery window followed by soft-delete recovery, not a guaranteed 35-day permanent-erasure deadline. Do not add indefinite monthly archives or expand the deletion scope without approval. Recheck current settings and actual expiry before promising a customer deletion window.
 
 The workflow fails closed when any required destination or encryption secret is absent. A workflow existing in GitHub is not evidence that backups are active: verify a successful run and the object in the private bucket.
 
@@ -56,9 +58,12 @@ The disposable drill invokes it after all restore sections, before reporting ver
 ```sql
 set inboxpay.restore_mode = 'isolated';
 \i scripts/recovery/invalidate-restored-gmail.sql
+\i scripts/recovery/invalidate-restored-notifications.sql
 ```
 
 Use `psql --set=ON_ERROR_STOP=1`. Never mark or run this against a healthy production database. The setting is an intent check, not proof of isolation. Failed verification rolls back credential changes; do not resume workers or route traffic after any error. After successful cleanup, archive the aggregate verification result without token values and require fresh owner consent for Gmail.
+
+The notification helper additionally revokes restored customer Telegram destinations, removes their encrypted identifier/hint/preferences and pending link tokens, and sanitizes/skips all restored payment-notification snapshots. It preserves source-key tombstones and invoice/payment evidence; the separate platform operator destination is unchanged. Require customers to reconnect before new alerts. This prevents an older backup from restoring disconnected chats or redacted message payloads. It does not erase messages already delivered to Telegram or replay broader workspace deletions. See [data controls](./DATA-CONTROLS.md).
 
 This removes usable credentials from the restored database, not the encrypted backup object or its temporary dump. Existing backups still need an approved expiry policy and isolated handling. Workspace-data deletions also require an independent deletion ledger and restore-time reapplication before cutover; the Gmail helper alone does not solve deletion of invoices, identity or other business records. That process remains under review.
 

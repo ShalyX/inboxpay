@@ -29,6 +29,10 @@ jobs:
           npm run test:gmail-oauth
           npm run test:gmail-disconnect
           npm run test:restore-credentials
+          npm run test:data-requests
+          npm run test:privacy-retention
+          npm run test:data-request-route
+          npm run test:data-controls
           npm run test:onboarding
           npm run test:preview
           npm run test:local

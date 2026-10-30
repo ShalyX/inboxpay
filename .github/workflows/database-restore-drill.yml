@@ -129,6 +129,14 @@ jobs:
             --workdir /work \
             postgres:17-alpine \
             sh -c "psql \"\$RESTORE_DATABASE_URL\" --set=ON_ERROR_STOP=1 -c \"set inboxpay.restore_mode = 'isolated'\" -f scripts/recovery/invalidate-restored-gmail.sql"
+          # Old backups must not reconnect chats or redeliver deleted snapshots.
+          docker run --rm \
+            --network host \
+            -e RESTORE_DATABASE_URL \
+            --volume "$PWD:/work" \
+            --workdir /work \
+            postgres:17-alpine \
+            sh -c "psql \"\$RESTORE_DATABASE_URL\" --set=ON_ERROR_STOP=1 -c \"set inboxpay.restore_mode = 'isolated'\" -f scripts/recovery/invalidate-restored-notifications.sql"
           docker run --rm --interactive \
             --network host \
             -e RESTORE_DATABASE_URL \

@@ -1,0 +1,64 @@
+name: Release data controls
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: The fixed migration plus read-only production retention counts
+        type: choice
+        options: [dry-run, apply-and-dry-run]
+        default: dry-run
+      confirmation:
+        description: For migration apply, type APPLY_DATA_CONTROLS_20261030
+        type: string
+        default: ''
+permissions:
+  contents: read
+concurrency:
+  group: inboxpay-production-schema
+  cancel-in-progress: false
+jobs:
+  release:
+    if: ${{ github.ref == 'refs/heads/main' && github.repository == 'ShalyX/inboxpay' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      RELEASE_MODE: ${{ inputs.mode }}
+      RELEASE_CONFIRMATION: ${{ inputs.confirmation }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Validate exact release request
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${SUPABASE_DB_PASSWORD:?Missing protected database credential}"
+          if [[ "$RELEASE_MODE" == 'apply-and-dry-run' ]]; then
+            [[ "$RELEASE_CONFIRMATION" == 'APPLY_DATA_CONTROLS_20261030' ]] || exit 1
+          elif [[ "$RELEASE_MODE" != 'dry-run' ]]; then exit 1; fi
+      - name: Pull PostgreSQL 17 client
+        run: docker pull postgres:17-alpine
+      - name: Prepare fixed migration
+        if: ${{ inputs.mode == 'apply-and-dry-run' }}
+        run: node scripts/privacy/build-release-sql.mjs /tmp/inboxpay-data-controls.sql
+      - name: Apply reviewed migration and record it atomically
+        if: ${{ inputs.mode == 'apply-and-dry-run' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          PGPASSWORD="$SUPABASE_DB_PASSWORD" docker run --rm \
+            -e PGPASSWORD --volume /tmp/inboxpay-data-controls.sql:/work/migration.sql:ro postgres:17-alpine \
+            psql --dbname="host=aws-0-eu-west-1.pooler.supabase.com port=5432 dbname=postgres user=postgres.ecportgmionyhlofyobc sslmode=require" \
+            --no-psqlrc --quiet --set=ON_ERROR_STOP=1 --file=/work/migration.sql
+      - name: Verify privileges and read production retention counts
+        shell: bash
+        run: |
+          set -euo pipefail
+          PGPASSWORD="$SUPABASE_DB_PASSWORD" docker run --rm \
+            -e PGPASSWORD --volume "$PWD:/work:ro" --workdir /work postgres:17-alpine \
+            psql --dbname="host=aws-0-eu-west-1.pooler.supabase.com port=5432 dbname=postgres user=postgres.ecportgmionyhlofyobc sslmode=require" \
+            --no-psqlrc --quiet --tuples-only --no-align --set=ON_ERROR_STOP=1 \
+            --file=scripts/verification/privacy-retention-dry-run.sql
+          echo 'Production dry run finished in a read-only transaction; no retention was applied.'

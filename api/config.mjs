@@ -12,7 +12,8 @@ export default function handler(req, res) {
     return res.status(405).json({ error: "Method Not Allowed" });
   }
   try {
-    return res.status(200).json({ ...publicSupabaseConfig(), previewReadOnly: isReadOnlyPreview() });
+    return res.status(200).json({ ...publicSupabaseConfig(), previewReadOnly: isReadOnlyPreview(),
+      dataControlsEnabled: process.env.INBOXPAY_DATA_CONTROLS_ENABLED === 'true' });
   } catch (error) {
     return res.status(500).json({ error: error instanceof Error ? error.message : "Config unavailable" });
   }

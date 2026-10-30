@@ -60,6 +60,7 @@ Apply committed migrations in filename order:
 11. `supabase/migrations/20261020000000_customer_payment_notifications.sql`
 12. `supabase/migrations/20261020000001_financial_write_boundary.sql`
 13. `supabase/migrations/20261021000000_vendor_sender_audit_boundary.sql`
+14. `supabase/migrations/20261030000000_privacy_requests_and_retention.sql` — data requests and bounded retention; no deletion runs during migration. Keep request intake and retention activation off until the [data-controls activation sequence](./DATA-CONTROLS.md) is approved and verified.
 
 The first four files are the exact foundational migrations already recorded by the production Supabase project. Do not squash, renumber, or replace them. They make clean-room deployment reproducible while preserving production migration identity.
 

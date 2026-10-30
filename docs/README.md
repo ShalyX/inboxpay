@@ -11,6 +11,7 @@ InboxPay helps businesses handle invoices and USDC payments from Gmail. This ind
 - [Landing media](./MEDIA.md) — photographic sources, licenses, playback behavior, and asset budgets.
 - [Operations runbook](../AUTONOMY-RUNBOOK.md) — worker health, recovery, and emergency response.
 - [Backup and recovery](./BACKUP-RECOVERY.md) — encrypted off-site backups and disposable restore drills.
+- [Data controls](./DATA-CONTROLS.md) — owner requests, approved retention scope, activation and recovery limits.
 - [Gmail setup](../GMAIL-SETUP.md) — Google OAuth configuration and invoice ingestion.
 
 ## Evidence boundary

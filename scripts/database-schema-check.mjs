@@ -17,7 +17,8 @@ const requiredFiles = [
   "20261019000001_fix_telegram_link_conflict.sql",
   "20261020000000_customer_payment_notifications.sql",
   "20261020000001_financial_write_boundary.sql",
-  "20261021000000_vendor_sender_audit_boundary.sql"
+  "20261021000000_vendor_sender_audit_boundary.sql",
+  "20261030000000_privacy_requests_and_retention.sql"
 ];
 
 assert.deepEqual(files, requiredFiles, "Migration inventory or ordering changed without updating the schema gate");

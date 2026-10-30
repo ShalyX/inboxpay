@@ -17,6 +17,8 @@ The server reloads business ownership and active network state for every protect
 | --- | --- | --- | --- |
 | `/api/config` | `GET` | Public | Returns the public Supabase URL and publishable key required by the browser. |
 | `/api/session` | `GET` | User | Returns the authenticated user, active business/network projection, and Gmail integration metadata. |
+| `/api/session?view=data_requests` | `GET` | User | Feature-gated list of the owner's last 20 scoped data requests and business identity. |
+| `/api/session` | `POST` | User | Feature-gated `request_data_removal`: exact `businessId`, UUID `requestId`, `scope` (`invoice_evidence`, `workspace_closure`, `export`) and `confirm:true`. Records a review request, not deletion or a financial change. |
 | `/api/session` | `POST` | User | `{action:"disconnect_gmail",confirm:true}` clears stored Gmail tokens and account metadata for the authenticated owner's business across networks. Retains the integration row and invoice references. Does not revoke Google's grant or alter payment authority. Preview writes are rejected. |
 | `/api/onboarding` | `POST` | User | `approve` loads an existing business. For a new owner, it returns `business: null` and `onboarding.businessNameRequired: true` until an explicit `businessName` is supplied. It then creates the owner-scoped business, network account and draft policy. Other actions are `rename_business`, `select_network`, and `provision_wallet`. Mainnet selection and wallet creation require `confirmMainnet: true`. |
 | `/api/gmail/start` | `GET` | User | Starts Gmail OAuth with signed, expiring state bound to the user and business. |
@@ -54,6 +56,8 @@ Business-name setup accepts 2–80 characters, collapses repeated whitespace and
 - `500/503`: provider or server failure. Financial clients must not interpret this as permission to resubmit with a new idempotency key.
 
 ## Idempotency and retries
+
+Data-request intake requires `INBOXPAY_DATA_CONTROLS_ENABLED=true` after the privacy migration. It otherwise returns 503 without making provider calls. The public config advertises only a boolean feature flag; no privileged credential. Preview POSTs remain blocked. The owner-scoped SQL RPC reuses the same request ID and coalesces concurrent open requests for the same business/scope. Retrying after a lost response must use the same ID. A 200 includes `removalCompleted:false` and `paymentAuthorityChanged:false`. Neither that receipt nor a timeout establishes completed deletion or export. See [data controls](./DATA-CONTROLS.md) for the separate operator review and approved retention job.
 
 Gmail disconnection is repeatable. A successful response includes `storedTokensRemoved: true`, `googleGrantRevoked: false`, `recordsDeleted: false`, and `paymentAuthorityChanged: false`. `auditRecorded: false` means credential removal succeeded but the separate audit write failed. A 503 or lost response does not confirm removal: retry the same disconnect action. No tokens are returned. Refresh writes and OAuth callbacks use conditional updates so an older request cannot silently restore removed credentials. An already-started provider request can finish; this is not cancellation of in-flight scans or payments. Removing Google consent is a separate user action.
 

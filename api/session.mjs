@@ -2,6 +2,7 @@ import { requireUser, supabaseRest } from "../lib/supabase-server.mjs";
 import { getBusiness } from "../lib/businesses.mjs";
 import { getSupabaseServerSecret } from "../lib/supabase-server.mjs";
 import { rejectPreviewRequest } from "../lib/preview-boundary.mjs";
+import dataRequestRoute from "../lib/data-request-route.mjs";
 
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");
@@ -10,6 +11,8 @@ export default async function handler(req, res) {
     res.setHeader("Allow", "GET, POST");
     return res.status(405).json({ error: "Method Not Allowed" });
   }
+  if ((req.method === 'GET' && req.query?.view === 'data_requests')
+    || (req.method === 'POST' && req.body?.action === 'request_data_removal')) return dataRequestRoute(req, res);
   if (req.method === "POST" && (req.body?.action !== "disconnect_gmail" || req.body?.confirm !== true)) {
     return res.status(400).json({ error: "Explicit Gmail disconnection confirmation is required" });
   }

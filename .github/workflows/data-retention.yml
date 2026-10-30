@@ -1,0 +1,40 @@
+name: Business data retention
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        options: [dry-run, apply]
+        default: dry-run
+        description: Apply requires the separate repository activation variable
+  schedule:
+    - cron: '47 3 * * *'
+permissions:
+  contents: read
+concurrency:
+  group: inboxpay-data-retention
+  cancel-in-progress: false
+jobs:
+  retention:
+    if: ${{ github.event_name == 'workflow_dispatch' || vars.INBOXPAY_RETENTION_ENABLED == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SUPABASE_URL: ${{ vars.SUPABASE_URL }}
+      SUPABASE_RETENTION_SERVICE_KEY: ${{ secrets.SUPABASE_RETENTION_SERVICE_KEY }}
+      INBOXPAY_RETENTION_ENABLED: ${{ vars.INBOXPAY_RETENTION_ENABLED }}
+      REQUESTED_MODE: ${{ inputs.mode }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run bounded retention batch
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$REQUESTED_MODE" == "apply" || "$GITHUB_EVENT_NAME" == "schedule" ]]; then
+            node scripts/privacy/run-retention.mjs --apply
+          else
+            node scripts/privacy/run-retention.mjs
+          fi
