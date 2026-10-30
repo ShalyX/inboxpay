@@ -91,7 +91,19 @@ confirmation `APPLY_DATA_CONTROLS_20261030`. It records the migration source in 
 existing Supabase migration ledger atomically, rejects a changed applied source,
 checks privileges, then calls retention with `true` inside a read-only transaction.
 It never runs retention apply or enables request intake/scheduled deletion.
-The separate scheduled REST runner below still requires its own activation setup.
+The **Business data retention** workflow now uses that same protected database
+connection and fixed SQL. It does not need a new REST credential. Manual apply
+requires `APPLY_RETENTION_BATCH`; scheduled apply additionally requires the
+repository variable `INBOXPAY_RETENTION_ENABLED=true`. The scheduled time is
+03:47 UTC daily (04:47 in Lagos); GitHub may delay scheduled starts.
+
+The fixed apply SQL captures at most 500 candidates in each category and locks
+them inside a repeatable-read transaction. It verifies exact deletion/redaction
+counts, retained source keys and cleared payload/error/lease fields before
+committing. A mismatch rolls back. A summary receipt is printed only after commit,
+followed by aggregate remaining-candidate counts. It cannot close a workspace or
+change financial records or request intake. The optional local REST runner above
+still requires its own private credential if used separately.
 
 1. Review migration `20261030000000_privacy_requests_and_retention.sql` and run
    `npm run test:privacy-retention`, `test:data-request-route`, `test:data-controls`,
@@ -99,13 +111,14 @@ The separate scheduled REST runner below still requires its own activation setup
 2. Deploy reviewed code and apply the migration using the normal controlled
    migration process. Keep both activation variables unset/false. There is no
    migration-time deletion and no cron installed in Supabase by this migration.
-3. Configure GitHub `SUPABASE_URL` variable and private
-   `SUPABASE_RETENTION_SERVICE_KEY` secret in a protected context. This is a
-   privileged server credential: never expose it in the browser. Confirm failure
-   notifications for the workflow and identify its responsible operator.
+3. Confirm the existing protected `SUPABASE_DB_PASSWORD` connection and reviewed
+   main-branch workflow. No credential value belongs in arguments, logs or the
+   browser. Failed runs remain visible in GitHub Actions; identify the operator
+   responsible for reviewing them. Do not assume external paging is configured.
 4. Dispatch **Business data retention** in its default `dry-run` mode. Inspect
-   aggregate counts and target environment privately. Obtain exact activation
-   approval before setting `INBOXPAY_RETENTION_ENABLED=true` and running apply.
+   aggregate counts and target environment privately. Obtain exact cleanup
+   approval before manual apply with its confirmation. After verified cleanup,
+   obtain schedule activation approval before setting `INBOXPAY_RETENTION_ENABLED=true`.
    Scheduled execution skips entirely while that variable is not true.
 5. Verify a successful applied batch and a second dry-run. Check no eligible
    payloads remain within the drained batch and payment rows are unchanged.

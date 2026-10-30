@@ -6,7 +6,11 @@ on:
         type: choice
         options: [dry-run, apply]
         default: dry-run
-        description: Apply requires the separate repository activation variable
+        description: Apply one bounded and verified cleanup batch
+      confirmation:
+        type: string
+        default: ''
+        description: For manual apply, type APPLY_RETENTION_BATCH
   schedule:
     - cron: '47 3 * * *'
 permissions:
@@ -16,25 +20,44 @@ concurrency:
   cancel-in-progress: false
 jobs:
   retention:
-    if: ${{ github.event_name == 'workflow_dispatch' || vars.INBOXPAY_RETENTION_ENABLED == 'true' }}
+    if: ${{ github.repository == 'ShalyX/inboxpay' && github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || vars.INBOXPAY_RETENTION_ENABLED == 'true') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
-      SUPABASE_URL: ${{ vars.SUPABASE_URL }}
-      SUPABASE_RETENTION_SERVICE_KEY: ${{ secrets.SUPABASE_RETENTION_SERVICE_KEY }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
       INBOXPAY_RETENTION_ENABLED: ${{ vars.INBOXPAY_RETENTION_ENABLED }}
       REQUESTED_MODE: ${{ inputs.mode }}
+      CONFIRMATION: ${{ inputs.confirmation }}
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
-      - name: Run bounded retention batch
+      - name: Validate retention mode and approval
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "$REQUESTED_MODE" == "apply" || "$GITHUB_EVENT_NAME" == "schedule" ]]; then
-            node scripts/privacy/run-retention.mjs --apply
+          : "${SUPABASE_DB_PASSWORD:?Missing protected database credential}"
+          if [[ "$GITHUB_EVENT_NAME" == 'schedule' ]]; then
+            [[ "$INBOXPAY_RETENTION_ENABLED" == 'true' ]] || exit 1
+          elif [[ "$REQUESTED_MODE" == 'apply' ]]; then
+            [[ "$CONFIRMATION" == 'APPLY_RETENTION_BATCH' ]] || exit 1
+          elif [[ "$REQUESTED_MODE" != 'dry-run' ]]; then exit 1; fi
+      - name: Pull PostgreSQL 17 client
+        run: docker pull postgres:17-alpine
+      - name: Execute fixed retention SQL
+        shell: bash
+        run: |
+          set -euo pipefail
+          export PGCONNECT_TIMEOUT=15
+          if [[ "$GITHUB_EVENT_NAME" == 'schedule' || "$REQUESTED_MODE" == 'apply' ]]; then
+            PGPASSWORD="$SUPABASE_DB_PASSWORD" docker run --rm \
+              -e PGPASSWORD -e PGCONNECT_TIMEOUT --volume "$PWD:/work:ro" --workdir /work postgres:17-alpine \
+              psql --dbname="host=aws-0-eu-west-1.pooler.supabase.com port=5432 dbname=postgres user=postgres.ecportgmionyhlofyobc sslmode=require" \
+              --no-psqlrc --quiet --tuples-only --no-align --set=ON_ERROR_STOP=1 \
+              --command="set inboxpay.retention_mode='approved_apply'" \
+              --file=scripts/privacy/apply-retention-batch.sql
           else
-            node scripts/privacy/run-retention.mjs
+            PGPASSWORD="$SUPABASE_DB_PASSWORD" docker run --rm \
+              -e PGPASSWORD -e PGCONNECT_TIMEOUT --volume "$PWD:/work:ro" --workdir /work postgres:17-alpine \
+              psql --dbname="host=aws-0-eu-west-1.pooler.supabase.com port=5432 dbname=postgres user=postgres.ecportgmionyhlofyobc sslmode=require" \
+              --no-psqlrc --quiet --tuples-only --no-align --set=ON_ERROR_STOP=1 \
+              --file=scripts/verification/privacy-retention-dry-run.sql
           fi
