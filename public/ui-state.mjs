@@ -31,6 +31,19 @@ export function invoiceQueueCategory(invoice = {}, paymentReady = false) {
   return "review";
 }
 
+// Presentation only. Payment eligibility continues to use live preflight.
+export function invoiceDisplayState(invoice = {}, { checking = false, settled = false } = {}) {
+  if (checking) return "CHECKING";
+  const payment = invoice.settlement || {};
+  if (payment.reconciled === true) return "RECONCILED";
+  if (settled || payment.status === "confirmed" || payment.onchainDuplicate === true) return "CONFIRMED";
+  if (payment.status === "processing" || payment.status === "pending") return "PENDING";
+  if (payment.status === "failed") return "FAILED";
+  if (payment.status === "review") return "REVIEW";
+  if (payment.status === "scheduled") return "SCHEDULED";
+  return invoice.agentDecision || "REVIEW";
+}
+
 export function singleFlight(action) {
   let pending = null;
   return (...args) => {
@@ -60,7 +73,7 @@ export function activateDestination(destination, sections, navItems, inboxConten
   if (inboxContent) inboxContent.inert = destination !== "inbox";
 }
 
-const WORKSPACE_DESTINATIONS = new Set(["inbox", "payments", "policy", "audit", "business", "vendors", "notifications"]);
+const WORKSPACE_DESTINATIONS = new Set(["inbox", "payments", "policy", "audit", "business", "vendors", "notifications", "setup"]);
 
 export function destinationFromHash(hash = "") {
   const destination = String(hash).replace(/^#\/?/, "").trim().toLowerCase();

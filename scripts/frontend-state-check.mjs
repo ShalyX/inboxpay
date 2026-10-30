@@ -9,6 +9,7 @@ import {
   destinationFromHash,
   inboxFailurePresentation,
   invoiceQueueCategory,
+  invoiceDisplayState,
   networkLabel,
   paymentFlowStep,
   singleFlight
@@ -26,6 +27,7 @@ assert.equal(destinationFromHash("#/vendors"), "vendors");
 assert.equal(destinationFromHash("#unknown"), "inbox");
 assert.equal(destinationFromHash("#operations"), "inbox", "Operator screens must not be reachable from the business workspace");
 assert.equal(destinationFromHash("#notifications"), "notifications");
+assert.equal(destinationFromHash("#setup"), "setup", "guided setup has a stable workspace destination");
 assert.equal(destinationFromHash(""), "inbox");
 assert.equal(auditEventLabel("payment_settled"), "Payment settled and reconciled");
 assert.equal(auditEventLabel("custom_business_event"), "Custom business event");
@@ -95,6 +97,14 @@ assert.equal(invoiceQueueCategory({ settlement: { status: "confirmed" } }, false
 assert.equal(invoiceQueueCategory({ settlement: { reconciled: true } }, false), "settled");
 assert.equal(invoiceQueueCategory({ invoiceNumber: "INV-1" }, true), "ready");
 assert.equal(invoiceQueueCategory({ invoiceNumber: "INV-1" }, false), "review");
+
+assert.equal(invoiceDisplayState({ settlement: { status: "confirmed" } }), "CONFIRMED", "confirmation alone must not claim reconciliation");
+assert.equal(invoiceDisplayState({ settlement: { status: "confirmed", reconciled: true } }), "RECONCILED");
+assert.equal(invoiceDisplayState({ settlement: { onchainDuplicate: true } }), "CONFIRMED", "duplicate evidence does not imply a matched record");
+assert.equal(invoiceDisplayState({ settlement: { status: "processing" } }), "PENDING");
+assert.equal(invoiceDisplayState({ settlement: { status: "failed" } }), "FAILED");
+assert.equal(invoiceDisplayState({ settlement: { status: "confirmed" } }, { checking: true }), "CHECKING", "fresh preflight takes priority over saved labels");
+assert.equal(invoiceDisplayState({ agentDecision: "PAY_NOW" }), "PAY_NOW");
 
 const configFailure = inboxFailurePresentation("INBOXPAY_TOKEN_ENCRYPTION_KEY must be a 32-byte hex key");
 assert.equal(configFailure.kind, "service");
@@ -191,6 +201,16 @@ assert.equal(focused, "replacement");
 assert.equal(fakeDialog.ownerDocument.body.style.overflow, "auto");
 drawer.close();
 
+// A desktop invoice sheet is nonmodal: queue navigation and body scrolling stay available.
+fakeDialog.show = function () { this.open = true; };
+const desktopSheet = createDialog(fakeDialog, { modal: () => false });
+desktopSheet.open(replacementOpener);
+assert.equal(desktopSheet.isOpen, true);
+assert.equal(desktopSheet.isModal, false);
+assert.equal(fakeDialog.ownerDocument.body.style.overflow, "auto");
+desktopSheet.close();
+assert.equal(fakeDialog.ownerDocument.body.style.overflow, "auto");
+
 const mediaSource = await readFile(new URL("../public/landing-media.js", import.meta.url), "utf8");
 const filmEvents = new Map();
 const sourceEvents = new Map();
@@ -240,6 +260,95 @@ assert.ok((await readFile(new URL("../public/media/studio-film.mp4", import.meta
 
 // Exercise real render functions: unavailable data must not look disconnected/empty.
 const appSource = await readFile(new URL("../public/inboxpay.js", import.meta.url), "utf8");
+// Exercise the real Gmail handlers: disclosure, cancellation and late responses.
+const gmailNodes = new Map();
+const gmailNode = (id) => {
+  if (!gmailNodes.has(id)) gmailNodes.set(id, {
+    textContent: "", disabled: false, events: new Map(),
+    addEventListener(event, handler) { this.events.set(event, handler); }
+  });
+  return gmailNodes.get(id);
+};
+const gmailState = {
+  session: { user: { id: "owner-a" } },
+  business: { id: "business-a", name: "Example Studio" }, gmail: null
+};
+const gmailUi = {
+  isOpen: false,
+  open(trigger) { this.isOpen = true; this.trigger = trigger; },
+  close() { this.isOpen = false; gmailNode("gmail-dialog").events.get("close")(); }
+};
+let gmailStarts = 0;
+let finishGmailStart;
+let latestGmailSignal;
+const gmailNavigations = [];
+const gmailHandlersStart = appSource.indexOf("let gmailConnectionRequest = null;");
+const gmailHandlersEnd = appSource.indexOf("async function disconnectGmail()", gmailHandlersStart);
+assert.ok(gmailHandlersStart >= 0 && gmailHandlersEnd > gmailHandlersStart);
+const gmailHandlers = runInNewContext(appSource.slice(gmailHandlersStart, gmailHandlersEnd) + "\n({ connectGmail, startGmailConnection })", {
+  state: gmailState, $: gmailNode, gmailDialog: gmailUi, AbortController, URL,
+  apiFetch: async (url, options) => {
+    assert.equal(url, "/api/gmail/start");
+    gmailStarts += 1;
+    latestGmailSignal = options.signal;
+    return new Promise((resolve) => { finishGmailStart = resolve; });
+  },
+  readJsonResponse: async (response) => response.body,
+  window: { location: { assign: (url) => gmailNavigations.push(url) } }
+});
+const gmailOpener = { id: "empty-connect" };
+gmailHandlers.connectGmail({ currentTarget: gmailOpener });
+assert.equal(gmailUi.isOpen, true);
+assert.equal(gmailUi.trigger, gmailOpener);
+assert.equal(gmailNode("gmail-dialog-business").textContent, "Example Studio");
+assert.equal(gmailStarts, 0, "reading the disclosure does not start authorization");
+gmailNode("gmail-cancel").events.get("click")();
+await gmailHandlers.startGmailConnection();
+assert.equal(gmailStarts, 0, "closed disclosure cannot start authorization");
+gmailHandlers.connectGmail();
+const cancelledStart = gmailHandlers.startGmailConnection();
+await gmailHandlers.startGmailConnection();
+assert.equal(gmailStarts, 1, "repeated Continue clicks start one request");
+assert.equal(gmailNode("gmail-continue").disabled, true);
+gmailUi.close();
+assert.equal(latestGmailSignal.aborted, true);
+finishGmailStart({ ok: true, body: { url: "https://accounts.google.com/o/oauth2/v2/auth?state=synthetic" } });
+await cancelledStart;
+assert.equal(gmailNavigations.length, 0, "late response cannot navigate after cancellation");
+assert.equal(gmailNode("gmail-continue").disabled, false);
+gmailHandlers.connectGmail();
+const failedStart = gmailHandlers.startGmailConnection();
+finishGmailStart({ ok: false, body: { error: "Connection temporarily unavailable" } });
+await failedStart;
+assert.equal(gmailNode("gmail-connection-message").textContent, "Connection temporarily unavailable");
+assert.equal(gmailNode("gmail-continue").disabled, false, "failure allows explicit retry");
+const retryStart = gmailHandlers.startGmailConnection();
+finishGmailStart({ ok: true, body: { url: "https://accounts.google.com/o/oauth2/v2/auth?state=synthetic" } });
+await retryStart;
+assert.equal(gmailNavigations.length, 1);
+gmailNavigations.length = 0;
+const changedBusinessStart = gmailHandlers.startGmailConnection();
+gmailState.business = { id: "business-b", name: "Other business" };
+finishGmailStart({ ok: true, body: { url: "https://accounts.google.com/o/oauth2/v2/auth" } });
+await changedBusinessStart;
+assert.equal(gmailNavigations.length, 0, "changed business cannot use an earlier response");
+const unexpectedRedirect = gmailHandlers.startGmailConnection();
+finishGmailStart({ ok: true, body: { url: "https://example.invalid/o/oauth2/v2/auth" } });
+await unexpectedRedirect;
+assert.equal(gmailNavigations.length, 0, "unexpected authorization hosts are rejected");
+assert.match(gmailNode("gmail-connection-message").textContent, /could not be opened/);
+gmailUi.close();
+gmailState.gmail = { status: "reauthorization_required" };
+gmailHandlers.connectGmail();
+assert.equal(gmailNode("gmail-dialog-title").textContent, "Reconnect business Gmail");
+gmailUi.close();
+const startsBeforePreview = gmailStarts;
+gmailState.previewReadOnly = true;
+gmailHandlers.connectGmail();
+assert.equal(gmailUi.isOpen, false, "read-only preview cannot open a connection flow");
+await gmailHandlers.startGmailConnection();
+assert.equal(gmailStarts, startsBeforePreview);
+
 const qaNodes = new Map();
 const qaNode = (id) => {
   if (!qaNodes.has(id)) qaNodes.set(id, { textContent: "", innerHTML: "", className: "", hidden: false });

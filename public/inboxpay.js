@@ -1,5 +1,6 @@
+import { mountWorkspace, paintWorkspaceNavigation, renderSetupGuide } from "./workspace-layout.js";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { activateDestination, auditEventCategory, auditEventLabel, destinationFromHash, inboxFailurePresentation, invoiceQueueCategory, networkLabel, paymentFlowStep, singleFlight } from "./ui-state.mjs";
+import { activateDestination, auditEventCategory, auditEventLabel, destinationFromHash, inboxFailurePresentation, invoiceQueueCategory, invoiceDisplayState, networkLabel, paymentFlowStep, singleFlight } from "./ui-state.mjs";
 import { createDialog } from "./dialog.js";
 import { businessNameNeedsReview } from "./ui-state.mjs";
 
@@ -52,12 +53,40 @@ async function readJsonResponse(response) {
 }
 
 const $ = (id) => document.getElementById(id);
+mountWorkspace();
+$("invoice-sheet-host").append($("invoice-drawer"));
+const invoiceSheetBreakpoint = window.matchMedia("(max-width: 1100px)");
 const invoiceDrawer = createDialog($("invoice-drawer"), {
+  modal: () => invoiceSheetBreakpoint.matches,
   resolveOpener: () => [...document.querySelectorAll("[data-invoice]")].find((row) =>
     decodeURIComponent(row.dataset.invoice) === state.selected?.invoiceNumber
   ) || $("queue-search")
 });
+invoiceSheetBreakpoint.addEventListener("change", () => {
+  if (!invoiceDrawer.isOpen) return;
+  $("invoice-drawer").addEventListener("close", () => window.requestAnimationFrame(() => {
+    if (activeDestination === "inbox" && state.selected) invoiceDrawer.open();
+  }), { once: true });
+  invoiceDrawer.close();
+});
+window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && invoiceDrawer.isOpen && !invoiceDrawer.isModal && !document.querySelector("dialog:modal")) invoiceDrawer.close();
+});
+const compactWorkspaceBreakpoint = window.matchMedia("(max-width: 800px)");
+function syncWorkspaceControls() { $("workspace-controls").open = false; }
+compactWorkspaceBreakpoint.addEventListener("change", syncWorkspaceControls);
+syncWorkspaceControls();
 const authDialog = createDialog($("auth-dialog"));
+const gmailDialog = createDialog($("gmail-dialog"), { resolveOpener: () => $("connect-gmail") });
+const vendorEntryDialog = createDialog($("vendor-entry-dialog"), { resolveOpener: () => $("new-vendor") });
+let guideStep = 0;
+function updateSetupGuide() {
+  renderSetupGuide(state, guideStep, {
+    business: () => openBusinessModal(), gmail: connectGmail, policy: () => openPolicyModal(),
+    step: (step) => { guideStep = step; updateSetupGuide(); }
+  });
+}
+function openSetup() { setDestination("setup"); renderSetup(); updateSetupGuide(); }
 document.querySelectorAll("[data-auth-open]").forEach((button) => button.addEventListener("click", () => authDialog.open(button)));
 $("auth-close").addEventListener("click", () => authDialog.close());
 $("close-invoice").addEventListener("click", () => invoiceDrawer.close());
@@ -97,14 +126,17 @@ function preflightSettled(preflight) {
 
 function status(decision) {
   const map = {
-    PAY_NOW: ["approved", "Pay now"],
+    PAY_NOW: ["escalate", "Needs review"],
     HOLD: ["hold", "Held"],
-    ESCALATE: ["escalate", "Review"],
+    ESCALATE: ["escalate", "Needs review"],
     SCHEDULE: ["schedule", "Scheduled"],
     SCHEDULED: ["schedule", "Queued"],
-    SETTLED: ["approved", "Settled"],
+    SETTLED: ["approved", "Confirmed"],
+    CONFIRMED: ["approved", "Confirmed"],
+    RECONCILED: ["reconciled", "Reconciled"],
+    PENDING: ["pending", "Pending"],
     PROCESSING: ["schedule", "Processing"],
-    FAILED: ["escalate", "Retry"],
+    FAILED: ["failed", "Failed"],
     CHECKING: ["schedule", "Checking"],
     REVIEW: ["escalate", "Review"]
   };
@@ -383,6 +415,8 @@ function renderPaymentFlow() {
 }
 
 function renderAccount() {
+  $("workspace-business-name").textContent = state.business?.name || "Your business";
+  $("workspace-controls-network").textContent = networkLabel(state.business?.wallet_blockchain);
   for (const id of ["signed-in-email", "signed-in-email-mobile"]) $(id).textContent = state.user?.email || "Account unavailable";
   for (const id of ["open-payments", "open-policy", "open-audit", "nav-business", "nav-vendors", "nav-notifications", "refresh", "connect-gmail", "network-switch"]) {
     $(id).disabled = state.businessNameRequired || (state.bootstrapError && !state.business) || (state.previewReadOnly && ["connect-gmail", "network-switch"].includes(id));
@@ -760,7 +794,12 @@ async function openBusinessModal(options = {}) {
       renderBusinessPage();
     }
   } catch {}
-  $("business-name-input").focus();
+  if (options.focusName) $("business-name-input").focus();
+  else {
+    $("business-modal").scrollTop = 0;
+    $("business-title").tabIndex = -1;
+    $("business-title").focus({ preventScroll: true });
+  }
 }
 
 function closeBusinessModal() {
@@ -1333,18 +1372,15 @@ function renderStats() {
   renderPaymentFlow();
   const settled = state.invoices.filter(invoiceSettled);
   const payable = state.invoices.filter(invoicePaymentReady);
-  const held = state.invoices.filter((x) => !invoiceSettled(x) && (
-    x.agentDecision !== "PAY_NOW" ||
-    ["processing", "failed", "review"].includes(x.settlement?.status)
-  ));
+  const held = state.invoices.filter((invoice) => queueCategory(invoice) === "review");
   const total = payable.reduce((sum, x) => sum + Number(x.amount || 0), 0);
   $("invoice-count").textContent = state.invoices.length;
   $("payment-count").textContent = settled.length;
   $("queue-count").textContent = state.invoices.length + (state.invoices.length === 1 ? " invoice" : " invoices");
   const metrics = [
-    ["◎", "Ready for payment", total.toFixed(2) + " USDC", payable.length + " invoices · final checks on open"],
-    ["◷", "Needs you", String(held.length), "invoices awaiting review"],
-    ["✓", "Paid", String(settled.length), "confirmed & reconciled"],
+    ["◎", "Ready for review", total.toFixed(2) + " USDC", payable.length + " invoices · final checks on open"],
+    ["◷", "Needs attention", String(held.length), "invoices awaiting review"],
+    ["✓", "Payments confirmed", String(settled.length), state.invoices.filter((invoice) => invoice.settlement?.reconciled === true).length + " reconciled to invoice records"],
     ["⌁", "Scheduled", String(state.invoices.filter((invoice) => !invoiceSettled(invoice) && (invoice.settlement?.status === "scheduled" || invoice.agentDecision === "SCHEDULE")).length), "queued or due later"]
   ];
   if (state.inboxStatus === "error") {
@@ -1355,7 +1391,7 @@ function renderStats() {
   }
   $("stats").innerHTML = metrics.map(([icon, label, value, meta]) =>
     '<div class="stat"><div class="stat-icon">' + icon + '</div><div><span>' + label +
-    '</span><strong>' + value + '</strong><small>' + meta + '</small></div></div>'
+    '</span><strong>' + escapeHtml(value).replace(/ USDC$/, '<span class="stat-unit">USDC</span>') + '</strong><small>' + meta + '</small></div></div>'
   ).join("");
   renderQueueControls();
 }
@@ -1383,10 +1419,10 @@ function renderQueueControls() {
     return summary;
   }, { ready: 0, review: 0, settled: 0 });
   const filters = [
-    ["all", "All", state.invoices.length],
+    ["all", "All invoices", state.invoices.length],
     ["ready", "Ready", counts.ready],
-    ["review", "Review", counts.review],
-    ["settled", "Settled", counts.settled]
+    ["review", "Needs attention", counts.review],
+    ["settled", "Paid", counts.settled]
   ];
   node.innerHTML = filters.map(([value, label, count]) =>
     '<button type="button" class="filter-button' + (state.queue.filter === value ? " active" : "") + '" data-queue-filter="' + value + '" aria-pressed="' + (state.queue.filter === value) + '"><span>' + label + '</span><b>' + count + '</b></button>'
@@ -1411,26 +1447,14 @@ function renderList() {
   }
   $("invoice-list").innerHTML = '<div class="queue-list">' + visibleInvoices.map((invoice) => {
     const selected = state.selected?.invoiceNumber === invoice.invoiceNumber ? " selected" : "";
-    const displayDecision = state.preflightLoading && selected
-      ? "CHECKING"
-      : invoiceSettled(invoice)
-      ? "SETTLED"
-      : invoice.settlement?.status === "processing"
-        ? "PROCESSING"
-        : invoice.settlement?.status === "scheduled"
-          ? "SCHEDULED"
-        : invoice.settlement?.status === "failed"
-          ? "FAILED"
-          : invoice.settlement?.status === "review"
-            ? "REVIEW"
-            : invoice.agentDecision;
+    const displayDecision = invoiceDisplayState(invoice, { checking: Boolean(state.preflightLoading && selected) });
     return '<button class="invoice-row' + selected + '" type="button" aria-current="' + (selected ? "true" : "false") + '" data-category="' + queueCategory(invoice) + '" data-invoice="' +
-      encodeURIComponent(invoice.invoiceNumber) + '"><div class="avatar">' +
-      escapeHtml((invoice.vendor || "V").slice(0, 1)) + '</div><div class="main"><div class="row-title"><strong>' +
-      escapeHtml(invoice.vendor || "Unknown vendor") + '</strong>' + status(displayDecision) + '</div><span class="sub">' +
-      escapeHtml(invoice.invoiceNumber || "Missing invoice number") + ' · due ' + escapeHtml(invoice.dueDate || "not found") +
-      '</span></div><div class="amount">' + Number(invoice.amount || 0).toFixed(2) + ' ' +
-      escapeHtml(invoice.currency || "") + '</div><span class="chev">›</span></button>';
+      encodeURIComponent(invoice.invoiceNumber) + '"><span class="invoice-identity"><span class="avatar" aria-hidden="true">' +
+      escapeHtml((invoice.vendor || "V").slice(0, 1)) + '</span><span class="main"><span class="row-title"><strong>' +
+      escapeHtml(invoice.vendor || "Unknown vendor") + '</strong></span><span class="sub">' + escapeHtml(invoice.invoiceNumber || "Missing invoice number") +
+      '</span><span class="mobile-due">Due ' + escapeHtml(invoice.dueDate || "not found") + '</span></span></span><span class="amount">' +
+      (invoice.amount == null ? "Missing amount" : Number(invoice.amount).toFixed(2)) + '<small>' + escapeHtml(invoice.currency || "Currency missing") +
+      '</small></span><span class="invoice-due"><span>' + escapeHtml(invoice.dueDate || "Missing due date") + '</span></span><span class="invoice-state">' + status(displayDecision) + '</span></button>';
   }).join("") + '</div>';
 
   document.querySelectorAll(".invoice-row").forEach((button) => {
@@ -1469,19 +1493,7 @@ function renderDetail() {
     vendor?.onchain_status === "registered" &&
     (vendor?.invoice_sender_emails || []).length > 0;
   const ready = !state.previewReadOnly && Boolean(preflight?.eligible);
-  const detailStatus = checking
-    ? "CHECKING"
-    : settled
-      ? "SETTLED"
-      : processing
-      ? "PROCESSING"
-      : invoice.settlement?.status === "scheduled"
-        ? "SCHEDULED"
-      : invoice.settlement?.status === "failed"
-        ? "FAILED"
-        : reviewRequired
-          ? "REVIEW"
-          : invoice.agentDecision;
+  const detailStatus = invoiceDisplayState(invoice, { checking, settled });
   const settlementNetwork = state.business?.wallet_blockchain === "ARC-TESTNET"
     ? "Arc Testnet"
     : state.business?.wallet_blockchain === "ARC"
@@ -1491,7 +1503,7 @@ function renderDetail() {
   const reasons = checking
     ? ["Checking the current settlement state before showing payment actions."]
     : settled
-      ? ["Payment executed and reconciled on " + settlementNetwork + "."]
+      ? [invoice.settlement?.reconciled === true ? "Payment confirmed and reconciled on " + settlementNetwork + "." : "Payment confirmed on " + settlementNetwork + ". Review the payment record for reconciliation evidence."]
       : (invoice.decisionReasons?.length ? invoice.decisionReasons : ["No decision reason recorded."]);
   const reasonsHtml = '<ul>' + reasons.map((reason) => '<li>' + escapeHtml(reason) + '</li>').join("") + '</ul>';
   const gateReasons = state.previewReadOnly ? ["Payments are disabled in this QA preview.", ...(preflight?.reasons || [])] : preflight?.reasons || ["Checking the live policy vault and payment state…"];
@@ -1527,17 +1539,21 @@ function renderDetail() {
     escapeHtml(invoice.invoiceNumber || "Needs review") + '</h2></div>' + status(detailStatus) + '</div>' +
     '<div class="merchant"><div class="avatar big">' + escapeHtml(vendorInitial) + '</div><div><strong>' +
     escapeHtml(invoice.vendor || "Unknown vendor") + '</strong><span>' + escapeHtml(invoice.currency || "Unknown") +
-    ' settlement · due ' + escapeHtml(invoice.dueDate || "not found") + '</span></div></div><div class="big-amount">' +
-    Number(invoice.amount || 0).toFixed(2) + ' <span>' + escapeHtml(invoice.currency || "") + '</span></div><div class="decision"><div class="decision-head">● Agent reasoning</div>' +
+    ' settlement</span></div></div><div class="big-amount">' +
+    Number(invoice.amount || 0).toFixed(2) + ' <span>' + escapeHtml(invoice.currency || "") + '</span></div><dl class="invoice-facts"><div><dt>Due date</dt><dd>' + escapeHtml(invoice.dueDate || "Not found") + '</dd></div><div><dt>Payment network</dt><dd>' + escapeHtml(settlementNetwork) + '</dd></div><div><dt>Recipient</dt><dd>' + escapeHtml(invoice.vendor || "Needs review") + '</dd></div><div><dt>Invoice currency</dt><dd>' + escapeHtml(invoice.currency || "Unknown") + '</dd></div></dl>' + renderInvoiceEvidence(invoice) + '<div class="decision"><div class="decision-head">Next action &amp; invoice notes</div>' +
     reasonsHtml + '<div class="confidence"><span>Extraction confidence</span><b>' +
     escapeHtml(invoice.extraction?.confidence || "unknown") + '</b></div><div class="confidence"><span>Invoice evidence</span><b>' +
     Number(invoice.sourceCount || invoice.sources?.length || 0) + " source" + (Number(invoice.sourceCount || invoice.sources?.length || 0) === 1 ? "" : "s") + '</b></div></div>' +
     scheduleHtml + '<details class="payment-details"' + (ready || settled ? '' : ' open') + '><summary>Payment checks <span>' + (checking ? 'Checking…' : ready ? 'Ready' : settled ? 'Complete' : 'Needs attention') + '</span></summary>' + gateHtml + '<div class="checks">' + checksHtml +
     (processing ? checkRow("Payment recovery", "In progress") : reviewRequired ? checkRow("Payment recovery", "Manual review") : "") +
-    '</div></details>' + (settled ? '<div class="settlement" id="settlement-receipt"><span>Payment receipt</span><b>Confirmed</b><small>Open Payments to view the transaction hash and reconciliation record.</small><button id="receipt-open-payments" class="ghost" type="button">View payment record ↗</button></div>' : "") +
+    '</div></details>' + (settled ? '<div class="settlement" id="settlement-receipt"><span>Payment record</span><b>' + (invoice.settlement?.reconciled === true ? 'Paid and reconciled' : 'Confirmed') + '</b><small>Open Payments to view the transaction hash and reconciliation evidence.</small><button id="receipt-open-payments" class="ghost" type="button">View payment record ↗</button></div>' : "") +
     '<button id="pay-button" class="pay"' + (ready ? "" : " disabled") +
-    '>' + (ready ? (invoice.settlement?.status === "failed" ? "Review & retry on Arc ↗" : "Review & settle on Arc ↗") : checking ? "Checking settlement state…" : settled ? "Settled on Arc ✓" : processing ? "Payment submitted · recovering…" : scheduled ? "Queued for review" : reviewRequired ? "Payment under review" : scheduleDecision ? "Schedule this invoice above" : preflight ? "Payment blocked" : "Checking payment gates…") + '</button></div>';
+    '>' + (ready ? (invoice.settlement?.status === "failed" ? "Review & retry on Arc ↗" : "Review & settle on Arc ↗") : checking ? "Checking settlement state…" : settled ? (invoice.settlement?.reconciled === true ? "Paid and reconciled ✓" : "Payment confirmed ✓") : processing ? "Payment submitted · recovering…" : scheduled ? "Queued for review" : reviewRequired ? "Payment under review" : scheduleDecision ? "Schedule this invoice above" : preflight ? "Payment blocked" : "Checking payment gates…") + '</button></div>';
 
+  const actionFooter = document.createElement("div");
+  actionFooter.className = "invoice-action";
+  actionFooter.append($("pay-button"));
+  $("detail").append(actionFooter);
   if (settled) { const receiptButton = $("receipt-open-payments"); if (receiptButton) receiptButton.addEventListener("click", () => openActivity("payments")); }
   if (ready) $("pay-button").addEventListener("click", settle);
   if (scheduleDecision && !autonomyEnabled) $("schedule-button").addEventListener("click", scheduleInvoice);
@@ -1545,6 +1561,15 @@ function renderDetail() {
   if (scheduled || dueReview) {
     $("cancel-schedule").addEventListener("click", cancelScheduledInvoice);
   }
+}
+
+function renderInvoiceEvidence(invoice) {
+  const sources = Array.isArray(invoice.sources) ? invoice.sources : [];
+  const names = { "gmail-email": "Gmail email", "gmail-pdf": "PDF attachment" };
+  return '<section class="invoice-evidence" aria-label="Invoice source evidence"><h3>Source evidence</h3>' +
+    (sources.length ? sources.map((source) => '<div class="evidence-source"><span aria-hidden="true">▤</span><div><strong>' + escapeHtml(names[source] || source) + '</strong><small>Recorded invoice source</small></div></div>').join("") :
+      '<p>' + Number(invoice.sourceCount || 0) + ' recorded source(s). Source documents are not available in this response.</p>') +
+    '<p class="evidence-note">Source metadata only. Original emails and PDFs are not served by this invoice record.</p></section>';
 }
 
 function checkRow(label, value) {
@@ -1597,7 +1622,7 @@ function renderActivitySummary(kind, rows) {
     const attention = rows.filter((row) => ["failed", "review"].includes(String(row.status).toLowerCase())).length;
     node.innerHTML = [
       pageMetric("Settlement records", String(rows.length), "All attempts for this business"),
-      pageMetric("Confirmed", String(confirmed.length), confirmedUsdc.toFixed(2) + " USDC reconciled", "ready"),
+      pageMetric("Confirmed", String(confirmed.length), confirmedUsdc.toFixed(2) + " USDC confirmed", "ready"),
       pageMetric("Needs attention", String(attention), attention ? "Review failed or flagged attempts" : "No failed attempts", attention ? "attention" : "ready")
     ].join("");
     return;
@@ -1633,13 +1658,18 @@ function renderActivity(kind, rows) {
     return;
   }
   if (kind === "payments") {
-    node.innerHTML = visibleRows.map((payment) => {
+    node.innerHTML = '<div class="payment-ledger" role="table" aria-label="Payment history"><div class="ledger-columns" role="row"><span role="columnheader">Vendor / invoice</span><span role="columnheader">Updated</span><span role="columnheader">Amount</span><span role="columnheader">Current state</span><span role="columnheader">Evidence / next action</span></div>' + visibleRows.map((payment) => {
       const statusValue = String(payment.status || "unknown").toLowerCase();
+      const paymentLabel = payment.reconciled === true ? "Reconciled" : statusValue === "processing" ? "Pending" : statusValue.charAt(0).toUpperCase() + statusValue.slice(1);
       const explorer = payment.network === "ARC" ? "https://arcscan.app/tx/" : "https://testnet.arcscan.app/tx/";
-      return '<article class="payment-record"><div class="record-status-mark ' + escapeHtml(statusValue) + '"></div><div class="record-primary"><span>' + escapeHtml(payment.vendor || "Unknown vendor") + '</span><strong>' + escapeHtml(payment.invoiceNumber || "Missing invoice number") + '</strong><small>' + escapeHtml(formatActivityDate(payment.updatedAt)) + '</small></div><div class="record-network"><span>' + escapeHtml(payment.network === "ARC" ? "Arc Mainnet" : "Arc Testnet") + '</span><b class="activity-status ' + escapeHtml(statusValue) + '">' + escapeHtml(statusValue) + '</b></div><div class="record-amount"><strong>' + Number(payment.amount || 0).toFixed(2) + '</strong><span>' + escapeHtml(payment.currency || "") + '</span></div><div class="record-receipt">' +
-        (payment.paymentId ? '<span title="' + escapeHtml(payment.paymentId) + '">ID ' + escapeHtml(payment.paymentId.slice(0, 10) + "…") + '</span>' : '<span>No payment ID</span>') +
-        (payment.paymentTxHash ? '<a href="' + explorer + encodeURIComponent(payment.paymentTxHash) + '" target="_blank" rel="noreferrer">View Arc receipt ↗</a>' : '<span>Receipt pending</span>') + '</div></article>';
-    }).join("");
+      return '<article class="payment-record ledger-row" role="row"><div class="ledger-identity" role="cell"><span class="vendor-avatar" aria-hidden="true">' + escapeHtml((payment.vendor || "V").slice(0,1)) + '</span><span><strong>' + escapeHtml(payment.vendor || "Unknown vendor") + '</strong><small>' + escapeHtml(payment.invoiceNumber || "Missing invoice number") + '</small></span></div><div class="ledger-date" role="cell">' + escapeHtml(formatActivityDate(payment.updatedAt)) + '</div><div class="ledger-amount" role="cell"><strong>' + Number(payment.amount || 0).toFixed(2) + '</strong><small>' + escapeHtml(payment.currency || "") + '</small></div><div role="cell"><span class="status ' + (statusValue === "processing" ? "pending" : statusValue === "failed" ? "failed" : payment.reconciled ? "reconciled" : "approved") + '">' + escapeHtml(paymentLabel) + '</span></div><div class="ledger-evidence" role="cell">' + (payment.paymentTxHash ? '<a href="' + explorer + encodeURIComponent(payment.paymentTxHash) + '" target="_blank" rel="noreferrer">View receipt ↗</a>' : '<button type="button" class="text-action" data-payment-invoice="' + encodeURIComponent(payment.invoiceNumber) + '">' + (statusValue === "failed" ? "Review invoice" : "View invoice") + ' ↗</button><small>' + (statusValue === "processing" ? "Receipt pending" : statusValue === "failed" ? "No confirmed receipt" : "Receipt not recorded") + '</small>') + '</div></article>';
+    }).join("") + '<div class="ledger-foot">' + visibleRows.length + ' payment records <span>Amounts in recorded currency</span></div></div>';
+    node.querySelectorAll("[data-payment-invoice]").forEach((button) => button.addEventListener("click", () => {
+      setDestination("inbox");
+      const number = decodeURIComponent(button.dataset.paymentInvoice);
+      const row = [...document.querySelectorAll("[data-invoice]")].find((item) => decodeURIComponent(item.dataset.invoice) === number);
+      if (row) row.click(); else toast("Refresh the invoice inbox to load this record.");
+    }));
     return;
   }
   node.innerHTML = visibleRows.map((event) => {
@@ -1662,9 +1692,9 @@ async function openActivity(kind, options = {}) {
   setDestination(kind, options.updateUrl !== false);
   const requestId = ++activityRequestId;
   $("activity-kicker").textContent = kind === "payments" ? "SETTLEMENTS" : "AUDIT TRAIL";
-  $("activity-title").textContent = kind === "payments" ? "Payments" : "Audit trail";
+  $("activity-title").textContent = kind === "payments" ? "Payments, accounted for." : "Workspace activity.";
   $("activity-context").textContent = kind === "payments"
-    ? "Every submitted, failed, processing, or reconciled payment for this business."
+    ? "Follow every transfer from submission to reconciliation."
     : "Business-scoped evidence for policy, vendor, wallet, and settlement decisions.";
   $("activity-message").textContent = "Loading live activity…";
   $("activity-message").className = "auth-message loading-message";
@@ -1755,20 +1785,10 @@ function renderVendors() {
     const chainStatus = vendor.onchain_status || "unavailable";
     const recipientMatch = registryStatus === "verified" && chainStatus === "registered";
     const senderEmails = vendor.invoice_sender_emails || [];
-    const chainLabel = chainStatus === "registered" ? "Registered" : chainStatus === "missing" ? "Missing" : chainStatus === "unavailable" ? "Unavailable" : "Not checked";
-    return '<div class="vendor-row"><div><strong>' + escapeHtml(vendor.name) + '</strong><span>' +
-    escapeHtml(vendor.recipient_address) +
-    '</span><button class="text-action copy-address" type="button" data-address="' + escapeHtml(vendor.recipient_address) + '" data-label="Vendor address">Copy address</button>' +
-    '<form class="vendor-sender-form" data-id="' + escapeHtml(vendor.id) + '"><label>Verified invoice senders</label><div><input type="text" value="' + escapeHtml(senderEmails.join(", ")) + '" placeholder="billing@vendor.com" aria-label="Verified invoice sender emails for ' + escapeHtml(vendor.name) + '"><button class="ghost" type="submit">Save senders</button></div><small>Comma-separated, up to five. Unmatched Gmail invoices stay in review.</small></form>' +
-    '</div><div class="vendor-state"><span class="vendor-state-line"><b>Registry</b> ' + escapeHtml(registryStatus) + '</span><span class="vendor-state-line"><b>Onchain</b> ' + escapeHtml(chainLabel) + '</span><span class="vendor-state-line"><b>Sender identity</b> ' + (senderEmails.length ? escapeHtml(senderEmails.length + " verified") : "missing") + '</span><span class="vendor-state-line"><b>Recipient</b> ' + (recipientMatch ? "matches registry" : "does not match / unavailable") + '</span><b class="vendor-status ' + (recipientMatch && senderEmails.length ? "verified" : "review") + '">' +
-    (recipientMatch && senderEmails.length ? "payment ready" : "payment blocked") + '</b>' +
-    (registryStatus === "review" || chainStatus === "missing"
-      ? '<button class="ghost verify-vendor" data-id="' + escapeHtml(vendor.id) + '">' + (chainStatus === "missing" ? "Register onchain" : "Verify") + '</button>'
-      : "") +
-    (registryStatus === "verified" || chainStatus === "registered"
-      ? '<button class="ghost revoke-vendor" data-id="' + escapeHtml(vendor.id) + '">Revoke vendor</button>'
-      : "") +
-    '</div></div>';
+    const ready = recipientMatch && senderEmails.length;
+    return '<details class="vendor-row registry-entry" data-search="' + escapeHtml((vendor.name + " " + senderEmails.join(" ")).toLowerCase()) + '"><summary><span class="ledger-identity"><span class="vendor-avatar" aria-hidden="true">' + escapeHtml(vendor.name.slice(0,1)) + '</span><span><strong>' + escapeHtml(vendor.name) + '</strong><small>' + senderEmails.length + ' invoice sender(s)</small></span></span><span class="registry-contact">' + escapeHtml(senderEmails[0] || "Sender needed") + '</span><span><b class="status ' + (ready ? "reconciled" : "escalate") + '">' + (ready ? "On file" : "Review required") + '</b></span><span class="registry-next">View vendor <span aria-hidden="true">↗</span></span></summary><div class="registry-detail"><div class="recipient-information"><span class="field-caption">Payment recipient</span><strong>' + escapeHtml(vendor.recipient_address) + '</strong><button class="text-action copy-address" type="button" data-address="' + escapeHtml(vendor.recipient_address) + '" data-label="Vendor address">Copy address</button><dl><div><dt>Registry</dt><dd>' + escapeHtml(registryStatus) + '</dd></div><div><dt>Onchain</dt><dd>' + escapeHtml(chainStatus) + '</dd></div></dl></div><div><form class="vendor-sender-form" data-id="' + escapeHtml(vendor.id) + '"><label>Verified invoice senders</label><div><input type="text" value="' + escapeHtml(senderEmails.join(", ")) + '" placeholder="billing@vendor.com" aria-label="Verified invoice sender emails for ' + escapeHtml(vendor.name) + '"><button class="ghost" type="submit">Save senders</button></div><small>Comma-separated, up to five. Unmatched Gmail invoices stay in review.</small></form><div class="registry-actions">' +
+    (registryStatus === "review" || chainStatus === "missing" ? '<button class="ghost verify-vendor" data-id="' + escapeHtml(vendor.id) + '">' + (chainStatus === "missing" ? "Register onchain" : "Verify vendor") + '</button>' : '') +
+    (registryStatus === "verified" || chainStatus === "registered" ? '<button class="ghost revoke-vendor" data-id="' + escapeHtml(vendor.id) + '">Revoke vendor</button>' : '') + '</div></div></div></details>';
   }).join("");
 
   document.querySelectorAll(".verify-vendor").forEach((button) => {
@@ -1925,29 +1945,54 @@ async function addVendor(event) {
   }
 }
 
+let gmailConnectionRequest = null;
+
+function canConnectGmail() {
+  return Boolean(state.session && state.business && !state.businessNameRequired && !state.previewReadOnly && !state.bootstrapError);
+}
+
+function connectGmail(event) {
+  if (!canConnectGmail()) return;
+  $("gmail-dialog-business").textContent = state.business.name;
+  $("gmail-dialog-title").textContent = state.gmail?.status === "reauthorization_required" ? "Reconnect business Gmail" : "Connect business Gmail";
+  $("gmail-connection-message").textContent = "";
+  gmailDialog.open(event?.currentTarget);
+}
+
 async function startGmailConnection() {
-  const buttons = [$('connect-gmail'), $('empty-connect'), $('empty-reconnect')].filter(Boolean);
-  const labels = buttons.map((button) => button.textContent);
-  buttons.forEach((button) => {
-    button.disabled = true;
-    button.textContent = "Opening Google…";
-  });
+  if (gmailConnectionRequest || !gmailDialog.isOpen || !canConnectGmail()) return;
+  const request = new AbortController();
+  const businessId = state.business.id;
+  const userId = state.session.user?.id;
+  gmailConnectionRequest = request;
+  const button = $("gmail-continue");
+  const message = $("gmail-connection-message");
+  button.disabled = true;
+  button.textContent = "Opening Google…";
+  message.textContent = "";
 
   try {
-    const response = await apiFetch("/api/gmail/start");
+    const response = await apiFetch("/api/gmail/start", { signal: request.signal });
     const data = await readJsonResponse(response);
+    if (request.signal.aborted || !gmailDialog.isOpen || !canConnectGmail() || state.business.id !== businessId || state.session.user?.id !== userId) return;
     if (!response.ok) throw new Error(data.error || "Unable to start Gmail connection");
-    window.location.href = data.url;
+    const destination = new URL(data.url);
+    if (destination.origin !== "https://accounts.google.com" || destination.pathname !== "/o/oauth2/v2/auth") {
+      throw new Error("Google connection could not be opened. Please try again.");
+    }
+    window.location.assign(destination.href);
   } catch (error) {
-    buttons.forEach((button, index) => {
-      button.disabled = false;
-      button.textContent = labels[index];
-    });
-    toast(error.message);
+    if (!request.signal.aborted && gmailDialog.isOpen) message.textContent = error.message || "Unable to start Gmail connection. Please try again.";
+  } finally {
+    if (gmailConnectionRequest === request) gmailConnectionRequest = null;
+    button.disabled = false;
+    button.textContent = "Continue to Google ↗";
   }
 }
 
-const connectGmail = singleFlight(startGmailConnection);
+$("gmail-dialog").addEventListener("close", () => gmailConnectionRequest?.abort());
+$("gmail-cancel").addEventListener("click", () => gmailDialog.close());
+$("gmail-continue").addEventListener("click", startGmailConnection);
 
 async function disconnectGmail() {
   if (state.previewReadOnly || state.disconnectingGmail) return;
@@ -2216,9 +2261,12 @@ function setDestination(destination, updateUrl = true) {
     audit: activity,
     business: $("business-modal"),
     vendors: $("vendor-modal"),
-    notifications: $("notifications-modal")
-  }, document.querySelectorAll(".nav[data-nav]"), document.querySelector(".content"));
+    notifications: $("notifications-modal"),
+    setup: $("setup-page")
+  }, document.querySelectorAll(".nav[data-nav]"), $("inbox-view"));
   activeDestination = destination;
+  paintWorkspaceNavigation(destination);
+  window.requestAnimationFrame(() => { if (activeDestination === destination) window.scrollTo(0, 0); });
   const titles = {
     inbox: "Invoice queue",
     payments: "Payments",
@@ -2226,7 +2274,8 @@ function setDestination(destination, updateUrl = true) {
     audit: "Audit trail",
     business: "Business profile",
     vendors: "Vendors",
-    notifications: "Notifications"
+    notifications: "Notifications",
+    setup: "Setup"
   };
   document.title = (titles[destination] || "InboxPay") + " — InboxPay";
   if (window.matchMedia("(max-width: 800px)").matches) {
@@ -2244,6 +2293,7 @@ function setDestination(destination, updateUrl = true) {
 }
 
 async function openDestination(destination, options = {}) {
+  if (destination === "setup") return openSetup();
   if (state.businessNameRequired) { setDestination("inbox", options.updateUrl !== false); return; }
   if (destination === "payments" || destination === "audit") return openActivity(destination, options);
   if (destination === "policy") return openPolicyModal(options);
@@ -2284,13 +2334,23 @@ async function init() {
     $("connect-gmail").addEventListener("click", connectGmail);
     $("disconnect-gmail").addEventListener("click", disconnectGmail);
     $("network-switch").addEventListener("change", switchNetwork);
-    $("edit-business").addEventListener("click", openBusinessModal);
+    $("edit-business").addEventListener("click", () => openBusinessModal({ focusName: true }));
     $("close-business").addEventListener("click", closeBusinessModal);
     $("business-form").addEventListener("submit", saveBusinessName);
     $("withdrawal-form").addEventListener("submit", submitWalletWithdrawal);
     $("withdrawal-recipient").addEventListener("input", () => { state.withdrawalRequestId = null; });
     $("withdrawal-amount").addEventListener("input", () => { state.withdrawalRequestId = null; });
     $("nav-business").addEventListener("click", openBusinessModal);
+    $("settings-profile").addEventListener("click", openBusinessModal);
+    $("workspace-profile").addEventListener("click", openBusinessModal);
+    $("nav-setup").addEventListener("click", openSetup);
+    $("sidebar-setup").addEventListener("click", openSetup);
+    $("new-vendor").addEventListener("click", (event) => { vendorEntryDialog.open(event.currentTarget); $("vendor-name").focus(); });
+    $("close-vendor-entry").addEventListener("click", () => vendorEntryDialog.close());
+    $("vendor-search").addEventListener("input", (event) => {
+      const query = event.currentTarget.value.trim().toLowerCase();
+      document.querySelectorAll(".registry-entry").forEach((row) => { row.hidden = !row.dataset.search.includes(query); });
+    });
     document.querySelector('[data-nav="inbox"]').addEventListener("click", () => setDestination("inbox"));
     $("nav-vendors").addEventListener("click", openVendorModal);
     $("nav-notifications").addEventListener("click", openNotifications);
@@ -2360,12 +2420,14 @@ async function init() {
       openDestination(destinationFromHash(window.location.hash), { updateUrl: false }).catch((error) => toast(error.message));
     });
     window.addEventListener("keydown", (event) => {
+      if (invoiceDrawer.isOpen || authDialog.isOpen || gmailDialog.isOpen || vendorEntryDialog.isOpen) return;
       if (event.key === "Escape" && activeDestination !== "inbox") setDestination("inbox");
     });
 
     state.supabase.auth.onAuthStateChange((event, session) => {
       state.session = session;
       if (event === "SIGNED_OUT") {
+        gmailDialog.close();
         state.user = null;
         state.business = null;
         state.businessNameRequired = false;

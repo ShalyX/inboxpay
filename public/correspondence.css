@@ -604,6 +604,71 @@ dialog::backdrop {
   font-size: 20px;
   min-height: 0;
 }
+.gmail-dialog {
+  max-width: 560px;
+}
+.gmail-dialog-content {
+  padding: 30px 30px 0;
+}
+.gmail-dialog h2 {
+  margin: 12px 0;
+  font-size: 27px;
+  line-height: 1.2;
+  letter-spacing: -1px;
+  font-weight: 600;
+}
+.gmail-dialog p,
+.gmail-disclosures dd {
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--muted);
+}
+.gmail-dialog strong {
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.gmail-disclosures {
+  margin: 22px 0;
+  display: grid;
+  gap: 18px;
+}
+.gmail-disclosures dt {
+  margin-bottom: 5px;
+  font-size: 13px;
+  font-weight: 650;
+}
+.gmail-disclosures dd {
+  margin: 0;
+}
+.gmail-control-note {
+  padding: 14px 16px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.gmail-data-link {
+  color: var(--blue);
+  font-size: 12px;
+  text-underline-offset: 3px;
+}
+.gmail-dialog .auth-message:empty {
+  display: none;
+}
+.gmail-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 22px 30px;
+}
+.gmail-dialog-actions button {
+  min-height: 44px;
+}
+@media (max-width: 480px) {
+  .gmail-dialog-content { padding: 24px 20px 0; }
+  .gmail-dialog-actions { padding: 20px; }
+  .gmail-dialog-actions .primary-button { flex: 1; justify-content: center; }
+}
 .auth-card-head {
   display: none;
 }

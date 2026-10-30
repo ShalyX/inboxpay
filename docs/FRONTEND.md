@@ -1,17 +1,31 @@
 # Frontend presentation and verification
 
+## Gmail connection disclosure — 2026-10-27
+
+Local follow-up: every workspace Connect/Reconnect Gmail entry opens an accessible disclosure before requesting `/api/gmail/start`. It identifies the business, explains Google's mailbox-wide read permission and the application filters, lists stored connection/invoice records, and links to the business help data controls. Only Continue requests authorization. Cancel, Escape or backdrop dismissal abort an in-flight start; late responses and account/business changes cannot redirect. Errors remain in the dialog for an explicit retry. Read-only previews cannot start this flow.
+
+The help page describes token removal, the separate Google grant, retained invoice/payment records and the support route for data-removal questions. This technical disclosure is not a published privacy policy or Google verification approval. No new permissions, payment actions or database changes accompany it.
+
+Verification: frontend handler checks exercise cancellation, late responses, duplicate Continue clicks, error/retry, business changes, redirect-host validation and preview rejection. The local UI fixture is available at `http://localhost:3014/?fixture=disconnected`. See the workspace verification below for the subsequent rendered review.
+
 ## Correspondence direction
 
 InboxPay's customer-facing job is handling invoices and USDC payments from Gmail. Lead with the invoice, next action, and payment record. Payment limits, authorization, vendor verification, and reconciliation remain real requirements; the presentation does not change those requirements.
 
-The static frontend uses `public/index.html` and `public/inboxpay.js`. `public/correspondence.css` supplies the current tokens and component presentation over the legacy form/destination styles. The legacy stylesheet is retained for controls not yet migrated; consolidating it should be a dedicated, visually verified follow-up, not an untested deletion.
+The static frontend uses `public/index.html` and `public/inboxpay.js`. `public/workspace-layout.js` composes the existing controls into the workspace; `public/workspace.css` owns its layout and responsive behavior. `public/correspondence.css` supplies shared tokens and presentation over legacy form styles. Financial handlers remain in `inboxpay.js`.
 
 - Public landing: product explanation, clearly labelled illustrative invoices, sign-in dialog, and early-access availability note.
 - Business help: `/help.html`, separate from developer documentation.
-- Workspace: full-width invoice queue, combined search/filter controls, business/network context, and optional account details with the full wallet address.
-- Invoice detail: native modal dialog, right-aligned on desktop and full-width on phones. Escape/close/backdrop dismiss it without resetting search or selection. The dialog restores focus even when a preflight refresh replaces the original row.
+- Workspace: Invoices, Payments, Vendors, Setup and Settings are distinct destinations. Settings has Business details, Payment settings, Notifications and Activity tabs. Network context and the full wallet address remain accessible through Account.
+- Invoice detail: an inline side panel above 1100px; a native modal sheet on tablet and phone. Escape/close/backdrop dismiss it without resetting search or selection. Resizing switches presentation without losing the selected invoice. The dialog restores focus even when a preflight refresh replaces the original row.
+- Mobile: bottom navigation, stacked ledger/registry rows and a full-width invoice sheet. The network selector keeps the complete network name visible. Settings tabs scroll within their own rail.
+- Invoice status: Pending, Failed, Confirmed and Reconciled are separate states. Ready is a review queue, not permission to bypass live preflight. Source cards identify recorded metadata; they do not claim to serve original email or PDF files.
 - Payment checks: visible on blocked invoices; expandable for eligible or already reconciled invoices. Eligibility, confirmation, financial API payloads, and reconciliation rules are not bypassed.
 - Other destinations: exclusive pages using the existing destination controller, not stacked dialogs.
+
+## Workspace verification — 2026-10-30
+
+Rendered in the in-app browser against the loopback-only fixture at desktop, tablet and phone widths (1440, 1280, 1024, 390 and 320px). Checked page isolation, Settings hierarchy, invoice selection, modal-to-inline resizing, Escape/focus return, network visibility, and horizontal overflow. Corrected inherited invoice-amount grid placement, aligned attention counts with the queue, and kept account controls reachable on short desktop screens. Fixtures are visual evidence only; this review does not prove Gmail discovery or settlement.
 
 ## Read-only authenticated previews
 

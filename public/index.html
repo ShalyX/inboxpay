@@ -47,6 +47,7 @@
       crossorigin
     />
     <link rel="stylesheet" href="/correspondence.css" />
+    <link rel="stylesheet" href="/workspace.css" />
   </head>
   <body>
   <aside id="preview-notice" class="preview-notice" role="status" hidden>QA preview · Saved business records. New inbox scans, setup changes, and payments are disabled. Sign-in may initialize draft settings for an existing business.</aside>
@@ -339,6 +340,7 @@
           />
           <div><strong>InboxPay</strong><span>Your AP agent</span></div>
         </div>
+        <div class="workspace-business"><span class="workspace-avatar" aria-hidden="true">↳</span><div><strong id="workspace-business-name">Your business</strong><small>Business workspace</small></div></div>
         <div class="nav-groups">
           <div class="nav-group">
             <div class="nav-label">Workspace</div>
@@ -436,10 +438,11 @@
           <div class="topbar-row">
             <div class="page-heading">
               <div class="eyebrow">YOUR WORKSPACE</div>
-              <h1>Invoices</h1>
-              <p>Your inbox, with the payment work taken care of.</p>
+              <h1>Your invoice day, in order.</h1>
+              <p>Review what’s arrived. Keep every payment accounted for.</p>
             </div>
           </div>
+          <details id="workspace-controls" class="workspace-controls" open><summary><span>Inbox &amp; payment account</span><b id="workspace-controls-network">Checking network…</b><span aria-hidden="true">⌄</span></summary>
           <div class="account-actions">
             <label class="environment-control" for="network-switch"
               ><span>Settlement environment</span
@@ -544,6 +547,7 @@
               </div>
             </section>
           </div>
+          </details>
         </header>
 
         <section id="stats" class="stats" aria-live="polite"></section>
@@ -558,8 +562,8 @@
           <section class="panel queue">
             <div class="panel-head">
               <div>
-                <label>YOUR INBOX</label>
-                <h2>Invoices from Gmail</h2>
+                <label>BUSINESS INVOICES</label>
+                <h2>Invoice inbox</h2>
               </div>
               <span id="queue-count" class="meta">0 invoices</span>
             </div>
@@ -578,8 +582,11 @@
                   placeholder="Vendor or invoice"
               /></label>
             </div>
+            <div class="invoice-columns" aria-hidden="true"><span>Vendor / invoice</span><span>Amount</span><span>Due date</span><span>Current state</span></div>
             <div id="invoice-list" aria-live="polite"></div>
+            <div class="queue-footnote">Source evidence and the next action stay with each invoice.</div>
           </section>
+          <aside id="invoice-sheet-host" class="invoice-sheet-host" aria-label="Invoice detail panel"><div class="invoice-sheet-empty"><span aria-hidden="true">↳</span><h2>Every detail, together.</h2><p>Select an invoice to see its amount, due date, source evidence, and next action.</p><small>Opening an invoice does not send a payment.</small></div></aside>
           <aside
             class="panel execution-rail"
             aria-label="Payment execution readiness"
@@ -1244,6 +1251,35 @@
         </button>
       </header>
       <section id="detail" class="detail" aria-live="polite"></section>
+    </dialog>
+    <dialog
+      id="gmail-dialog"
+      class="auth-dialog gmail-dialog"
+      aria-labelledby="gmail-dialog-title"
+      aria-describedby="gmail-dialog-intro"
+    >
+      <div class="gmail-dialog-content">
+        <span class="overline">CONNECT YOUR INBOX</span>
+        <h2 id="gmail-dialog-title" tabindex="-1" autofocus>Connect business Gmail</h2>
+        <p id="gmail-dialog-intro">Choose the inbox that receives invoices for <strong id="gmail-dialog-business"></strong>.</p>
+        <dl class="gmail-disclosures">
+          <div>
+            <dt>What Google lets InboxPay read</dt>
+            <dd>Messages, attachments and settings across your mailbox, plus your Google account name and email. InboxPay searches for invoices and reads matching messages and supported PDFs. Those searches don't narrow Google's mailbox permission. This permission doesn't allow sending, editing or deleting mail.</dd>
+          </div>
+          <div>
+            <dt>What InboxPay keeps</dt>
+            <dd>Encrypted connection tokens, extracted invoice details, source references and payment records in your business workspace.</dd>
+          </div>
+        </dl>
+        <p class="gmail-control-note">You can disconnect in Settings → Business details to remove stored Gmail tokens. Existing records, queued payments and payment authority stay; manage automatic payments separately in Payment settings.</p>
+        <a class="gmail-data-link" href="/help.html#gmail-data" target="_blank" rel="noopener noreferrer" aria-label="Gmail access and data controls (opens in a new tab)">Gmail access and data controls <span aria-hidden="true">↗</span></a>
+        <p id="gmail-connection-message" class="auth-message error" role="status" aria-live="polite"></p>
+      </div>
+      <footer class="gmail-dialog-actions">
+        <button id="gmail-cancel" class="ghost" type="button">Not now</button>
+        <button id="gmail-continue" class="primary-button" type="button">Continue to Google <span aria-hidden="true">↗</span></button>
+      </footer>
     </dialog>
     <script type="module" src="/inboxpay.js"></script>
   <script type="module" src="/landing-media.js"></script>

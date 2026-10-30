@@ -32,6 +32,7 @@
         <nav aria-label="Guide contents">
           <a href="#start">Getting started</a
           ><a href="#connect">Connect Gmail</a
+          ><a href="#gmail-data">Gmail access &amp; data controls</a
           ><a href="#first-payment">Your first payment</a
           ><a href="#review">Invoices needing review</a
           ><a href="#receipts">Payments &amp; receipts</a
@@ -74,8 +75,9 @@
         <section id="connect">
           <h2>02. Connect the right inbox</h2>
           <p>
-            In Invoices, choose <strong>Connect Gmail</strong> and authorize the
-            Google account that receives your business invoices. After
+            In Invoices, choose <strong>Connect Gmail</strong>, read the access
+            disclosure, then continue to Google. Authorize the Google account
+            that receives your business invoices. After
             connecting, refresh the inbox to see the invoices the agent found.
           </p>
           <p>
@@ -87,6 +89,51 @@
             If the connection expires or access is revoked, InboxPay asks you to
             reconnect. Start a new connection rather than reusing an expired
             Google sign-in link.
+          </p>
+        </section>
+        <section id="gmail-data">
+          <h2>Your Gmail access and data</h2>
+          <p>
+            Google gives InboxPay permission to read messages, attachments and
+            settings across the connected mailbox. Google also shares the
+            account name and email. InboxPay searches for invoices and reads
+            matching email text and supported PDFs; those searches don't reduce
+            the mailbox permission. The connection doesn't allow sending,
+            editing or deleting mail.
+          </p>
+          <p>
+            InboxPay stores encrypted Google connection tokens and extracted
+            invoice details, source references, decisions and payment records.
+            Payment providers receive the addresses, amounts and transaction
+            details needed to process payments. Blockchain records are public.
+            If you link Telegram, payment alerts share invoice summaries with
+            the chat you choose.
+          </p>
+          <h3>Disconnect the inbox</h3>
+          <p>
+            Open <strong>Settings → Business details → Gmail connection → Disconnect Gmail</strong>.
+            This removes stored Gmail tokens from the active database across
+            your business's environments and stops new inbox scans. A scan
+            already in progress may finish. Existing invoices and payment
+            records stay. Disconnecting doesn't cancel queued payments or
+            remove payment authority; manage automatic payments separately in
+            <strong>Payment settings</strong>.
+          </p>
+          <p>
+            To remove the Google grant as well, visit
+            <a href="https://myaccount.google.com/connections" target="_blank" rel="noopener noreferrer">Google Account connections (opens in a new tab)</a>.
+            InboxPay doesn't revoke that grant automatically. Removing it may
+            affect related access within the same Google project.
+          </p>
+          <h3>Ask about data removal</h3>
+          <p>
+            Complete workspace deletion isn't available as a self-service
+            action. Contact
+            <a href="mailto:inboxpaysupport@gmail.com">inboxpaysupport@gmail.com</a>
+            with your business name, account email and what you want removed.
+            We'll verify ownership and confirm the scope before taking action.
+            Don't send passwords, access tokens or wallet secrets. Public
+            blockchain records can't be erased by InboxPay.
           </p>
         </section>
         <section id="first-payment">
