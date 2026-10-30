@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { runInNewContext } from 'node:vm';
+import { verifyDataControlsRelease } from './verification/data-controls-live-check.mjs';
 const source=(await readFile('public/data-controls.js','utf8')).replace(/^import[^\n]*\n/,'');
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 async function setup(preview=false) {
@@ -33,4 +34,13 @@ const retry=test.submit();await tick();assert.equal(test.posts[0].requestId,test
 test=await setup();test.nodes.confirm.checked=true;const stale=test.submit();await tick();test.changeOwner();test.resolve();await stale;
 assert.equal(test.nodes.submit.disabled,true);assert.equal(test.nodes.requests.children.length,0);assert.match(test.nodes.message.textContent,/Reload/,'late receipt must not enter another session');
 test=await setup(true);test.nodes.confirm.checked=true;await test.submit();assert.equal(test.posts.length,0,'preview cannot submit');
+const cloudFetch = async url => {
+  const path = new URL(url).pathname;
+  if(path==='/api/config')return Response.json({dataControlsEnabled:false,previewReadOnly:false});
+  if(path==='/api/session')return new Response('{}',{status:503});
+  return new Response(await readFile('public'+path,'utf8'));
+};
+assert.equal((await verifyDataControlsRelease(cloudFetch)).productionAssetsMatch,true);
+await assert.rejects(verifyDataControlsRelease(async()=>Response.json({dataControlsEnabled:true,previewReadOnly:false})),/Unexpected production feature flags/);
+await assert.rejects(verifyDataControlsRelease(async url=>new URL(url).pathname==='/api/config'?Response.json({dataControlsEnabled:false,previewReadOnly:false}):new Response('wrong asset')),/asset mismatch/);
 console.log('Business data request UI: acknowledgement, double submit, stable retry, session change and preview lock passed');

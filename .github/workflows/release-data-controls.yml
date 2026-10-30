@@ -62,3 +62,5 @@ jobs:
             --no-psqlrc --quiet --tuples-only --no-align --set=ON_ERROR_STOP=1 \
             --file=scripts/verification/privacy-retention-dry-run.sql
           echo 'Production dry run finished in a read-only transaction; no retention was applied.'
+      - name: Verify live production assets and disabled request intake
+        run: node scripts/verification/data-controls-live-check.mjs
